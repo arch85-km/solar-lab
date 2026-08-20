@@ -1,0 +1,370 @@
+/**
+ * Headless verification for index.html.
+ *
+ * The published app loads three.js from jsDelivr. This sandbox has no route to
+ * the CDN, so every jsDelivr request is intercepted and served from the copy of
+ * the *published npm package* under tests/.vendor — which also proves the
+ * importmap URLs point at paths that really exist in three@<version>.
+ *
+ * Physics assertions are checked against an independent reference: the Chicago
+ * TMY3 EPW's own measured Global Horizontal Radiation.
+ */
+import { createServer } from 'node:http';
+import { readFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { join, dirname, extname, normalize } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { chromium } from 'playwright';
+import { ensureVendor, ensureEpw, THREE_VERSION } from './fetch-vendor.mjs';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const ROOT = join(HERE, '..');
+const SHOTS = join(HERE, 'screenshots');
+
+const MIME = { '.html':'text/html', '.js':'text/javascript', '.mjs':'text/javascript',
+               '.css':'text/css', '.epw':'text/plain', '.obj':'text/plain', '.json':'application/json' };
+
+let pass = 0, fail = 0;
+const results = [];
+function check(name, ok, detail = ''){
+  results.push({ name, ok, detail });
+  if (ok) { pass++; console.log('  PASS  ' + name + (detail ? '  — ' + detail : '')); }
+  else    { fail++; console.log('  FAIL  ' + name + (detail ? '  — ' + detail : '')); }
+}
+const near = (a, b, tolPct) => Math.abs(a - b) / Math.max(Math.abs(b), 1e-9) <= tolPct / 100;
+
+/* --------------------------------------------------------------- server --- */
+function serve(root){
+  const server = createServer(async (req, res) => {
+    const p = normalize(decodeURIComponent(req.url.split('?')[0])).replace(/^(\.\.[/\\])+/, '');
+    const file = join(root, p === '/' ? 'index.html' : p);
+    if (!existsSync(file)) { res.writeHead(404); res.end('not found'); return; }
+    res.writeHead(200, { 'content-type': MIME[extname(file)] || 'application/octet-stream' });
+    res.end(await readFile(file));
+  });
+  return new Promise(r => server.listen(0, '127.0.0.1', () => r(server)));
+}
+
+/* ------------------------------------------------------------------ main --- */
+const vendorRoot = await ensureVendor();
+const epwPath = await ensureEpw();
+const server = await serve(ROOT);
+const port = server.address().port;
+
+const browser = await chromium.launch({ args: ['--no-sandbox', '--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
+const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
+
+const cdnHits = new Set();
+await ctx.route('**://cdn.jsdelivr.net/**', async (route) => {
+  const url = new URL(route.request().url());
+  const m = url.pathname.match(/^\/npm\/three@([^/]+)\/(.+)$/);
+  if (!m) return route.fulfill({ status: 404, body: 'unexpected CDN path: ' + url.pathname });
+  if (m[1] !== THREE_VERSION)
+    return route.fulfill({ status: 404, body: 'version mismatch: page asked for ' + m[1] });
+  const file = join(vendorRoot, m[2]);
+  if (!existsSync(file))
+    return route.fulfill({ status: 404, body: 'not in published package: ' + m[2] });
+  cdnHits.add(m[2]);
+  await route.fulfill({ status: 200, contentType: 'text/javascript',
+                        headers: { 'access-control-allow-origin': '*' }, body: await readFile(file, 'utf8') });
+});
+
+const page = await ctx.newPage();
+const consoleErrors = [];
+page.on('console', m => { if (m.type() === 'error') consoleErrors.push(m.text()); });
+page.on('pageerror', e => consoleErrors.push('pageerror: ' + e.message));
+
+console.log('\n=== boot ===');
+await page.goto('http://127.0.0.1:' + port + '/index.html', { waitUntil: 'load' });
+await page.waitForFunction(() => window.__SUNAPP && window.__SUNAPP.ready, null, { timeout: 30000 });
+check('app boots and exposes its API', true);
+check('importmap resolves against the real published package',
+      cdnHits.has('build/three.module.js') &&
+      cdnHits.has('examples/jsm/controls/OrbitControls.js') &&
+      cdnHits.has('examples/jsm/loaders/OBJLoader.js'),
+      [...cdnHits].join(', '));
+
+// First-load appearance: London, clear-sky model, demo massing, nothing imported
+{ const { mkdir } = await import('node:fs/promises');
+  await mkdir(SHOTS, { recursive: true });
+  await page.waitForTimeout(900);
+  await page.screenshot({ path: join(SHOTS, 'first-load.png') }); }
+
+/* ------------------------------------------------------- solar geometry --- */
+console.log('\n=== solar geometry ===');
+
+const clearSky = await page.evaluate(() => {
+  const A = window.__SUNAPP;
+  const site = { lat: 51.48, lon: -0.45, tz: 0, el: 25 };
+  const noon = A.SolarCore.dayInfo(site, 172, 0).solarNoon;
+  const sun = A.SolarCore.position(site, 172, noon, 0);
+  const cs = A.ClearSky.irradiance(sun.altitude, 172, 25);
+  A.setAnalysis({ mode: 'inst', density: 1, useGround: false });
+  A.State.doy = 172; A.State.minutes = Math.round(noon);
+  const src = A.buildSources();
+  return { alt: sun.altitude, ...cs, horiz: A.unobstructed(0, 1, 0, src) };
+});
+check('clear-sky model gives a plausible London midsummer noon global horizontal',
+      clearSky.ghi > 780 && clearSky.ghi < 1000,
+      Math.round(clearSky.ghi) + ' W/m² at ' + clearSky.alt.toFixed(1) + '° altitude');
+check('clear-sky sky matrix reproduces its own global horizontal',
+      near(clearSky.horiz, clearSky.ghi, 2),
+      clearSky.horiz.toFixed(1) + ' vs ' + clearSky.ghi.toFixed(1) + ' W/m²');
+
+const eq = await page.evaluate(() => {
+  const A = window.__SUNAPP;
+  const site = { lat: 51.48, lon: -0.45, tz: 0, el: 25 };
+  const info = A.SolarCore.dayInfo(site, 80, 0);          // 21 March
+  const noon = A.SolarCore.position(site, 80, info.solarNoon, 0);
+  return { alt: noon.altitude, decl: noon.decl, az: noon.azimuth, lat: site.lat };
+});
+check('London equinox solar-noon altitude equals 90 - latitude + declination',
+      Math.abs(eq.alt - (90 - eq.lat + eq.decl)) < 0.6,
+      'alt ' + eq.alt.toFixed(2) + '°, expected ' + (90 - eq.lat + eq.decl).toFixed(2) + '°');
+check('London solar noon puts the sun due south',
+      Math.abs(eq.az - 180) < 1.0, 'azimuth ' + eq.az.toFixed(2) + '°');
+
+const jun = await page.evaluate(() => {
+  const A = window.__SUNAPP;
+  return A.SolarCore.dayInfo({ lat: 51.48, lon: -0.45, tz: 0, el: 25 }, 172, 0);
+});
+// Heathrow, 21 June: sunrise 04:44 BST = 03:44 GMT, sunset 21:22 BST = 20:22 GMT
+check('London 21 June sunrise within 6 min of published time',
+      Math.abs(jun.sunrise - (3 * 60 + 44)) <= 6,
+      'computed ' + Math.floor(jun.sunrise/60) + ':' + String(Math.round(jun.sunrise%60)).padStart(2,'0') + ' GMT');
+check('London 21 June sunset within 6 min of published time',
+      Math.abs(jun.sunset - (20 * 60 + 22)) <= 6,
+      'computed ' + Math.floor(jun.sunset/60) + ':' + String(Math.round(jun.sunset%60)).padStart(2,'0') + ' GMT');
+
+const syd = await page.evaluate(() => {
+  const A = window.__SUNAPP;
+  const site = { lat: -33.95, lon: 151.18, tz: 10, el: 3 };
+  const info = A.SolarCore.dayInfo(site, 172, 0);
+  const noon = A.SolarCore.position(site, 172, info.solarNoon, 0);
+  return { day: info.dayLength, az: noon.azimuth, alt: noon.altitude };
+});
+check('Sydney 21 June is a short winter day', syd.day > 9.4 && syd.day < 10.3, syd.day.toFixed(2) + ' h');
+check('Sydney winter noon sun is due north (southern hemisphere)',
+      Math.min(Math.abs(syd.az), Math.abs(syd.az - 360)) < 1.5, 'azimuth ' + syd.az.toFixed(2) + '°');
+
+/* ---------------------------------------------------------- sky patches --- */
+console.log('\n=== sky discretisation ===');
+const dome = await page.evaluate(() => {
+  const A = window.__SUNAPP;
+  const t = A.buildSkyDome(1), r = A.buildSkyDome(2);
+  const sum = (d) => { let s = 0; for (let i = 0; i < d.count; i++) s += d.solidAngle[i]; return s; };
+  return { tregenza: t.count, reinhart: r.count, omegaT: sum(t), omegaR: sum(r) };
+});
+check('Tregenza sky has 145 patches', dome.tregenza === 145, String(dome.tregenza));
+check('Reinhart sky has 577 patches', dome.reinhart === 577, String(dome.reinhart));
+check('sky patch solid angles sum to a hemisphere (2π sr)',
+      near(dome.omegaT, 2 * Math.PI, 0.01) && near(dome.omegaR, 2 * Math.PI, 0.01),
+      dome.omegaT.toFixed(6) + ' sr');
+
+/* ------------------------------------------------------------------- EPW --- */
+console.log('\n=== EPW import (Chicago O\'Hare TMY3) ===');
+const epwText = await readFile(epwPath, 'utf8');
+const epwInfo = await page.evaluate((text) => {
+  const A = window.__SUNAPP;
+  const w = A.EPW.parse(text, 'chicago.epw');
+  A.applyEPW(w);
+  return { site: w.site, summary: w.summary };
+}, epwText);
+check('EPW LOCATION header parsed', near(epwInfo.site.lat, 41.98, 0.1) && near(epwInfo.site.lon, -87.92, 0.1)
+      && epwInfo.site.tz === -6, JSON.stringify({ lat: epwInfo.site.lat, lon: epwInfo.site.lon, tz: epwInfo.site.tz }));
+check('EPW annual global horizontal reads 1406.6 kWh/m²',
+      near(epwInfo.summary.annualGhi, 1406.6, 0.5), epwInfo.summary.annualGhi.toFixed(1) + ' kWh/m²');
+check('EPW sun-up hours read 4703', epwInfo.summary.sunUpHours === 4703, String(epwInfo.summary.sunUpHours));
+
+/* -------------------------------------------------- Perez normalisation --- */
+console.log('\n=== Perez sky model ===');
+const perez = await page.evaluate(() => {
+  const A = window.__SUNAPP;
+  const dome = A.buildSkyDome(1);
+  const out = new Float64Array(dome.count);
+  const cases = [
+    { alt: 55, az: 180, dni: 850, dhi: 120 },   // clear
+    { alt: 30, az: 140, dni: 300, dhi: 260 },   // intermediate
+    { alt: 12, az: 105, dni:   0, dhi: 90  },   // overcast, low sun
+    { alt: 78, az: 180, dni: 900, dhi: 100 },   // clear, high sun
+  ];
+  return cases.map(c => {
+    A.Perez.patchIrradiance(dome, c.alt, c.az, c.dni, c.dhi, 172, out);
+    let horiz = 0;
+    for (let i = 0; i < dome.count; i++) horiz += out[i] * Math.sin(dome.altitude[i]);
+    return { dhi: c.dhi, horiz, alt: c.alt };
+  });
+});
+for (const p of perez){
+  check('Perez sky integrates back to DHI (sun at ' + p.alt + '°)',
+        near(p.horiz, p.dhi, 0.5), p.horiz.toFixed(2) + ' vs ' + p.dhi + ' W/m²');
+}
+
+/* ------------------------------------- annual energy on a horizontal plane --- */
+console.log('\n=== annual energy balance vs EPW ===');
+const annual = await page.evaluate(() => {
+  const A = window.__SUNAPP;
+  A.setAnalysis({ mode: 'cum', period: 'year', density: 1, useGround: false, hourFrom: 0, hourTo: 24 });
+  const src = A.buildSources();
+  const horizWh = A.unobstructed(0, 1, 0, src);
+  return { kwh: horizWh / 1000, ghiSum: src.meta.ghiSum / 1000,
+           nSky: src.meta.nSky, nSun: src.meta.nSun, hours: src.meta.hours };
+});
+check('annual cumulative on an unobstructed horizontal plane matches the EPW total',
+      near(annual.kwh, 1406.6, 3),
+      annual.kwh.toFixed(1) + ' kWh/m² vs EPW 1406.6 kWh/m² (' +
+      ((annual.kwh / 1406.6 - 1) * 100).toFixed(2) + '%)');
+check('direct beam binned into a manageable number of unique sun directions',
+      annual.nSun > 150 && annual.nSun < 1500, annual.nSun + ' sun bins from 4703 sun-up hours');
+check('sky matrix covers all 8760 hours', annual.hours === 8760, String(annual.hours));
+
+/* ------------------------------------------------ instantaneous vs EPW GHI --- */
+const inst = await page.evaluate(() => {
+  const A = window.__SUNAPP;
+  A.setAnalysis({ mode: 'inst', density: 1, useGround: false });
+  let sumComputed = 0, sumEpw = 0, worst = 0;
+  for (let doy = 5; doy <= 365; doy += 7){
+    for (let h = 0; h < 24; h++){
+      A.State.doy = doy; A.State.minutes = h * 60 + 30;
+      const src = A.buildSources();
+      const c = A.unobstructed(0, 1, 0, src);
+      const e = A.State.weather.ghi[(doy - 1) * 24 + h];
+      sumComputed += c; sumEpw += e;
+      if (e > 200) worst = Math.max(worst, Math.abs(c - e) / e);
+    }
+  }
+  return { sumComputed, sumEpw, worst };
+});
+check('instantaneous horizontal irradiance reproduces EPW global horizontal',
+      near(inst.sumComputed, inst.sumEpw, 4),
+      'sampled sum ' + Math.round(inst.sumComputed) + ' vs ' + Math.round(inst.sumEpw) +
+      ' W/m² (' + ((inst.sumComputed / inst.sumEpw - 1) * 100).toFixed(2) + '%)');
+
+/* ------------------------------------------------------- ground-reflected --- */
+const grnd = await page.evaluate(() => {
+  const A = window.__SUNAPP;
+  A.setAnalysis({ mode: 'inst', density: 1, useGround: true, groundRefl: 0.2 });
+  A.State.doy = 172; A.State.minutes = 720;
+  const src = A.buildSources();
+  const down = A.unobstructed(0, -1, 0, src);              // a soffit sees only the ground
+  const h = clamp => 0;
+  const ghi = A.State.weather.ghi[(172 - 1) * 24 + 12];
+  return { down, expected: 0.2 * ghi, ghi };
+});
+check('a downward-facing surface receives reflectance × GHI',
+      near(grnd.down, grnd.expected, 1),
+      grnd.down.toFixed(1) + ' vs ' + grnd.expected.toFixed(1) + ' W/m²');
+
+/* ------------------------------------------------------- shading and mesh --- */
+console.log('\n=== geometry, shading and results ===');
+const box = await page.evaluate(async () => {
+  const A = window.__SUNAPP;
+  A.loadSample('box');
+  A.setAnalysis({ mode: 'cum', period: 'year', unit: 'kwh', density: 1,
+                  gridSize: 2, useGround: true, groundRefl: 0.2, shade: true });
+  await A.runAnalysis();
+  const r = A.State.results;
+  const g = {};
+  for (let i = 0; i < r.sensors.count; i++){
+    const k = A.orientOf(r.sensors.normals[i*3], r.sensors.normals[i*3+1], r.sensors.normals[i*3+2]);
+    (g[k] = g[k] || { s: 0, a: 0 });
+    g[k].s += r.values[i] * r.sensors.areas[i];
+    g[k].a += r.sensors.areas[i];
+  }
+  const mean = {};
+  for (const k in g) mean[k] = g[k].s / g[k].a;
+  return { mean, count: r.sensors.count, unit: r.unit, ms: r.ms };
+});
+check('a box in Chicago receives most annual radiation on its roof',
+      box.mean.Roof > box.mean.S && box.mean.S > box.mean.N,
+      'roof ' + box.mean.Roof.toFixed(0) + ', south ' + box.mean.S.toFixed(0) +
+      ', north ' + box.mean.N.toFixed(0) + ' kWh/m²');
+check('east and west faces are near-symmetric on an unobstructed box',
+      near(box.mean.E, box.mean.W, 3),
+      'east ' + box.mean.E.toFixed(0) + ' vs west ' + box.mean.W.toFixed(0) + ' kWh/m²');
+check('roof annual radiation is close to the site global horizontal',
+      near(box.mean.Roof, 1406.6, 8), box.mean.Roof.toFixed(0) + ' kWh/m² vs 1406.6 site GHI');
+
+const shade = await page.evaluate(async () => {
+  const A = window.__SUNAPP;
+  A.loadSample('court');
+  A.setAnalysis({ mode: 'cum', period: 'year', unit: 'kwh', gridSize: 2.5, shade: true });
+  await A.runAnalysis();
+  let withShade = 0, aw = 0;
+  let r = A.State.results;
+  for (let i = 0; i < r.sensors.count; i++){ withShade += r.values[i] * r.sensors.areas[i]; aw += r.sensors.areas[i]; }
+  A.setAnalysis({ shade: false });
+  await A.runAnalysis();
+  r = A.State.results;
+  let noShade = 0;
+  for (let i = 0; i < r.sensors.count; i++) noShade += r.values[i] * r.sensors.areas[i];
+  return { withShade: withShade / aw, noShade: noShade / aw, n: r.sensors.count };
+});
+check('self-shading in a courtyard reduces incident radiation',
+      shade.withShade < shade.noShade * 0.97,
+      'shaded ' + shade.withShade.toFixed(0) + ' vs unshaded ' + shade.noShade.toFixed(0) + ' kWh/m²');
+
+/* ------------------------------------------------------------ OBJ import --- */
+const objText = [
+  '# 10 x 10 x 10 cube',
+  'v 0 0 0','v 10 0 0','v 10 0 10','v 0 0 10',
+  'v 0 10 0','v 10 10 0','v 10 10 10','v 0 10 10',
+  'f 1 2 3','f 1 3 4','f 5 7 6','f 5 8 7',
+  'f 1 6 2','f 1 5 6','f 2 7 3','f 2 6 7',
+  'f 3 8 4','f 3 7 8','f 4 5 1','f 4 8 5',
+].join('\n');
+const obj = await page.evaluate((text) => {
+  const A = window.__SUNAPP;
+  const before = A.State.model.count;
+  const blobFile = new File([text], 'cube.obj', { type: 'text/plain' });
+  return new Promise((res) => {
+    const input = document.getElementById('f-obj');
+    const dt = new DataTransfer();
+    dt.items.add(blobFile);
+    input.files = dt.files;
+    input.dispatchEvent(new Event('change'));
+    setTimeout(() => res({ before, after: A.State.model.count, name: A.State.objName,
+                           height: A.State.modelHeight }), 400);
+  });
+}, objText);
+check('OBJ import replaces the model', obj.after === 12 && obj.name === 'cube.obj',
+      obj.after + ' triangles, ' + obj.height.toFixed(1) + ' m tall');
+
+/* -------------------------------------------------------------- console --- */
+console.log('\n=== runtime health ===');
+check('no console errors during the whole run', consoleErrors.length === 0,
+      consoleErrors.slice(0, 3).join(' | '));
+
+/* ------------------------------------------------------------ screenshots --- */
+console.log('\n=== responsive screenshots ===');
+await page.evaluate(() => {
+  const A = window.__SUNAPP;
+  A.loadSample('demo');
+  A.setDoy(172); A.setMinutes(600);
+  A.setAnalysis({ mode: 'cum', period: 'year', unit: 'kwh', gridSize: 1.5, shade: true });
+  return A.runAnalysis();
+});
+await page.waitForTimeout(500);
+
+const sizes = [
+  { w: 1440, h: 900, tag: 'desktop' },
+  { w:  900, h: 700, tag: 'tablet' },
+  { w:  390, h: 844, tag: 'mobile' },
+];
+for (const s of sizes){
+  await page.setViewportSize({ width: s.w, height: s.h });
+  await page.waitForTimeout(700);
+  await page.screenshot({ path: join(SHOTS, s.tag + '.png') });
+  const overflow = await page.evaluate(() =>
+    document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  check('no horizontal overflow at ' + s.w + '×' + s.h, overflow <= 1, 'overflow ' + overflow + 'px');
+}
+
+/* ------------------------------------------------------------------ done --- */
+await browser.close();
+server.close();
+
+console.log('\n' + '─'.repeat(66));
+console.log(pass + ' passed, ' + fail + ' failed');
+console.log('─'.repeat(66));
+process.exit(fail ? 1 : 0);

@@ -1,0 +1,3393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Interactive 3D sun path and solar radiation analysis for architectural design teaching. EPW climate import, OBJ model import, Perez sky model, W/m2 irradiance on all surfaces.">
+<title>Sun Path &amp; Solar Radiation Studio</title>
+<style>
+/* ============================================================
+   Sun Path & Solar Radiation Studio
+   Design tokens
+   ============================================================ */
+:root{
+  --bg:#0d1117;
+  --bg-viewport:#0a0e14;
+  --panel:#151b23;
+  --panel-2:#1b222c;
+  --panel-3:#222b36;
+  --line:#2a3441;
+  --line-soft:#212a35;
+  --text:#e8eef5;
+  --text-dim:#9aa8b8;
+  --text-faint:#6b7887;
+  --accent:#ffb340;
+  --accent-dim:#c8862a;
+  --accent-soft:rgba(255,179,64,.14);
+  --blue:#4d9dff;
+  --green:#3fbf7f;
+  --red:#ff6b5e;
+  --shadow:0 10px 34px rgba(0,0,0,.5);
+  --r:7px;
+  --lw:304px;
+  --rw:326px;
+  --topbar-h:50px;
+  --status-h:34px;
+  --fs:13px;
+  font-synthesis-weight:none;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0;height:100%;overflow:hidden;overscroll-behavior:none}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:"Inter","Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+  font-size:var(--fs);
+  line-height:1.45;
+  -webkit-font-smoothing:antialiased;
+  -webkit-text-size-adjust:100%;
+}
+button,input,select,textarea{font:inherit;color:inherit}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#33404f;border-radius:6px;border:2px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:#42525f;background-clip:content-box}
+.num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+
+/* ============================================================
+   App shell
+   ============================================================ */
+#app{
+  display:grid;
+  grid-template-rows:var(--topbar-h) minmax(0,1fr) auto;
+  height:100dvh;
+  height:100vh;
+}
+@supports (height:100dvh){#app{height:100dvh}}
+#main{
+  position:relative;
+  display:grid;
+  grid-template-columns:var(--lw) minmax(0,1fr) var(--rw);
+  min-height:0;
+  background:var(--bg-viewport);
+  transition:grid-template-columns .22s cubic-bezier(.4,0,.2,1);
+}
+#app.no-left{--lw:0px}
+#app.no-right{--rw:0px}
+
+/* ============================================================
+   Top bar
+   ============================================================ */
+#topbar{
+  display:flex;align-items:center;gap:10px;
+  padding:0 12px;
+  background:linear-gradient(180deg,#1a2129,#141a21);
+  border-bottom:1px solid var(--line);
+  z-index:40;
+}
+.brand{display:flex;align-items:center;gap:9px;padding-right:12px;margin-right:2px;border-right:1px solid var(--line);height:26px}
+.brand-mark{
+  width:22px;height:22px;border-radius:50%;flex:0 0 auto;
+  background:radial-gradient(circle at 36% 32%,#ffd98a,#ffb340 42%,#e07a1f 78%,#a85410);
+  box-shadow:0 0 0 1px rgba(255,200,120,.35),0 0 13px rgba(255,179,64,.5);
+}
+.brand-text{display:flex;flex-direction:column;line-height:1.12}
+.brand-text b{font-size:12.5px;font-weight:650;letter-spacing:.2px;white-space:nowrap}
+.brand-text span{font-size:9.5px;color:var(--text-faint);letter-spacing:.7px;text-transform:uppercase;white-space:nowrap}
+.tb-group{display:flex;align-items:center;gap:3px}
+.tb-spacer{flex:1 1 auto;min-width:0}
+.tb-btn{
+  display:inline-flex;align-items:center;gap:6px;
+  height:31px;padding:0 10px;
+  background:transparent;border:1px solid transparent;border-radius:var(--r);
+  color:var(--text-dim);font-size:12.5px;font-weight:500;
+  cursor:pointer;white-space:nowrap;
+  transition:background .13s,color .13s,border-color .13s;
+}
+.tb-btn:hover{background:var(--panel-2);color:var(--text)}
+.tb-btn.on{background:var(--accent-soft);color:var(--accent);border-color:rgba(255,179,64,.32)}
+.tb-btn svg{width:15px;height:15px;flex:0 0 auto}
+.tb-sep{width:1px;height:22px;background:var(--line);margin:0 5px;flex:0 0 auto}
+.tb-label{display:inline}
+.view-cube{display:flex;gap:2px;background:var(--panel-2);border:1px solid var(--line);border-radius:var(--r);padding:2px}
+.view-cube button{
+  min-width:26px;height:23px;padding:0 5px;
+  background:transparent;border:0;border-radius:4px;
+  color:var(--text-dim);font-size:11px;font-weight:600;letter-spacing:.3px;cursor:pointer;
+}
+.view-cube button:hover{background:var(--panel-3);color:var(--text)}
+.view-cube button.on{background:var(--accent);color:#241a08}
+
+/* ============================================================
+   Panels
+   ============================================================ */
+.panel{
+  background:var(--panel);
+  display:flex;flex-direction:column;
+  min-height:0;min-width:0;
+  overflow:hidden;
+  z-index:25;
+}
+#panel-left{border-right:1px solid var(--line)}
+#panel-right{border-left:1px solid var(--line)}
+#app.no-left #panel-left,#app.no-right #panel-right{visibility:hidden}
+.panel-scroll{overflow-y:auto;overflow-x:hidden;flex:1 1 auto;min-height:0;padding-bottom:20px;overscroll-behavior:contain}
+.panel-head{
+  display:none;align-items:center;justify-content:space-between;
+  padding:9px 12px;border-bottom:1px solid var(--line);flex:0 0 auto;
+}
+.panel-head b{font-size:12px;letter-spacing:.5px;text-transform:uppercase;color:var(--text-dim)}
+.panel-close{background:transparent;border:0;color:var(--text-dim);cursor:pointer;font-size:19px;line-height:1;padding:2px 6px;border-radius:5px}
+.panel-close:hover{background:var(--panel-3);color:var(--text)}
+.sheet-grip{display:none}
+
+/* --- accordion sections --- */
+.sec{border-bottom:1px solid var(--line-soft)}
+.sec-head{
+  display:flex;align-items:center;gap:8px;width:100%;
+  padding:11px 13px;background:transparent;border:0;
+  color:var(--text);cursor:pointer;text-align:left;
+}
+.sec-head:hover{background:var(--panel-2)}
+.sec-head .chev{
+  width:9px;height:9px;flex:0 0 auto;margin-left:auto;
+  border-right:1.6px solid var(--text-faint);border-bottom:1.6px solid var(--text-faint);
+  transform:rotate(45deg) translate(-2px,-2px);transition:transform .18s;
+}
+.sec.closed .chev{transform:rotate(-45deg) translate(-1px,1px)}
+.sec-head .ico{width:15px;height:15px;color:var(--accent);flex:0 0 auto}
+.sec-title{font-size:11.5px;font-weight:650;letter-spacing:.62px;text-transform:uppercase}
+.sec-body{padding:2px 13px 15px}
+.sec.closed .sec-body{display:none}
+
+/* --- form rows --- */
+.row{display:flex;align-items:center;gap:8px;margin:8px 0;min-height:26px}
+.row.col{flex-direction:column;align-items:stretch;gap:5px}
+.row label,.lbl{font-size:11.5px;color:var(--text-dim);flex:0 0 auto}
+.row .lbl.w{width:78px}
+.row .grow{flex:1 1 auto;min-width:0}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.hint{font-size:10.5px;color:var(--text-faint);line-height:1.42;margin:5px 0 0}
+.hint.warn{color:#e0a13a}
+
+input[type=text],input[type=number],input[type=date],input[type=time],select,textarea{
+  width:100%;height:28px;padding:0 8px;
+  background:var(--panel-2);border:1px solid var(--line);border-radius:5px;
+  font-size:12px;outline:none;
+  transition:border-color .13s,background .13s;
+  min-width:0;
+}
+select{height:28px;padding-right:22px;cursor:pointer;
+  appearance:none;-webkit-appearance:none;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' fill='none' stroke='%239aa8b8' stroke-width='1.4'/></svg>");
+  background-repeat:no-repeat;background-position:right 7px center;background-size:9px;
+}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);background:var(--panel-3)}
+input[type=number]{-moz-appearance:textfield}
+input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+input[type=date],input[type=time]{cursor:pointer}
+::-webkit-calendar-picker-indicator{filter:invert(.62) sepia(.2)}
+
+/* --- range sliders --- */
+input[type=range]{
+  -webkit-appearance:none;appearance:none;
+  width:100%;height:20px;background:transparent;cursor:pointer;margin:0;
+}
+input[type=range]::-webkit-slider-runnable-track{height:4px;background:var(--panel-3);border-radius:3px}
+input[type=range]::-moz-range-track{height:4px;background:var(--panel-3);border-radius:3px}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:14px;height:14px;margin-top:-5px;border-radius:50%;
+  background:var(--accent);border:2px solid #16202b;box-shadow:0 1px 4px rgba(0,0,0,.55);
+}
+input[type=range]::-moz-range-thumb{
+  width:12px;height:12px;border-radius:50%;
+  background:var(--accent);border:2px solid #16202b;box-shadow:0 1px 4px rgba(0,0,0,.55);
+}
+input[type=range]:focus{outline:none}
+input[type=range]:focus::-webkit-slider-thumb{box-shadow:0 0 0 3px var(--accent-soft)}
+
+/* --- buttons --- */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  height:29px;padding:0 11px;
+  background:var(--panel-3);border:1px solid var(--line);border-radius:5px;
+  color:var(--text);font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;
+  transition:background .13s,border-color .13s,opacity .13s;
+}
+.btn:hover{background:#2b3644;border-color:#3a4756}
+.btn:active{transform:translateY(.5px)}
+.btn:disabled{opacity:.42;cursor:not-allowed}
+.btn.wide{width:100%}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#241a08;font-weight:650}
+.btn.primary:hover{background:#ffc061;border-color:#ffc061}
+.btn.ghost{background:transparent}
+.btn.ghost:hover{background:var(--panel-2)}
+.btn svg{width:14px;height:14px;flex:0 0 auto}
+.btn.sm{height:25px;padding:0 8px;font-size:11px}
+
+/* --- segmented control --- */
+.seg{display:flex;background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:2px;gap:2px}
+.seg button{
+  flex:1 1 0;min-width:0;height:24px;padding:0 6px;
+  background:transparent;border:0;border-radius:4px;
+  color:var(--text-dim);font-size:11.5px;font-weight:550;cursor:pointer;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.seg button:hover{color:var(--text)}
+.seg button.on{background:var(--accent);color:#241a08}
+.seg.sm button{height:21px;font-size:10.5px}
+
+/* --- switches --- */
+.sw{display:flex;align-items:center;gap:9px;padding:4px 0;cursor:pointer;user-select:none}
+.sw input{position:absolute;opacity:0;width:0;height:0}
+.sw .track{
+  width:30px;height:17px;border-radius:9px;flex:0 0 auto;
+  background:var(--panel-3);border:1px solid var(--line);
+  position:relative;transition:background .16s,border-color .16s;
+}
+.sw .track::after{
+  content:"";position:absolute;left:2px;top:1.5px;
+  width:12px;height:12px;border-radius:50%;background:var(--text-faint);
+  transition:transform .16s,background .16s;
+}
+.sw input:checked + .track{background:var(--accent-dim);border-color:var(--accent)}
+.sw input:checked + .track::after{transform:translateX(13px);background:#fff2dc}
+.sw input:focus-visible + .track{box-shadow:0 0 0 3px var(--accent-soft)}
+.sw span.t{font-size:12px;color:var(--text-dim)}
+.sw:hover span.t{color:var(--text)}
+</style>
+<style>
+/* ============================================================
+   Chips, badges, tables, legend
+   ============================================================ */
+.chip{
+  display:flex;align-items:center;gap:7px;
+  padding:7px 9px;margin-top:7px;
+  background:var(--panel-2);border:1px solid var(--line);border-left:2px solid var(--accent);
+  border-radius:5px;font-size:11px;
+}
+.chip .cname{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:550}
+.chip .cx{background:transparent;border:0;color:var(--text-faint);cursor:pointer;font-size:15px;line-height:1;padding:0 3px}
+.chip .cx:hover{color:var(--red)}
+.chip.info{border-left-color:var(--blue)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:11px;margin-top:8px}
+.kv dt{color:var(--text-faint)}
+.kv dd{margin:0;text-align:right;font-variant-numeric:tabular-nums;color:var(--text-dim)}
+
+table.tbl{width:100%;border-collapse:collapse;font-size:11px;margin-top:9px}
+table.tbl th{
+  text-align:right;padding:5px 5px;color:var(--text-faint);font-weight:600;
+  border-bottom:1px solid var(--line);font-size:10px;letter-spacing:.4px;text-transform:uppercase;
+}
+table.tbl th:first-child,table.tbl td:first-child{text-align:left}
+table.tbl td{padding:4px 5px;border-bottom:1px solid var(--line-soft);font-variant-numeric:tabular-nums;color:var(--text-dim)}
+table.tbl tr:last-child td{border-bottom:0}
+table.tbl td.hi{color:var(--text);font-weight:600}
+table.tbl .swatch{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;vertical-align:middle}
+
+/* --- legend --- */
+#legend-wrap{padding:2px 0 0}
+.legend-bar{height:14px;border-radius:3px;border:1px solid var(--line);margin:6px 0 5px}
+.legend-scale{display:flex;justify-content:space-between;font-size:10px;color:var(--text-faint);font-variant-numeric:tabular-nums}
+.legend-unit{font-size:10.5px;color:var(--text-dim);text-align:center;margin-top:3px;letter-spacing:.3px}
+
+/* --- progress --- */
+.prog{height:4px;background:var(--panel-3);border-radius:3px;overflow:hidden;margin-top:9px;display:none}
+.prog.on{display:block}
+.prog i{display:block;height:100%;width:0%;background:linear-gradient(90deg,var(--accent-dim),var(--accent));transition:width .16s}
+.prog-txt{font-size:10.5px;color:var(--text-faint);margin-top:4px;display:none;font-variant-numeric:tabular-nums}
+.prog-txt.on{display:block}
+
+/* ============================================================
+   Viewport
+   ============================================================ */
+#viewport{position:relative;min-width:0;min-height:0;overflow:hidden;background:var(--bg-viewport)}
+#viewport canvas{display:block;width:100%;height:100%;touch-action:none}
+.vp-overlay{position:absolute;pointer-events:none;z-index:10}
+#vp-readout{
+  top:11px;left:12px;
+  padding:8px 11px;border-radius:7px;
+  background:rgba(13,17,23,.76);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);
+  border:1px solid rgba(80,96,114,.4);
+  font-size:11px;line-height:1.6;font-variant-numeric:tabular-nums;
+  max-width:min(46vw,260px);
+}
+#vp-readout .t{color:var(--text-faint);font-size:9.5px;letter-spacing:.7px;text-transform:uppercase;display:block;margin-bottom:3px}
+#vp-readout .r{display:flex;justify-content:space-between;gap:14px}
+#vp-readout .r b{font-weight:600;color:var(--text)}
+#vp-readout .r span{color:var(--text-dim)}
+#vp-compass{top:11px;right:12px;width:52px;height:52px;opacity:.9}
+#vp-empty{
+  inset:0;display:none;align-items:center;justify-content:center;
+  color:var(--text-faint);font-size:12px;text-align:center;padding:20px;
+}
+#vp-busy{
+  inset:0;display:none;align-items:center;justify-content:center;
+  background:rgba(10,14,20,.55);backdrop-filter:blur(2px);z-index:15;
+}
+#vp-busy.on{display:flex}
+.spinner{
+  width:26px;height:26px;border-radius:50%;
+  border:2.5px solid rgba(255,179,64,.22);border-top-color:var(--accent);
+  animation:spin .8s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+#vp-busy .msg{margin-left:11px;font-size:12px;color:var(--text-dim)}
+
+/* floating bottom-centre time scrubber (visible when panels hidden) */
+#vp-scrub{
+  left:50%;bottom:12px;transform:translateX(-50%);
+  display:none;align-items:center;gap:9px;pointer-events:auto;
+  padding:7px 11px;border-radius:9px;
+  background:rgba(13,17,23,.82);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);
+  border:1px solid rgba(80,96,114,.42);
+  width:min(430px,calc(100% - 24px));
+}
+#vp-scrub.on{display:flex}
+#vp-scrub .tval{font-size:11.5px;font-variant-numeric:tabular-nums;color:var(--text);min-width:44px;text-align:center}
+#vp-scrub input[type=range]{flex:1 1 auto}
+.icon-btn{
+  width:27px;height:27px;flex:0 0 auto;
+  display:inline-flex;align-items:center;justify-content:center;
+  background:var(--panel-3);border:1px solid var(--line);border-radius:6px;
+  color:var(--text);cursor:pointer;padding:0;
+}
+.icon-btn:hover{background:#2f3b4a}
+.icon-btn svg{width:13px;height:13px}
+.icon-btn.on{background:var(--accent);border-color:var(--accent);color:#241a08}
+
+/* ============================================================
+   Status bar
+   ============================================================ */
+#statusbar{
+  display:flex;align-items:center;gap:0;
+  min-height:var(--status-h);padding:0 12px;
+  background:linear-gradient(180deg,#141a21,#111720);
+  border-top:1px solid var(--line);
+  font-size:11px;font-variant-numeric:tabular-nums;
+  overflow-x:auto;overflow-y:hidden;white-space:nowrap;
+  scrollbar-width:none;
+}
+#statusbar::-webkit-scrollbar{display:none}
+.st{display:inline-flex;align-items:baseline;gap:5px;padding:0 11px;border-right:1px solid var(--line-soft);flex:0 0 auto;height:16px}
+.st:last-child{border-right:0}
+.st .k{color:var(--text-faint);font-size:10px;letter-spacing:.4px;text-transform:uppercase}
+.st .v{color:var(--text);font-weight:550}
+.st.accent .v{color:var(--accent)}
+.st.ok .v{color:var(--green)}
+.st.bad .v{color:var(--red)}
+.st.hide{display:none}
+
+/* ============================================================
+   Toast
+   ============================================================ */
+#toast-wrap{position:fixed;bottom:calc(var(--status-h) + 14px);left:50%;transform:translateX(-50%);z-index:100;display:flex;flex-direction:column;gap:7px;align-items:center;pointer-events:none}
+.toast{
+  padding:8px 14px;border-radius:7px;
+  background:#222c38;border:1px solid var(--line);box-shadow:var(--shadow);
+  font-size:12px;max-width:min(90vw,420px);
+  animation:tin .22s ease-out;
+}
+.toast.err{border-left:3px solid var(--red)}
+.toast.ok{border-left:3px solid var(--green)}
+.toast.info{border-left:3px solid var(--blue)}
+@keyframes tin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* scrim for overlay panels */
+#scrim{
+  position:absolute;inset:0;z-index:22;display:none;
+  background:rgba(5,8,12,.5);backdrop-filter:blur(1px);
+}
+#scrim.on{display:block}
+
+/* ============================================================
+   Responsive
+   ============================================================ */
+@media (max-width:1180px){
+  .tb-label{display:none}
+  .tb-btn{padding:0 8px}
+}
+@media (max-width:1100px){
+  #main{grid-template-columns:minmax(0,1fr)}
+  .panel{
+    position:absolute;top:0;bottom:0;
+    width:min(330px,84vw);
+    box-shadow:var(--shadow);
+    transform:translateX(0);
+  }
+  #panel-left{left:0}
+  #panel-right{right:0}
+  #app.no-left #panel-left{transform:translateX(-102%);visibility:hidden}
+  #app.no-right #panel-right{transform:translateX(102%);visibility:hidden}
+  .panel{transition:transform .22s cubic-bezier(.4,0,.2,1)}
+  .panel-head{display:flex}
+  #vp-scrub.avail{display:flex}
+}
+@media (max-width:820px){
+  .brand-text span{display:none}
+}
+@media (max-width:700px){
+  :root{--topbar-h:46px}
+  .brand{padding-right:8px;margin-right:0}
+  .brand-text b{font-size:11.5px}
+  .tb-btn{padding:0 7px;height:29px}
+  .view-cube{display:none}
+  .panel{
+    left:0;right:0;width:auto;top:auto;bottom:0;
+    height:min(66dvh,540px);
+    border-radius:13px 13px 0 0;
+    border-left:1px solid var(--line);border-right:1px solid var(--line);
+    border-top:1px solid var(--line);
+  }
+  #app.no-left #panel-left,#app.no-right #panel-right{transform:translateY(103%)}
+  .sheet-grip{
+    display:block;width:34px;height:4px;border-radius:3px;
+    background:var(--line);margin:7px auto 0;flex:0 0 auto;
+  }
+  #vp-readout{font-size:10.5px;padding:6px 9px;max-width:56vw;top:9px;left:9px}
+  #vp-compass{width:40px;height:40px;top:9px;right:9px}
+  .grid3{grid-template-columns:1fr 1fr}
+  #statusbar{min-height:auto;padding:5px 8px}
+  .st{padding:0 8px;height:15px}
+  .st.sec-only{display:none}
+  #vp-scrub{width:calc(100% - 18px);bottom:9px}
+}
+@media (max-width:430px){
+  .brand-text{display:none}
+  .st .k{display:none}
+  .st{gap:0}
+}
+/* embed mode: hide brand for tight iframes */
+body.embed .brand{display:none}
+body.embed{--topbar-h:44px}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms !important;transition-duration:.01ms !important}
+}
+</style>
+</head>
+<body>
+<div id="app" class="">
+
+  <!-- ================= TOP BAR ================= -->
+  <header id="topbar">
+    <div class="brand">
+      <div class="brand-mark"></div>
+      <div class="brand-text">
+        <b>Sun Path &amp; Solar Radiation Studio</b>
+        <span>Environmental design analysis</span>
+      </div>
+    </div>
+
+    <div class="tb-group">
+      <button class="tb-btn" id="tb-left" title="Location, time and sun path display (L)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/></svg>
+        <span class="tb-label">Sun &amp; Site</span>
+      </button>
+      <button class="tb-btn" id="tb-right" title="Model and analysis (R)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 2.6 21 7.5v9L12 21.4 3 16.5v-9z"/><path d="M3 7.5l9 4.9 9-4.9M12 12.4v9"/></svg>
+        <span class="tb-label">Model &amp; Analysis</span>
+      </button>
+      <span class="tb-sep"></span>
+      <button class="tb-btn" id="tb-play" title="Animate (Space)">
+        <svg id="ic-play" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>
+        <span class="tb-label">Animate</span>
+      </button>
+    </div>
+
+    <div class="tb-spacer"></div>
+
+    <div class="view-cube" id="view-cube">
+      <button data-view="axo" class="on" title="Axonometric">AXO</button>
+      <button data-view="top" title="Plan / top view">TOP</button>
+      <button data-view="N" title="Looking from north">N</button>
+      <button data-view="E" title="Looking from east">E</button>
+      <button data-view="S" title="Looking from south">S</button>
+      <button data-view="W" title="Looking from west">W</button>
+    </div>
+    <span class="tb-sep"></span>
+    <button class="tb-btn" id="tb-help" title="Help &amp; methodology (?)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9.2"/><path d="M9.3 9.2a2.8 2.8 0 1 1 3.6 2.7c-.7.25-.9.8-.9 1.5v.5"/><circle cx="12" cy="17.2" r="1.05" fill="currentColor" stroke="none"/></svg>
+      <span class="tb-label">Help</span>
+    </button>
+    <button class="tb-btn" id="tb-full" title="Fullscreen (F)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+    </button>
+  </header>
+
+  <!-- ================= MAIN ================= -->
+  <div id="main">
+
+    <!-- ---------- LEFT PANEL ---------- -->
+    <aside class="panel" id="panel-left">
+      <div class="sheet-grip"></div>
+      <div class="panel-head"><b>Sun &amp; Site</b><button class="panel-close" data-close="left">&times;</button></div>
+      <div class="panel-scroll">
+
+        <!-- LOCATION -->
+        <section class="sec" data-sec="loc">
+          <button class="sec-head">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 21.5s7-6.2 7-11.3A7 7 0 0 0 5 10.2c0 5.1 7 11.3 7 11.3z"/><circle cx="12" cy="10" r="2.6"/></svg>
+            <span class="sec-title">Location</span><span class="chev"></span>
+          </button>
+          <div class="sec-body">
+            <div class="row col">
+              <label for="i-city">Preset city</label>
+              <select id="i-city"></select>
+            </div>
+            <div class="grid2">
+              <div class="row col"><label for="i-lat">Latitude &deg;</label><input type="number" id="i-lat" step="0.01" min="-90" max="90" value="51.48"></div>
+              <div class="row col"><label for="i-lon">Longitude &deg;</label><input type="number" id="i-lon" step="0.01" min="-180" max="180" value="-0.45"></div>
+            </div>
+            <div class="grid2">
+              <div class="row col"><label for="i-tz">Time zone (UTC)</label><input type="number" id="i-tz" step="0.5" min="-12" max="14" value="0"></div>
+              <div class="row col"><label for="i-elev">Elevation m</label><input type="number" id="i-elev" step="1" value="25"></div>
+            </div>
+            <div class="row col">
+              <label for="i-north">Project north rotation &mdash; <span id="v-north" class="num">0&deg;</span></label>
+              <input type="range" id="i-north" min="-180" max="180" step="1" value="0">
+            </div>
+            <label class="sw"><input type="checkbox" id="i-dst"><span class="track"></span><span class="t">Daylight saving (+1h)</span></label>
+
+            <div class="row col" style="margin-top:12px">
+              <label>Climate data</label>
+              <button class="btn wide" id="b-epw">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 15.5V3.5M8.4 7.1 12 3.5l3.6 3.6"/><path d="M4 14.5v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>
+                Import EPW weather file
+              </button>
+              <input type="file" id="f-epw" accept=".epw,.txt" hidden>
+              <p class="hint" id="epw-hint">No EPW loaded &mdash; using a synthetic <b>clear-sky</b> model (ASHRAE/Hottel). Import an EPW for real climate data.</p>
+              <div id="epw-chip"></div>
+              <dl class="kv" id="epw-kv" style="display:none"></dl>
+            </div>
+          </div>
+        </section>
+
+        <!-- DATE & TIME -->
+        <section class="sec" data-sec="time">
+          <button class="sec-head">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9.2"/><path d="M12 6.6V12l3.6 2.2"/></svg>
+            <span class="sec-title">Date &amp; Time</span><span class="chev"></span>
+          </button>
+          <div class="sec-body">
+            <div class="row col">
+              <label for="i-date">Date &mdash; <span id="v-date" class="num"></span></label>
+              <input type="date" id="i-date">
+              <input type="range" id="i-doy" min="1" max="365" step="1" value="172">
+            </div>
+            <div class="seg sm" id="seg-quick">
+              <button data-q="jun">Jun solstice</button>
+              <button data-q="eqx">Equinox</button>
+              <button data-q="dec">Dec solstice</button>
+            </div>
+            <div class="row col" style="margin-top:11px">
+              <label for="i-time">Local clock time &mdash; <span id="v-time" class="num"></span></label>
+              <input type="range" id="i-min" min="0" max="1439" step="1" value="720">
+            </div>
+            <div class="row">
+              <input type="time" id="i-time" class="grow" step="60">
+              <button class="btn sm" id="b-noon" title="Jump to solar noon">Solar noon</button>
+            </div>
+            <div class="row" style="margin-top:11px">
+              <button class="icon-btn" id="b-play2" title="Play / pause">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>
+              </button>
+              <div class="seg sm grow" id="seg-anim">
+                <button data-a="day" class="on">Animate day</button>
+                <button data-a="year">Animate year</button>
+              </div>
+            </div>
+            <div class="row col">
+              <label for="i-speed">Speed &mdash; <span id="v-speed" class="num">1.0&times;</span></label>
+              <input type="range" id="i-speed" min="0.2" max="6" step="0.2" value="1.4">
+            </div>
+          </div>
+        </section>
+
+        <!-- DISPLAY -->
+        <section class="sec closed" data-sec="disp">
+          <button class="sec-head">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M2.2 12S5.8 5.4 12 5.4 21.8 12 21.8 12 18.2 18.6 12 18.6 2.2 12 2.2 12z"/><circle cx="12" cy="12" r="2.9"/></svg>
+            <span class="sec-title">Sun Path Display</span><span class="chev"></span>
+          </button>
+          <div class="sec-body">
+            <label class="sw"><input type="checkbox" id="d-arcs" checked><span class="track"></span><span class="t">Monthly sun-path arcs</span></label>
+            <label class="sw"><input type="checkbox" id="d-analemma" checked><span class="track"></span><span class="t">Hourly analemmas</span></label>
+            <label class="sw"><input type="checkbox" id="d-today" checked><span class="track"></span><span class="t">Highlight today&rsquo;s arc</span></label>
+            <label class="sw"><input type="checkbox" id="d-compass" checked><span class="track"></span><span class="t">Compass rose &amp; bearings</span></label>
+            <label class="sw"><input type="checkbox" id="d-rings" checked><span class="track"></span><span class="t">Altitude rings</span></label>
+            <label class="sw"><input type="checkbox" id="d-shadow" checked><span class="track"></span><span class="t">Cast shadows</span></label>
+            <label class="sw"><input type="checkbox" id="d-grid" checked><span class="track"></span><span class="t">Ground grid</span></label>
+            <label class="sw"><input type="checkbox" id="d-dome"><span class="track"></span><span class="t">Sky dome patches (sky matrix)</span></label>
+            <div class="row col" style="margin-top:10px">
+              <label for="d-radius">Sun path radius &mdash; <span id="v-radius" class="num">1.0&times;</span></label>
+              <input type="range" id="d-radius" min="0.5" max="2.2" step="0.05" value="1">
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </aside>
+
+    <!-- ---------- VIEWPORT ---------- -->
+    <div id="viewport">
+      <div class="vp-overlay" id="vp-readout"></div>
+      <svg class="vp-overlay" id="vp-compass" viewBox="0 0 100 100"></svg>
+      <div class="vp-overlay" id="vp-scrub">
+        <button class="icon-btn" id="b-play3" title="Play / pause"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg></button>
+        <span class="tval num" id="scrub-t">12:00</span>
+        <input type="range" id="i-min2" min="0" max="1439" step="1" value="720">
+      </div>
+      <div class="vp-overlay" id="vp-busy"><div class="spinner"></div><div class="msg" id="busy-msg">Working…</div></div>
+      <div id="scrim"></div>
+    </div>
+
+    <!-- ---------- RIGHT PANEL ---------- -->
+    <aside class="panel" id="panel-right">
+      <div class="sheet-grip"></div>
+      <div class="panel-head"><b>Model &amp; Analysis</b><button class="panel-close" data-close="right">&times;</button></div>
+      <div class="panel-scroll">
+
+        <!-- MODEL -->
+        <section class="sec" data-sec="model">
+          <button class="sec-head">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 2.6 21 7.5v9L12 21.4 3 16.5v-9z"/><path d="M3 7.5l9 4.9 9-4.9M12 12.4v9"/></svg>
+            <span class="sec-title">Model</span><span class="chev"></span>
+          </button>
+          <div class="sec-body">
+            <div class="row col">
+              <label for="i-sample">Sample massing</label>
+              <select id="i-sample">
+                <option value="demo">Demo massing (mixed heights)</option>
+                <option value="court">Courtyard block</option>
+                <option value="tower">Tower with context</option>
+                <option value="shading">Shaded facade study</option>
+                <option value="box">Single box (reference)</option>
+                <option value="none">Empty site (ground only)</option>
+              </select>
+            </div>
+            <button class="btn wide" id="b-obj" style="margin-top:8px">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 15.5V3.5M8.4 7.1 12 3.5l3.6 3.6"/><path d="M4 14.5v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>
+              Import OBJ model
+            </button>
+            <input type="file" id="f-obj" accept=".obj,.txt" hidden>
+            <div id="obj-chip"></div>
+            <div class="grid2" style="margin-top:9px">
+              <div class="row col">
+                <label for="i-units">Model units</label>
+                <select id="i-units">
+                  <option value="1">Metres</option>
+                  <option value="0.01">Centimetres</option>
+                  <option value="0.001">Millimetres</option>
+                  <option value="0.3048">Feet</option>
+                  <option value="0.0254">Inches</option>
+                </select>
+              </div>
+              <div class="row col">
+                <label for="i-objup">OBJ up axis</label>
+                <select id="i-objup"><option value="y">Y up</option><option value="z">Z up</option></select>
+              </div>
+            </div>
+            <label class="sw"><input type="checkbox" id="i-drop" checked><span class="track"></span><span class="t">Drop model to ground</span></label>
+            <label class="sw"><input type="checkbox" id="i-center" checked><span class="track"></span><span class="t">Centre on site origin</span></label>
+            <dl class="kv" id="model-kv"></dl>
+            <p class="hint warn" id="model-warn" style="display:none"></p>
+          </div>
+        </section>
+
+        <!-- ANALYSIS -->
+        <section class="sec" data-sec="analysis">
+          <button class="sec-head">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 19.5h16M6.5 19.5V11M11 19.5V5.4M15.5 19.5v-5.6M20 19.5V8.2"/></svg>
+            <span class="sec-title">Solar Radiation Analysis</span><span class="chev"></span>
+          </button>
+          <div class="sec-body">
+            <div class="row col">
+              <label>Analysis type</label>
+              <div class="seg" id="seg-mode">
+                <button data-m="inst" class="on">Instant W/m&sup2;</button>
+                <button data-m="cum">Cumulative</button>
+              </div>
+            </div>
+
+            <div id="cum-opts" style="display:none">
+              <div class="row col">
+                <label for="i-period">Analysis period</label>
+                <select id="i-period">
+                  <option value="year">Full year (1 Jan – 31 Dec)</option>
+                  <option value="month">Current month</option>
+                  <option value="day">Current day</option>
+                  <option value="summer">Cooling season (May – Sep)</option>
+                  <option value="winter">Heating season (Oct – Apr)</option>
+                  <option value="custom">Custom range…</option>
+                </select>
+              </div>
+              <div class="grid2" id="custom-range" style="display:none">
+                <div class="row col"><label for="i-from">From</label><input type="date" id="i-from"></div>
+                <div class="row col"><label for="i-to">To</label><input type="date" id="i-to"></div>
+              </div>
+              <div class="grid2">
+                <div class="row col"><label for="i-h0">From hour</label><input type="number" id="i-h0" min="0" max="23" step="1" value="0"></div>
+                <div class="row col"><label for="i-h1">To hour</label><input type="number" id="i-h1" min="1" max="24" step="1" value="24"></div>
+              </div>
+              <div class="row col">
+                <label>Result unit</label>
+                <div class="seg sm" id="seg-unit">
+                  <button data-u="kwh" class="on">kWh/m&sup2; total</button>
+                  <button data-u="wm2">W/m&sup2; average</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="grid2" style="margin-top:10px">
+              <div class="row col"><label for="i-grid">Grid size m</label><input type="number" id="i-grid" min="0.2" max="20" step="0.1" value="1.5"></div>
+              <div class="row col"><label for="i-offset">Offset m</label><input type="number" id="i-offset" min="0.001" max="1" step="0.005" value="0.02"></div>
+            </div>
+            <div class="grid2">
+              <div class="row col">
+                <label for="i-density">Sky density</label>
+                <select id="i-density"><option value="1">Tregenza (145)</option><option value="2">Reinhart (577)</option></select>
+              </div>
+              <div class="row col"><label for="i-ground">Ground refl.</label><input type="number" id="i-ground" min="0" max="1" step="0.05" value="0.2"></div>
+            </div>
+            <label class="sw"><input type="checkbox" id="i-useground" checked><span class="track"></span><span class="t">Include ground-reflected</span></label>
+            <label class="sw"><input type="checkbox" id="i-ctx" checked><span class="track"></span><span class="t">Surfaces shade each other</span></label>
+
+            <button class="btn primary wide" id="b-run" style="margin-top:11px">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3.6 20 12 6 20.4z"/></svg>
+              Run analysis
+            </button>
+            <div class="prog" id="prog"><i></i></div>
+            <div class="prog-txt" id="prog-txt"></div>
+            <div class="row" style="margin-top:7px">
+              <button class="btn ghost grow" id="b-clear">Clear results</button>
+              <button class="btn ghost grow" id="b-auto" title="Recompute instantly whenever the time changes">Auto: off</button>
+            </div>
+            <p class="hint" id="run-hint"></p>
+          </div>
+        </section>
+
+        <!-- RESULTS -->
+        <section class="sec" data-sec="results">
+          <button class="sec-head">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M3.5 3.5v17h17"/><path d="M7 15.5l3.6-4.6 3.2 2.6L20 6.6"/></svg>
+            <span class="sec-title">Results</span><span class="chev"></span>
+          </button>
+          <div class="sec-body">
+            <div id="no-results"><p class="hint">Run an analysis to see irradiance results mapped onto every surface.</p></div>
+            <div id="have-results" style="display:none">
+              <div id="legend-wrap">
+                <div class="legend-bar" id="legend-bar"></div>
+                <div class="legend-scale"><span id="lg-min">0</span><span id="lg-mid"></span><span id="lg-max">0</span></div>
+                <div class="legend-unit" id="lg-unit"></div>
+              </div>
+              <div class="grid2" style="margin-top:9px">
+                <div class="row col">
+                  <label for="i-scheme">Colour scheme</label>
+                  <select id="i-scheme">
+                    <option value="ladybug">Ladybug spectrum</option>
+                    <option value="viridis">Viridis</option>
+                    <option value="turbo">Turbo</option>
+                    <option value="heat">Heat</option>
+                    <option value="gray">Greyscale</option>
+                  </select>
+                </div>
+                <div class="row col">
+                  <label for="i-legmode">Legend range</label>
+                  <select id="i-legmode"><option value="auto">Auto (min–max)</option><option value="manual">Manual</option></select>
+                </div>
+              </div>
+              <div class="grid2" id="legend-manual" style="display:none">
+                <div class="row col"><label for="i-lgmin">Min</label><input type="number" id="i-lgmin" step="1" value="0"></div>
+                <div class="row col"><label for="i-lgmax">Max</label><input type="number" id="i-lgmax" step="1" value="1000"></div>
+              </div>
+              <dl class="kv" id="res-kv"></dl>
+              <div style="margin-top:13px">
+                <div class="lbl" style="font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--text-faint)">By orientation</div>
+                <table class="tbl" id="orient-tbl"></table>
+              </div>
+              <div class="row" style="margin-top:12px">
+                <button class="btn grow" id="b-csv">Export CSV</button>
+                <button class="btn grow" id="b-png">Export PNG</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </aside>
+  </div>
+
+  <!-- ================= STATUS BAR ================= -->
+  <footer id="statusbar"></footer>
+</div>
+<div id="toast-wrap"></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.185.1/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+
+/* ============================================================================
+ *  Sun Path & Solar Radiation Studio
+ *
+ *  Methodology follows the Radiance / Ladybug Tools chain:
+ *    - solar position .............. NOAA solar position algorithm
+ *    - sky discretisation .......... Tregenza (145) / Reinhart (577) patches,
+ *                                    generated exactly as Radiance rh_init()
+ *    - sky radiance distribution ... Perez et al. 1993 all-weather model,
+ *                                    coefficients transcribed from Radiance
+ *                                    gendaymtx.c (Perez 1993 Table 1)
+ *    - climate data ................ EnergyPlus EPW hourly DNI / DHI / GHI
+ *    - shading ..................... BVH ray casting in a Web Worker
+ *
+ *  Scene convention: Y up, -Z is north, +X is east, +Z is south, -X is west.
+ *  All lengths are metres. All irradiance is W/m2; cumulative is kWh/m2.
+ * ========================================================================== */
+
+const D2R = Math.PI / 180, R2D = 180 / Math.PI, TWO_PI = Math.PI * 2;
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const lerp = (a, b, t) => a + (b - a) * t;
+const YEAR = 2025;                       // non-leap reference year -> 8760 hours
+const DAYS_IN_MONTH = [31,28,31,30,31,30,31,31,30,31,30,31];
+const MONTH_NAMES = ['January','February','March','April','May','June',
+                     'July','August','September','October','November','December'];
+const MONTH_ABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+/** Day-of-year (1..365) from month (1..12) and day. */
+function doyOf(month, day){
+  let d = day;
+  for (let m = 0; m < month - 1; m++) d += DAYS_IN_MONTH[m];
+  return d;
+}
+/** Inverse of doyOf: {month (1..12), day}. */
+function dateOfDoy(doy){
+  let d = clamp(Math.round(doy), 1, 365), m = 0;
+  while (d > DAYS_IN_MONTH[m]) { d -= DAYS_IN_MONTH[m]; m++; }
+  return { month: m + 1, day: d };
+}
+const fmtHM = (min) => {
+  const m = ((Math.round(min) % 1440) + 1440) % 1440;
+  return String(Math.floor(m / 60)).padStart(2,'0') + ':' + String(m % 60).padStart(2,'0');
+};
+const fmtDate = (doy) => { const d = dateOfDoy(doy); return d.day + ' ' + MONTH_ABBR[d.month-1]; };
+const fmtNum = (v, dp = 0) =>
+  (!isFinite(v)) ? '–' : v.toLocaleString('en-GB',{minimumFractionDigits:dp, maximumFractionDigits:dp});
+
+/* ============================================================================
+ *  Preset locations — 20 cities spanning the major climate zones
+ * ========================================================================== */
+const CITIES = [
+  { n:'London, United Kingdom',        lat: 51.48, lon:  -0.45, tz:  0,   el:  25 },
+  { n:'Edinburgh, United Kingdom',     lat: 55.95, lon:  -3.35, tz:  0,   el:  41 },
+  { n:'Oslo, Norway',                  lat: 59.91, lon:  10.75, tz:  1,   el:  17 },
+  { n:'Berlin, Germany',               lat: 52.47, lon:  13.40, tz:  1,   el:  37 },
+  { n:'Paris, France',                 lat: 48.73, lon:   2.40, tz:  1,   el:  96 },
+  { n:'Madrid, Spain',                 lat: 40.45, lon:  -3.55, tz:  1,   el: 582 },
+  { n:'Rome, Italy',                   lat: 41.80, lon:  12.23, tz:  1,   el:   3 },
+  { n:'Athens, Greece',                lat: 37.90, lon:  23.73, tz:  2,   el:  15 },
+  { n:'Moscow, Russia',                lat: 55.75, lon:  37.63, tz:  3,   el: 156 },
+  { n:'Cairo, Egypt',                  lat: 30.13, lon:  31.40, tz:  2,   el:  74 },
+  { n:'Dubai, United Arab Emirates',   lat: 25.25, lon:  55.33, tz:  4,   el:   5 },
+  { n:'Mumbai, India',                 lat: 19.12, lon:  72.85, tz:  5.5, el:  14 },
+  { n:'Singapore',                     lat:  1.37, lon: 103.98, tz:  8,   el:  16 },
+  { n:'Beijing, China',                lat: 39.93, lon: 116.28, tz:  8,   el:  55 },
+  { n:'Tokyo, Japan',                  lat: 35.68, lon: 139.77, tz:  9,   el:  36 },
+  { n:'Sydney, Australia',             lat:-33.95, lon: 151.18, tz: 10,   el:   3 },
+  { n:'Nairobi, Kenya',                lat: -1.32, lon:  36.92, tz:  3,   el:1624 },
+  { n:'Cape Town, South Africa',       lat:-33.98, lon:  18.60, tz:  2,   el:  42 },
+  { n:'São Paulo, Brazil',             lat:-23.62, lon: -46.65, tz: -3,   el: 803 },
+  { n:'New York, United States',       lat: 40.78, lon: -73.97, tz: -5,   el:  40 },
+  { n:'Chicago, United States',        lat: 41.98, lon: -87.92, tz: -6,   el: 201 },
+  { n:'Denver, United States',         lat: 39.83, lon:-104.66, tz: -7,   el:1650 },
+  { n:'Los Angeles, United States',    lat: 33.93, lon:-118.40, tz: -8,   el:  32 },
+  { n:'Reykjavík, Iceland',            lat: 64.13, lon: -21.90, tz:  0,   el:  61 },
+];
+
+/* ============================================================================
+ *  SolarCore — NOAA solar position algorithm
+ *
+ *  Reference: NOAA Global Monitoring Laboratory solar calculator
+ *  (Jean Meeus, "Astronomical Algorithms", 2nd ed., chapters 25 & 28).
+ * ========================================================================== */
+const SolarCore = (() => {
+
+  /** Julian day for a civil date at 00:00 UT. */
+  function julianDay(y, m, d){
+    if (m <= 2) { y -= 1; m += 12; }
+    const A = Math.floor(y / 100), B = 2 - A + Math.floor(A / 4);
+    return Math.floor(365.25 * (y + 4716)) + Math.floor(30.6001 * (m + 1)) + d + B - 1524.5;
+  }
+
+  /**
+   * Orbital quantities that depend only on the date/time, not the site.
+   * @param {number} jc Julian century since J2000.0
+   */
+  function orbital(jc){
+    const L0 = ((280.46646 + jc * (36000.76983 + jc * 0.0003032)) % 360 + 360) % 360;
+    const M  = 357.52911 + jc * (35999.05029 - 0.0001537 * jc);
+    const e  = 0.016708634 - jc * (0.000042037 + 0.0000001267 * jc);
+    const C  = Math.sin(M * D2R) * (1.914602 - jc * (0.004817 + 0.000014 * jc))
+             + Math.sin(2 * M * D2R) * (0.019993 - 0.000101 * jc)
+             + Math.sin(3 * M * D2R) * 0.000289;
+    const trueLong = L0 + C;
+    const omega    = 125.04 - 1934.136 * jc;
+    const appLong  = trueLong - 0.00569 - 0.00478 * Math.sin(omega * D2R);
+    const eps0     = 23 + (26 + (21.448 - jc * (46.815 + jc * (0.00059 - jc * 0.001813))) / 60) / 60;
+    const eps      = eps0 + 0.00256 * Math.cos(omega * D2R);
+    const decl     = Math.asin(Math.sin(eps * D2R) * Math.sin(appLong * D2R)) * R2D;
+
+    // Equation of time, minutes
+    const y = Math.tan(eps * D2R / 2) ** 2;
+    const L0r = L0 * D2R, Mr = M * D2R;
+    const eot = 4 * R2D * (
+        y * Math.sin(2 * L0r)
+      - 2 * e * Math.sin(Mr)
+      + 4 * e * y * Math.sin(Mr) * Math.cos(2 * L0r)
+      - 0.5 * y * y * Math.sin(4 * L0r)
+      - 1.25 * e * e * Math.sin(2 * Mr));
+    return { decl, eot };
+  }
+
+  /** Atmospheric refraction correction (NOAA), degrees, for a true altitude. */
+  function refraction(altDeg){
+    if (altDeg > 85) return 0;
+    const te = Math.tan(altDeg * D2R);
+    let r;
+    if (altDeg > 5)        r = 58.1 / te - 0.07 / te ** 3 + 0.000086 / te ** 5;
+    else if (altDeg > -0.575) r = 1735 + altDeg * (-518.2 + altDeg * (103.4 + altDeg * (-12.79 + altDeg * 0.711)));
+    else                   r = -20.772 / te;
+    return r / 3600;
+  }
+
+  /**
+   * Sun position for a site and instant.
+   * @param {object} site  {lat, lon, tz}  tz = standard-time offset from UTC, hours
+   * @param {number} doy   day of year, 1..365
+   * @param {number} minutes  local *clock* time in minutes from midnight
+   * @param {number} dstHours  hours of daylight saving currently applied (0 or 1)
+   * @returns {{altitude:number, azimuth:number, decl:number, eot:number,
+   *            hourAngle:number, zenith:number}}  degrees
+   */
+  function position(site, doy, minutes, dstHours = 0){
+    const { month, day } = dateOfDoy(doy);
+    const stdMinutes = minutes - dstHours * 60;       // back to local standard time
+    const jd = julianDay(YEAR, month, day) + (stdMinutes - site.tz * 60) / 1440;
+    const jc = (jd - 2451545) / 36525;
+    const { decl, eot } = orbital(jc);
+
+    // True solar time, minutes
+    let tst = (stdMinutes + eot + 4 * site.lon - 60 * site.tz) % 1440;
+    if (tst < 0) tst += 1440;
+    let ha = tst / 4 - 180;
+    if (ha < -180) ha += 360;
+
+    const latR = site.lat * D2R, decR = decl * D2R, haR = ha * D2R;
+    const cosZ = clamp(Math.sin(latR) * Math.sin(decR) +
+                       Math.cos(latR) * Math.cos(decR) * Math.cos(haR), -1, 1);
+    const zenith = Math.acos(cosZ) * R2D;
+    const trueAlt = 90 - zenith;
+
+    // Azimuth, clockwise from north
+    let az;
+    const denom = Math.cos(latR) * Math.sin(zenith * D2R);
+    if (Math.abs(denom) > 1e-9) {
+      let c = clamp((Math.sin(latR) * cosZ - Math.sin(decR)) / denom, -1, 1);
+      az = Math.acos(c) * R2D;
+      az = (ha > 0) ? (az + 180) % 360 : (540 - az) % 360;
+    } else {
+      az = (site.lat > 0) ? 180 : 0;
+    }
+    const altitude = trueAlt + refraction(trueAlt);
+    return { altitude, azimuth: az, decl, eot, hourAngle: ha, zenith: 90 - altitude };
+  }
+
+  /**
+   * Sunrise / sunset / solar noon in local clock minutes.
+   * Returns nulls for polar day / polar night, with `polar` set to 'day'|'night'.
+   */
+  function dayInfo(site, doy, dstHours = 0){
+    const { month, day } = dateOfDoy(doy);
+    const jd = julianDay(YEAR, month, day) + (720 - site.tz * 60) / 1440;
+    const { decl, eot } = orbital((jd - 2451545) / 36525);
+    const solarNoon = 720 - 4 * site.lon - eot + 60 * site.tz + dstHours * 60;
+
+    const latR = site.lat * D2R, decR = decl * D2R;
+    const cosHa = Math.cos(90.833 * D2R) / (Math.cos(latR) * Math.cos(decR)) - Math.tan(latR) * Math.tan(decR);
+    if (cosHa < -1) return { sunrise:null, sunset:null, solarNoon, dayLength:24, decl, eot, polar:'day' };
+    if (cosHa >  1) return { sunrise:null, sunset:null, solarNoon, dayLength: 0, decl, eot, polar:'night' };
+    const ha = Math.acos(cosHa) * R2D;
+    return {
+      sunrise: solarNoon - ha * 4,
+      sunset:  solarNoon + ha * 4,
+      solarNoon,
+      dayLength: ha * 8 / 60,
+      decl, eot, polar: null
+    };
+  }
+
+  /**
+   * Unit vector towards the sun in scene space (Y up, -Z north, +X east).
+   * @returns {{x:number,y:number,z:number}}
+   */
+  function vector(altDeg, azDeg){
+    const a = altDeg * D2R, z = azDeg * D2R, ca = Math.cos(a);
+    return { x: Math.sin(z) * ca, y: Math.sin(a), z: -Math.cos(z) * ca };
+  }
+
+  return { position, dayInfo, vector, julianDay, refraction };
+})();
+
+/* ============================================================================
+ *  EPW — EnergyPlus Weather file parser
+ *
+ *  Field indices verified against ladybug/epw.py (0-based):
+ *    0 year | 1 month | 2 day | 3 hour (1-24) | 4 minute | 6 dry bulb degC
+ *    13 GHI Wh/m2 | 14 DNI Wh/m2 | 15 DHI Wh/m2
+ *  Missing-value sentinels: 9999 for radiation, 99.9 for dry bulb.
+ *  Header line 1: LOCATION,city,state,country,source,WMO,lat,lon,tz,elevation
+ * ========================================================================== */
+const EPW = (() => {
+  const MISSING_RAD = 9990, MISSING_TEMP = 99;
+
+  function parse(text, fileName = 'weather.epw'){
+    const lines = text.split(/\r?\n/);
+    if (!lines.length || !/^LOCATION/i.test(lines[0]))
+      throw new Error('Not an EPW file — the first line must start with "LOCATION".');
+
+    const h = lines[0].split(',');
+    const site = {
+      city:    (h[1] || '').trim() || 'Imported site',
+      state:   (h[2] || '').trim(),
+      country: (h[3] || '').trim(),
+      source:  (h[4] || '').trim(),
+      lat:  parseFloat(h[6]),
+      lon:  parseFloat(h[7]),
+      tz:   parseFloat(h[8]),
+      el:   parseFloat(h[9]),
+    };
+    if (!isFinite(site.lat) || !isFinite(site.lon) || !isFinite(site.tz))
+      throw new Error('EPW LOCATION header is missing latitude, longitude or time zone.');
+
+    const n = 8760;
+    const dni = new Float32Array(n), dhi = new Float32Array(n),
+          ghi = new Float32Array(n), temp = new Float32Array(n);
+    let filled = 0;
+
+    for (let i = 0; i < lines.length; i++){
+      const L = lines[i];
+      if (!L || L.charCodeAt(0) < 48 || L.charCodeAt(0) > 57) continue;   // header lines
+      const f = L.split(',');
+      if (f.length < 16) continue;
+      const month = +f[1], day = +f[2], hour = +f[3];
+      if (!(month >= 1 && month <= 12) || !(day >= 1 && day <= 31) || !(hour >= 1 && hour <= 24)) continue;
+      if (month === 2 && day === 29) continue;                            // drop leap day
+      const idx = (doyOf(month, day) - 1) * 24 + (hour - 1);
+      if (idx < 0 || idx >= n) continue;
+
+      const g = +f[13], b = +f[14], d = +f[15], t = +f[6];
+      ghi[idx]  = (isFinite(g) && g >= 0 && g < MISSING_RAD) ? g : 0;
+      dni[idx]  = (isFinite(b) && b >= 0 && b < MISSING_RAD) ? b : 0;
+      dhi[idx]  = (isFinite(d) && d >= 0 && d < MISSING_RAD) ? d : 0;
+      temp[idx] = (isFinite(t) && Math.abs(t) < MISSING_TEMP) ? t : 0;
+      filled++;
+    }
+    if (filled < 8000)
+      throw new Error('EPW contains only ' + filled + ' valid hourly records (expected 8760).');
+
+    // Climate summary
+    let sGhi = 0, sDni = 0, sDhi = 0, sunUp = 0, tMin = Infinity, tMax = -Infinity, tSum = 0;
+    for (let i = 0; i < n; i++){
+      sGhi += ghi[i]; sDni += dni[i]; sDhi += dhi[i];
+      if (dni[i] + dhi[i] > 0) sunUp++;
+      if (temp[i] < tMin) tMin = temp[i];
+      if (temp[i] > tMax) tMax = temp[i];
+      tSum += temp[i];
+    }
+    return {
+      fileName, site, dni, dhi, ghi, temp, hours: n,
+      summary: {
+        annualGhi: sGhi / 1000, annualDni: sDni / 1000, annualDhi: sDhi / 1000,
+        sunUpHours: sunUp, tMin, tMax, tMean: tSum / n
+      }
+    };
+  }
+  return { parse };
+})();
+
+/* ============================================================================
+ *  ClearSky — synthetic fallback when no EPW is loaded
+ *
+ *  Beam transmittance: Hottel (1976) for the 23 km visibility standard
+ *  atmosphere; diffuse: Liu & Jordan (1960) correlation. Mid-latitude summer
+ *  correction factors. This is a *synthetic* clear day, not real climate.
+ * ========================================================================== */
+const ClearSky = (() => {
+  const SOLAR_CONSTANT = 1367;   // W/m2
+
+  /** Extraterrestrial normal irradiance for a day of year, W/m2. */
+  function extraterrestrial(doy){
+    return SOLAR_CONSTANT * (1 + 0.033 * Math.cos(TWO_PI * doy / 365));
+  }
+
+  /**
+   * Clear-sky DNI and DHI for a sun altitude.
+   * @returns {{dni:number, dhi:number, ghi:number}} W/m2
+   */
+  function irradiance(altDeg, doy, elevationM = 0){
+    if (altDeg <= 0) return { dni: 0, dhi: 0, ghi: 0 };
+    const A = clamp(elevationM, 0, 2500) / 1000;               // km, Hottel valid to 2.5 km
+    const a0 = 0.97 * (0.4237 - 0.00821 * (6 - A) ** 2);
+    const a1 = 0.99 * (0.5055 + 0.00595 * (6.5 - A) ** 2);
+    const k  = 1.02 * (0.2711 + 0.01858 * (2.5 - A) ** 2);
+    const cosZ = Math.max(Math.sin(altDeg * D2R), 0.02);
+    const tb = Math.max(a0 + a1 * Math.exp(-k / cosZ), 0);
+    const td = Math.max(0.271 - 0.294 * tb, 0);
+    const gon = extraterrestrial(doy);
+    const dni = gon * tb;
+    const dhi = gon * cosZ * td;
+    return { dni, dhi, ghi: dni * cosZ + dhi };
+  }
+  return { irradiance, extraterrestrial, SOLAR_CONSTANT };
+})();
+
+/* ============================================================================
+ *  SkyDome — Reinhart/Tregenza sky subdivision
+ *
+ *  Generated exactly as Radiance rh_init() (gendaymtx.c):
+ *    alpha = (pi/2) / (7 * MF + 0.5)
+ *    row i altitude = alpha * (i + 0.5),  patches in row = tnaz[i/MF] * MF
+ *    solid angle    = 2*pi * (sin(alpha*(i+1)) - sin(alpha*i)) / patchesInRow
+ *    plus one zenith cap of 2*pi * (1 - cos(alpha/2))
+ *  MF = 1 -> 145 sky patches (Tregenza); MF = 2 -> 577 (Reinhart).
+ * ========================================================================== */
+function buildSkyDome(mf = 1){
+  const TNAZ = [30, 30, 24, 24, 18, 12, 6];
+  const NROW = 7;
+  const alpha = (Math.PI / 2) / (NROW * mf + 0.5);
+  const alt = [], azi = [], dom = [], dir = [];
+
+  for (let i = 0; i < NROW * mf; i++){
+    const ralt = alpha * (i + 0.5);
+    const nInRow = TNAZ[Math.floor(i / mf)] * mf;
+    const d = TWO_PI * (Math.sin(alpha * (i + 1)) - Math.sin(alpha * i)) / nInRow;
+    for (let j = 0; j < nInRow; j++){
+      alt.push(ralt); azi.push(TWO_PI * j / nInRow); dom.push(d);
+    }
+  }
+  alt.push(Math.PI / 2); azi.push(0); dom.push(TWO_PI * (1 - Math.cos(alpha / 2)));
+
+  // Unit vectors, azimuth measured clockwise from north (-Z)
+  const n = alt.length;
+  const vec = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++){
+    const ca = Math.cos(alt[i]);
+    vec[i*3    ] =  Math.sin(azi[i]) * ca;
+    vec[i*3 + 1] =  Math.sin(alt[i]);
+    vec[i*3 + 2] = -Math.cos(azi[i]) * ca;
+    dir.push([vec[i*3], vec[i*3+1], vec[i*3+2]]);
+  }
+  return {
+    count: n, mf,
+    altitude: Float64Array.from(alt),      // radians above horizon
+    azimuth:  Float64Array.from(azi),      // radians clockwise from north
+    solidAngle: Float64Array.from(dom),    // steradians
+    vec, dir
+  };
+}
+
+/* ============================================================================
+ *  Perez — all-weather sky radiance distribution (Perez et al. 1993)
+ *
+ *  Coefficient table and parameter equations transcribed verbatim from
+ *  Radiance gendaymtx.c (PerezCoeff / CalcPerezParam / CalcRelLuminance).
+ * ========================================================================== */
+const Perez = (() => {
+
+  const COEFF = [
+    // eps 1.000 – 1.065
+    [ 1.3525,-0.2576,-0.2690,-1.4366,-0.7670, 0.0007, 1.2734,-0.1233, 2.8000, 0.6004,
+      1.2375, 1.0000, 1.8734, 0.6297, 0.9738, 0.2809, 0.0356,-0.1246,-0.5718, 0.9938],
+    // eps 1.065 – 1.230
+    [-1.2219,-0.7730, 1.4148, 1.1016,-0.2054, 0.0367,-3.9128, 0.9156, 6.9750, 0.1774,
+      6.4477,-0.1239,-1.5798,-0.5081,-1.7812, 0.1080, 0.2624, 0.0672,-0.2190,-0.4285],
+    // eps 1.230 – 1.500
+    [-1.1000,-0.2515, 0.8952, 0.0156, 0.2782,-0.1812,-4.5000, 1.1766,24.7219,-13.0812,
+    -37.7000,34.8438,-5.0000, 1.5218, 3.9229,-2.6204,-0.0156, 0.1597, 0.4199,-0.5562],
+    // eps 1.500 – 1.950
+    [-0.5484,-0.6654,-0.2672, 0.7117, 0.7234,-0.6219,-5.6812, 2.6297,33.3389,-18.3000,
+    -62.2500,52.0781,-3.5000, 0.0016, 1.1477, 0.1062, 0.4659,-0.3296,-0.0876,-0.0329],
+    // eps 1.950 – 2.800
+    [-0.6000,-0.3566,-2.5000, 2.3250, 0.2937, 0.0496,-5.6812, 1.8415,21.0000,-4.7656,
+    -21.5906, 7.2492,-3.5000,-0.1554, 1.4062, 0.3988, 0.0032, 0.0766,-0.0656,-0.1294],
+    // eps 2.800 – 4.500
+    [-1.0156,-0.3670, 1.0078, 1.4051, 0.2875,-0.5328,-3.8500, 3.3750,14.0000,-0.9999,
+     -7.1406, 7.5469,-3.4000,-0.1078,-1.0750, 1.5702,-0.0672, 0.4016, 0.3017,-0.4844],
+    // eps 4.500 – 6.200
+    [-1.0000, 0.0211, 0.5025,-0.5119,-0.3000, 0.1922, 0.7023,-1.6317,19.0000,-5.0000,
+      1.2438,-1.9094,-4.0000, 0.0250, 0.3844, 0.2656, 1.0468,-0.3788,-2.4517, 1.4656],
+    // eps 6.200 and above
+    [-1.0500, 0.0289, 0.4260, 0.3590,-0.3250, 0.1156, 0.7781, 0.0025,31.0625,-14.5000,
+    -46.1148,55.3750,-7.2312, 0.4050,13.3500, 0.6234, 1.5000,-0.6426, 1.8564, 0.5636],
+  ];
+  const EPS_UPPER = [1.065, 1.230, 1.500, 1.950, 2.800, 4.500, 6.200, Infinity];
+
+  /** Kasten-style relative optical air mass used by Radiance CalcAirMass(). */
+  function airMass(zenithRad){
+    const zDeg = zenithRad * R2D;
+    return 1 / (Math.cos(zenithRad) + 0.15 * Math.pow(Math.max(93.885 - zDeg, 0.1), -1.253));
+  }
+
+  /**
+   * Perez a..e parameters for one hour.
+   * @param {number} zenithRad  solar zenith angle, radians
+   * @param {number} dni  W/m2 direct normal
+   * @param {number} dhi  W/m2 diffuse horizontal
+   * @param {number} doy  day of year (for the eccentricity correction)
+   */
+  function params(zenithRad, dni, dhi, doy){
+    const sz3 = zenithRad ** 3;
+    let eps = ((dhi + dni) / dhi + 1.041 * sz3) / (1 + 1.041 * sz3);
+    eps = clamp(eps, 1.0, 11.9);
+
+    const ecc = 1 + 0.033 * Math.cos(TWO_PI * doy / 365);
+    let delta = dhi * airMass(zenithRad) / (ClearSky.SOLAR_CONSTANT * ecc);
+    delta = clamp(delta, 0.01, 0.6);
+
+    let idx = 0;
+    while (idx < 7 && eps >= EPS_UPPER[idx]) idx++;
+
+    // Radiance clamps brightness for the intermediate clearness bins
+    if (eps > 1.065 && eps < 2.8 && delta < 0.2) delta = 0.2;
+
+    const c = COEFF[idx], x = [];
+    for (let i = 0; i < 5; i++) x.push([c[4*i], c[4*i+1], c[4*i+2], c[4*i+3]]);
+
+    const p = new Array(5);
+    if (idx !== 0){
+      for (let i = 0; i < 5; i++)
+        p[i] = x[i][0] + x[i][1] * zenithRad + delta * (x[i][2] + x[i][3] * zenithRad);
+    } else {
+      // Overcast bin: c and d use Perez eqns. 7 and 8 instead of eqn. 6
+      p[0] = x[0][0] + x[0][1] * zenithRad + delta * (x[0][2] + x[0][3] * zenithRad);
+      p[1] = x[1][0] + x[1][1] * zenithRad + delta * (x[1][2] + x[1][3] * zenithRad);
+      p[4] = x[4][0] + x[4][1] * zenithRad + delta * (x[4][2] + x[4][3] * zenithRad);
+      p[2] = Math.exp(Math.pow(delta * (x[2][0] + x[2][1] * zenithRad), x[2][2])) - x[2][3];
+      p[3] = -Math.exp(delta * (x[3][0] + x[3][1] * zenithRad)) + x[3][2] + delta * x[3][3];
+    }
+    return { a: p[0], b: p[1], c: p[2], d: p[3], e: p[4], eps, delta, bin: idx };
+  }
+
+  /**
+   * Relative sky radiance at a point on the dome.
+   * @param {object} P      parameters from params()
+   * @param {number} gamma  angle between the sky point and the sun, radians
+   * @param {number} zeta   zenith angle of the sky point, radians
+   */
+  function relativeRadiance(P, gamma, zeta){
+    const cz = Math.max(Math.cos(zeta), 0.01);
+    return (1 + P.a * Math.exp(P.b / cz)) *
+           (1 + P.c * Math.exp(P.d * gamma) + P.e * Math.cos(gamma) ** 2);
+  }
+
+  /**
+   * Diffuse irradiance contributed by each sky patch for one hour, W/m2,
+   * already multiplied by the patch solid angle. Normalised so that the sum of
+   * value * cos(zenith) over all patches reproduces the measured DHI exactly.
+   *
+   * @param {object} dome    from buildSkyDome()
+   * @param {number} sunAlt  degrees
+   * @param {number} sunAz   degrees clockwise from north
+   * @param {Float64Array} out  destination, length dome.count
+   */
+  function patchIrradiance(dome, sunAlt, sunAz, dni, dhi, doy, out){
+    const n = dome.count;
+    if (!(dhi > 0)) { out.fill(0); return 0; }
+
+    const zenithRad = clamp((90 - sunAlt) * D2R, 0, Math.PI / 2);
+    const P = params(zenithRad, dni, dhi, doy);
+
+    const sv = SolarCore.vector(sunAlt, sunAz);
+    let norm = 0;
+    for (let i = 0; i < n; i++){
+      const zeta = Math.PI / 2 - dome.altitude[i];
+      const dot = clamp(dome.vec[i*3] * sv.x + dome.vec[i*3+1] * sv.y + dome.vec[i*3+2] * sv.z, -1, 1);
+      const rel = Math.max(relativeRadiance(P, Math.acos(dot), zeta), 0);
+      out[i] = rel;
+      norm += rel * Math.cos(zeta) * dome.solidAngle[i];
+    }
+    if (!(norm > 1e-9)){                       // degenerate: fall back to uniform sky
+      let u = 0;
+      for (let i = 0; i < n; i++){ out[i] = 1; u += Math.cos(Math.PI/2 - dome.altitude[i]) * dome.solidAngle[i]; }
+      norm = u;
+    }
+    // Scale so sum(L_i * omega_i * cos(zeta_i)) == DHI, then fold in the solid angle
+    const k = dhi / norm;
+    for (let i = 0; i < n; i++) out[i] = out[i] * k * dome.solidAngle[i];
+    return P.eps;
+  }
+
+  return { params, relativeRadiance, patchIrradiance, airMass, COEFF };
+})();
+
+/* ============================================================================
+ *  SkyMatrix — assemble a list of directional sources for the analysis
+ *
+ *  Every analysis reduces to the same problem: a set of directions, each
+ *  carrying an amount of energy, plus a visibility test per sensor. Direct sun,
+ *  diffuse sky patches and the reflecting ground hemisphere are all folded into
+ *  one flat source list so the ray tracer has a single code path.
+ *
+ *  Direct beam is deliberately kept OUT of the sky patches and binned on its
+ *  own finer grid: smearing a low-altitude sun across 145 Tregenza patches is a
+ *  well-known artefact of the coarse gendaymtx default.
+ * ========================================================================== */
+const SkyMatrix = (() => {
+
+  /** Hourly DNI/DHI in W/m2 for a given hour index, from EPW or the clear-sky model. */
+  function hourly(weather, site, doy, hourIndex, altDeg){
+    if (weather){
+      const i = (doy - 1) * 24 + hourIndex;
+      return { dni: weather.dni[i], dhi: weather.dhi[i], ghi: weather.ghi[i] };
+    }
+    const cs = ClearSky.irradiance(altDeg, doy, site.el || 0);
+    return cs;
+  }
+
+  /**
+   * Sources for a single instant, in W/m2.
+   * @returns {{dirs:Float32Array, vals:Float64Array, count:number, meta:object}}
+   */
+  function instant(opts){
+    const { dome, site, weather, doy, minutes, dstHours, groundRefl, useGround } = opts;
+    const sun = SolarCore.position(site, doy, minutes, dstHours);
+    // EPW hour h describes the hour *preceding* h, so hour index = floor(minutes/60)
+    const hourIndex = clamp(Math.floor(minutes / 60), 0, 23);
+    const rad = hourly(weather, site, doy, hourIndex, sun.altitude);
+
+    const nSky = dome.count;
+    const nGround = useGround ? dome.count : 0;
+    const dirs = new Float32Array((nSky + nGround + 1) * 3);
+    const vals = new Float64Array(nSky + nGround + 1);
+
+    // --- diffuse sky ---
+    const patch = new Float64Array(nSky);
+    if (rad.dhi > 0 && sun.altitude > -6) Perez.patchIrradiance(dome, sun.altitude, sun.azimuth, rad.dni, rad.dhi, doy, patch);
+    for (let i = 0; i < nSky; i++){
+      dirs[i*3] = dome.vec[i*3]; dirs[i*3+1] = dome.vec[i*3+1]; dirs[i*3+2] = dome.vec[i*3+2];
+      vals[i] = patch[i];
+    }
+
+    // --- ground-reflected hemisphere (mirror of the sky dome) ---
+    const ghi = rad.ghi || (rad.dni * Math.max(Math.sin(sun.altitude * D2R), 0) + rad.dhi);
+    if (useGround){
+      const L = groundRefl * ghi / Math.PI;                    // radiance, W/m2/sr
+      for (let i = 0; i < nGround; i++){
+        const o = (nSky + i) * 3;
+        dirs[o] = dome.vec[i*3]; dirs[o+1] = -dome.vec[i*3+1]; dirs[o+2] = dome.vec[i*3+2];
+        vals[nSky + i] = L * dome.solidAngle[i];
+      }
+    }
+
+    // --- direct beam ---
+    let count = nSky + nGround;
+    if (sun.altitude > 0 && rad.dni > 0){
+      const v = SolarCore.vector(sun.altitude, sun.azimuth);
+      dirs[count*3] = v.x; dirs[count*3+1] = v.y; dirs[count*3+2] = v.z;
+      vals[count] = rad.dni;
+      count++;
+    }
+    return {
+      dirs, vals, count,
+      meta: { sun, dni: rad.dni, dhi: rad.dhi, ghi, hours: 1, unit: 'W/m²', nSky, nGround, nSun: count - nSky - nGround }
+    };
+  }
+
+  /**
+   * Sources accumulated over a period, in Wh/m2.
+   * @param {object} opts  adds {doyFrom, doyTo, hourFrom, hourTo, sunBinDeg, onProgress}
+   */
+  function cumulative(opts){
+    const { dome, site, weather, dstHours, groundRefl, useGround,
+            doyFrom, doyTo, hourFrom, hourTo, sunBinDeg = 2.5, onProgress } = opts;
+
+    const nSky = dome.count;
+    const skyAcc = new Float64Array(nSky);
+    const patch  = new Float64Array(nSky);
+    const sunBins = new Map();
+    let ghiSum = 0, hours = 0, sunUpHours = 0, dniSum = 0, dhiSum = 0;
+
+    const binsPerAxis = 1 / Math.max(sunBinDeg, 0.1);   // bins per degree
+    for (let doy = doyFrom; doy <= doyTo; doy++){
+      for (let h = hourFrom; h < hourTo; h++){
+        hours++;
+        const minutes = h * 60 + 30;                 // mid-hour: EPW hour h covers (h-1, h]
+        const sun = SolarCore.position(site, doy, minutes, dstHours);
+        const rad = hourly(weather, site, doy, h, sun.altitude);
+        if (rad.dni <= 0 && rad.dhi <= 0) continue;
+
+        const ghi = rad.ghi || (rad.dni * Math.max(Math.sin(sun.altitude * D2R), 0) + rad.dhi);
+        ghiSum += ghi; dniSum += rad.dni; dhiSum += rad.dhi;
+        if (sun.altitude > 0) sunUpHours++;
+
+        if (rad.dhi > 0){
+          Perez.patchIrradiance(dome, sun.altitude, sun.azimuth, rad.dni, rad.dhi, doy, patch);
+          for (let i = 0; i < nSky; i++) skyAcc[i] += patch[i];
+        }
+        if (sun.altitude > 0 && rad.dni > 0){
+          const ka = Math.round(sun.altitude * binsPerAxis);
+          const kz = Math.round(((sun.azimuth % 360) + 360) % 360 * binsPerAxis);
+          const key = ka * 100000 + kz;
+          let b = sunBins.get(key);
+          if (!b) { b = { e: 0, x: 0, y: 0, z: 0 }; sunBins.set(key, b); }
+          const v = SolarCore.vector(sun.altitude, sun.azimuth);
+          b.e += rad.dni;
+          b.x += v.x * rad.dni; b.y += v.y * rad.dni; b.z += v.z * rad.dni;
+        }
+      }
+      if (onProgress && (doy & 7) === 0) onProgress((doy - doyFrom + 1) / (doyTo - doyFrom + 1));
+    }
+
+    const nSun = sunBins.size;
+    const nGround = useGround ? nSky : 0;
+    const total = nSky + nGround + nSun;
+    const dirs = new Float32Array(total * 3);
+    const vals = new Float64Array(total);
+
+    for (let i = 0; i < nSky; i++){
+      dirs[i*3] = dome.vec[i*3]; dirs[i*3+1] = dome.vec[i*3+1]; dirs[i*3+2] = dome.vec[i*3+2];
+      vals[i] = skyAcc[i];
+    }
+    if (useGround){
+      const L = groundRefl * ghiSum / Math.PI;
+      for (let i = 0; i < nSky; i++){
+        const o = (nSky + i) * 3;
+        dirs[o] = dome.vec[i*3]; dirs[o+1] = -dome.vec[i*3+1]; dirs[o+2] = dome.vec[i*3+2];
+        vals[nSky + i] = L * dome.solidAngle[i];
+      }
+    }
+    let k = nSky + nGround;
+    for (const b of sunBins.values()){
+      const len = Math.hypot(b.x, b.y, b.z) || 1;
+      dirs[k*3] = b.x / len; dirs[k*3+1] = b.y / len; dirs[k*3+2] = b.z / len;
+      vals[k] = b.e;
+      k++;
+    }
+    return {
+      dirs, vals, count: total,
+      meta: { hours, sunUpHours, ghiSum, dniSum, dhiSum, unit: 'Wh/m²',
+              nSky, nGround, nSun, skyAcc }
+    };
+  }
+
+  return { instant, cumulative };
+})();
+
+/* ============================================================================
+ *  Ray tracing worker — a compact BVH over the model triangles.
+ *
+ *  Runs off the main thread so the viewport stays interactive and progress can
+ *  be reported honestly. It needs no three.js: it receives raw triangle data as
+ *  a Float32Array (9 floats per triangle) and answers occlusion queries.
+ * ========================================================================== */
+const WORKER_SOURCE = `
+'use strict';
+var TRI = null, NTRI = 0;
+var nodeMin = null, nodeMax = null, nodeLeft = null, nodeStart = null, nodeCount = null, triIdx = null;
+var nNodes = 0;
+var EPS = 1e-7;
+
+function buildBVH(){
+  NTRI = TRI.length / 9;
+  triIdx = new Uint32Array(NTRI);
+  var cent = new Float32Array(NTRI * 3);
+  var i, o;
+  for (i = 0; i < NTRI; i++){
+    triIdx[i] = i; o = i * 9;
+    cent[i*3  ] = (TRI[o  ] + TRI[o+3] + TRI[o+6]) / 3;
+    cent[i*3+1] = (TRI[o+1] + TRI[o+4] + TRI[o+7]) / 3;
+    cent[i*3+2] = (TRI[o+2] + TRI[o+5] + TRI[o+8]) / 3;
+  }
+  var cap = Math.max(4, NTRI * 2 + 8);
+  nodeMin = new Float32Array(cap * 3); nodeMax = new Float32Array(cap * 3);
+  nodeLeft = new Int32Array(cap); nodeStart = new Int32Array(cap); nodeCount = new Int32Array(cap);
+  nNodes = 1;
+
+  function bounds(node, start, count){
+    var mnx = Infinity, mny = Infinity, mnz = Infinity;
+    var mxx = -Infinity, mxy = -Infinity, mxz = -Infinity;
+    for (var k = start; k < start + count; k++){
+      var t = triIdx[k] * 9;
+      for (var c = 0; c < 3; c++){
+        var x = TRI[t+c*3], y = TRI[t+c*3+1], z = TRI[t+c*3+2];
+        if (x < mnx) mnx = x; if (x > mxx) mxx = x;
+        if (y < mny) mny = y; if (y > mxy) mxy = y;
+        if (z < mnz) mnz = z; if (z > mxz) mxz = z;
+      }
+    }
+    nodeMin[node*3] = mnx; nodeMin[node*3+1] = mny; nodeMin[node*3+2] = mnz;
+    nodeMax[node*3] = mxx; nodeMax[node*3+1] = mxy; nodeMax[node*3+2] = mxz;
+  }
+
+  var stack = [[0, 0, NTRI]];
+  nodeStart[0] = 0; nodeCount[0] = NTRI; nodeLeft[0] = -1;
+  bounds(0, 0, NTRI);
+
+  while (stack.length){
+    var job = stack.pop();
+    var node = job[0], start = job[1], count = job[2];
+    if (count <= 4 || nNodes + 2 > cap){ nodeLeft[node] = -1; continue; }
+
+    var ex = nodeMax[node*3] - nodeMin[node*3];
+    var ey = nodeMax[node*3+1] - nodeMin[node*3+1];
+    var ez = nodeMax[node*3+2] - nodeMin[node*3+2];
+    var axis = (ex > ey) ? (ex > ez ? 0 : 2) : (ey > ez ? 1 : 2);
+
+    // median split on centroid along the longest axis
+    var sub = Array.prototype.slice.call(triIdx.subarray(start, start + count));
+    sub.sort(function(a, b){ return cent[a*3+axis] - cent[b*3+axis]; });
+    for (var s = 0; s < count; s++) triIdx[start + s] = sub[s];
+    var mid = count >> 1;
+
+    var l = nNodes++, r = nNodes++;
+    nodeLeft[node] = l;
+    nodeStart[l] = start; nodeCount[l] = mid; nodeLeft[l] = -1;
+    nodeStart[r] = start + mid; nodeCount[r] = count - mid; nodeLeft[r] = -1;
+    bounds(l, start, mid);
+    bounds(r, start + mid, count - mid);
+    stack.push([l, start, mid]);
+    stack.push([r, start + mid, count - mid]);
+  }
+}
+
+/* Moller-Trumbore, occlusion only (any hit within maxT wins) */
+function hitTri(t, ox, oy, oz, dx, dy, dz, maxT){
+  var ax = TRI[t], ay = TRI[t+1], az = TRI[t+2];
+  var e1x = TRI[t+3] - ax, e1y = TRI[t+4] - ay, e1z = TRI[t+5] - az;
+  var e2x = TRI[t+6] - ax, e2y = TRI[t+7] - ay, e2z = TRI[t+8] - az;
+  var px = dy * e2z - dz * e2y, py = dz * e2x - dx * e2z, pz = dx * e2y - dy * e2x;
+  var det = e1x * px + e1y * py + e1z * pz;
+  if (det > -EPS && det < EPS) return false;
+  var inv = 1 / det;
+  var tx = ox - ax, ty = oy - ay, tz = oz - az;
+  var u = (tx * px + ty * py + tz * pz) * inv;
+  if (u < 0 || u > 1) return false;
+  var qx = ty * e1z - tz * e1y, qy = tz * e1x - tx * e1z, qz = tx * e1y - ty * e1x;
+  var v = (dx * qx + dy * qy + dz * qz) * inv;
+  if (v < 0 || u + v > 1) return false;
+  var tt = (e2x * qx + e2y * qy + e2z * qz) * inv;
+  return tt > EPS && tt < maxT;
+}
+
+var stackBuf = new Int32Array(128);
+
+function occluded(ox, oy, oz, dx, dy, dz, maxT){
+  if (!NTRI) return false;
+  var idx = 1 / (dx === 0 ? 1e-20 : dx), idy = 1 / (dy === 0 ? 1e-20 : dy), idz = 1 / (dz === 0 ? 1e-20 : dz);
+  var sp = 0; stackBuf[sp++] = 0;
+  while (sp > 0){
+    var node = stackBuf[--sp];
+    var t1 = (nodeMin[node*3] - ox) * idx, t2 = (nodeMax[node*3] - ox) * idx;
+    var tmin = Math.min(t1, t2), tmax = Math.max(t1, t2);
+    t1 = (nodeMin[node*3+1] - oy) * idy; t2 = (nodeMax[node*3+1] - oy) * idy;
+    tmin = Math.max(tmin, Math.min(t1, t2)); tmax = Math.min(tmax, Math.max(t1, t2));
+    t1 = (nodeMin[node*3+2] - oz) * idz; t2 = (nodeMax[node*3+2] - oz) * idz;
+    tmin = Math.max(tmin, Math.min(t1, t2)); tmax = Math.min(tmax, Math.max(t1, t2));
+    if (tmax < Math.max(tmin, 0) || tmin > maxT) continue;
+
+    if (nodeLeft[node] < 0){
+      var s = nodeStart[node], c = nodeCount[node];
+      for (var k = s; k < s + c; k++){
+        if (hitTri(triIdx[k] * 9, ox, oy, oz, dx, dy, dz, maxT)) return true;
+      }
+    } else {
+      if (sp < 126){ stackBuf[sp++] = nodeLeft[node]; stackBuf[sp++] = nodeLeft[node] + 1; }
+    }
+  }
+  return false;
+}
+
+self.onmessage = function(ev){
+  var m = ev.data;
+  if (m.cmd === 'build'){
+    TRI = m.tris;
+    buildBVH();
+    self.postMessage({ ok: true, cmd: 'build', tris: NTRI, nodes: nNodes });
+    return;
+  }
+  if (m.cmd === 'trace'){
+    var origins = m.origins, normals = m.normals, dirs = m.dirs, vals = m.vals;
+    var shade = m.shade !== false;
+    var n = origins.length / 3, nd = vals.length;
+    var out = new Float64Array(n);
+    var direct = new Float64Array(n);
+    var firstSun = m.firstSun == null ? nd : m.firstSun;
+    var maxT = m.maxT || 1e6;
+    var reportEvery = Math.max(1, Math.floor(n / 60));
+
+    for (var i = 0; i < n; i++){
+      var ox = origins[i*3], oy = origins[i*3+1], oz = origins[i*3+2];
+      var nx = normals[i*3], ny = normals[i*3+1], nz = normals[i*3+2];
+      var acc = 0, accDir = 0;
+      for (var j = 0; j < nd; j++){
+        var v = vals[j];
+        if (v <= 0) continue;
+        var dx = dirs[j*3], dy = dirs[j*3+1], dz = dirs[j*3+2];
+        var dot = nx * dx + ny * dy + nz * dz;
+        if (dot <= 0) continue;
+        if (shade && occluded(ox, oy, oz, dx, dy, dz, maxT)) continue;
+        var e = v * dot;
+        acc += e;
+        if (j >= firstSun) accDir += e;
+      }
+      out[i] = acc;
+      direct[i] = accDir;
+      if ((i % reportEvery) === 0) self.postMessage({ cmd: 'progress', done: i, total: n });
+    }
+    self.postMessage({ cmd: 'result', values: out, direct: direct }, [out.buffer, direct.buffer]);
+    return;
+  }
+};
+`;
+
+/* ============================================================================
+ *  Scene — renderer, camera, lighting, ground
+ * ========================================================================== */
+const viewportEl = document.getElementById('viewport');
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, alpha: false });
+renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.setClearColor(0x0a0e14, 1);
+if ('outputColorSpace' in renderer) renderer.outputColorSpace = THREE.SRGBColorSpace;
+viewportEl.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x0a0e14, 260, 900);
+
+const camera = new THREE.PerspectiveCamera(45, 1, 0.35, 4000);
+camera.position.set(52, 38, 66);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.075;
+controls.maxPolarAngle = Math.PI / 2 - 0.012;      // never go below the ground
+controls.minDistance = 3;
+controls.maxDistance = 1400;
+controls.target.set(0, 4, 0);
+
+/* --- lighting ------------------------------------------------------------ */
+const sunLight = new THREE.DirectionalLight(0xfff0d4, 2.5);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.set(2048, 2048);
+sunLight.shadow.bias = -0.0006;
+sunLight.shadow.normalBias = 0.035;
+scene.add(sunLight, sunLight.target);
+
+const skyLight = new THREE.HemisphereLight(0x9dc3ee, 0x2a2f38, 1.05);
+scene.add(skyLight);
+const fillLight = new THREE.DirectionalLight(0x93b4de, 0.32);
+fillLight.position.set(-40, 55, -35);
+scene.add(fillLight);
+
+/* --- ground -------------------------------------------------------------- */
+const GROUND_SIZE = 900;
+const groundMat = new THREE.MeshStandardMaterial({ color: 0x2b3038, roughness: 0.98, metalness: 0 });
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(GROUND_SIZE, GROUND_SIZE), groundMat);
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = -0.015;
+ground.receiveShadow = true;
+scene.add(ground);
+
+const gridHelper = new THREE.GridHelper(200, 40, 0x4a5563, 0x333c47);
+gridHelper.material.opacity = 0.5;
+gridHelper.material.transparent = true;
+gridHelper.position.y = 0.006;
+scene.add(gridHelper);
+
+/* --- groups -------------------------------------------------------------- */
+const modelGroup   = new THREE.Group();   // buildings (rotated by project north)
+const sunPathGroup = new THREE.Group();   // sun path diagram
+const compassGroup = new THREE.Group();
+const resultGroup  = new THREE.Group();   // radiation mesh
+const domeGroup    = new THREE.Group();   // sky matrix patches
+scene.add(modelGroup, sunPathGroup, compassGroup, resultGroup, domeGroup);
+
+/** Canvas-based text sprite for compass bearings and hour labels. */
+function makeLabel(text, { size = 46, color = '#cfd9e4', weight = 600, scale = 1 } = {}){
+  const pad = 8, cnv = document.createElement('canvas'), ctx = cnv.getContext('2d');
+  ctx.font = weight + ' ' + size + 'px Inter, system-ui, sans-serif';
+  const w = Math.ceil(ctx.measureText(text).width) + pad * 2, h = size + pad * 2;
+  cnv.width = w; cnv.height = h;
+  ctx.font = weight + ' ' + size + 'px Inter, system-ui, sans-serif';
+  ctx.fillStyle = color; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+  ctx.fillText(text, w / 2, h / 2);
+  const tex = new THREE.CanvasTexture(cnv);
+  tex.minFilter = THREE.LinearFilter;
+  if ('colorSpace' in tex) tex.colorSpace = THREE.SRGBColorSpace;
+  const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false }));
+  spr.scale.set(w / size * scale, h / size * scale, 1);
+  spr.renderOrder = 900;
+  return spr;
+}
+
+function disposeGroup(g){
+  const kill = [];
+  g.traverse(o => { if (o.geometry || o.material) kill.push(o); });
+  for (const o of kill){
+    if (o.geometry) o.geometry.dispose();
+    const m = o.material;
+    if (Array.isArray(m)) m.forEach(x => { if (x.map) x.map.dispose(); x.dispose(); });
+    else if (m) { if (m.map) m.map.dispose(); m.dispose(); }
+  }
+  g.clear();
+}
+
+/* ============================================================================
+ *  Sun path diagram
+ * ========================================================================== */
+const SUN_COLORS = {
+  summer: new THREE.Color(0xffb340),
+  winter: new THREE.Color(0x62b8ff),
+  today:  new THREE.Color(0xffe27a),
+  analemma: new THREE.Color(0x6d8398),
+};
+
+let sunPathRadius = 40;
+
+/** Position on the sun-path dome for a given altitude/azimuth. */
+function domePoint(altDeg, azDeg, r = sunPathRadius){
+  const v = SolarCore.vector(altDeg, azDeg);
+  return new THREE.Vector3(v.x * r, v.y * r, v.z * r);
+}
+
+function lineFromPoints(points, color, opacity = 1, width = 1){
+  const geo = new THREE.BufferGeometry().setFromPoints(points);
+  const mat = new THREE.LineBasicMaterial({ color, transparent: opacity < 1, opacity, linewidth: width });
+  return new THREE.Line(geo, mat);
+}
+
+/**
+ * Rebuild the whole sun-path diagram for the current site.
+ * Cheap enough (a few thousand solar-position evaluations) to run on every
+ * location change, which is what makes the tool feel live.
+ */
+function buildSunPath(){
+  disposeGroup(sunPathGroup);
+  disposeGroup(compassGroup);
+  const site = State.site, dst = State.dstHours;
+  const R = sunPathRadius;
+
+  /* --- monthly arcs (21st of each month) --- */
+  if (State.disp.arcs){
+    for (let m = 1; m <= 12; m++){
+      const doy = doyOf(m, 21);
+      const pts = [];
+      for (let t = 0; t <= 1440; t += 6){
+        const p = SolarCore.position(site, doy, t, dst);
+        if (p.altitude < -0.35) continue;
+        pts.push(domePoint(Math.max(p.altitude, 0), p.azimuth, R));
+      }
+      if (pts.length < 2) continue;
+      // Colour by season: June solstice warm, December solstice cool
+      const w = Math.abs(Math.cos((doy - 172) / 365 * TWO_PI)) * 0.5 + 0.25;
+      const isWarm = doy > 80 && doy < 266;
+      const col = SUN_COLORS.winter.clone().lerp(SUN_COLORS.summer, isWarm ? 0.35 + w : 0.12);
+      const solstice = (m === 6 || m === 12);
+      sunPathGroup.add(lineFromPoints(pts, col, solstice ? 0.95 : 0.5));
+      if (solstice){
+        const lab = makeLabel(m === 6 ? '21 Jun' : '21 Dec', { size: 38, color: '#' + col.getHexString(), scale: R * 0.027 });
+        lab.position.copy(pts[Math.floor(pts.length / 2)]).multiplyScalar(1.045);
+        sunPathGroup.add(lab);
+      }
+    }
+  }
+
+  /* --- hourly analemmas --- */
+  if (State.disp.analemma){
+    for (let h = 0; h < 24; h++){
+      const pts = [];
+      let above = false;
+      for (let doy = 1; doy <= 366; doy += 3){
+        const p = SolarCore.position(site, Math.min(doy, 365), h * 60, dst);
+        if (p.altitude < -0.35) { if (above && pts.length > 2) { sunPathGroup.add(lineFromPoints(pts, SUN_COLORS.analemma, 0.42)); } pts.length = 0; above = false; continue; }
+        above = true;
+        pts.push(domePoint(p.altitude, p.azimuth, R));
+      }
+      if (pts.length > 2){
+        sunPathGroup.add(lineFromPoints(pts, SUN_COLORS.analemma, 0.42));
+        const noonish = SolarCore.position(site, 172, h * 60, dst);
+        if (noonish.altitude > 3){
+          const lab = makeLabel(String(h).padStart(2,'0'), { size: 34, color: '#8ea3b7', scale: R * 0.021 });
+          lab.position.copy(domePoint(noonish.altitude, noonish.azimuth, R)).multiplyScalar(1.06);
+          sunPathGroup.add(lab);
+        }
+      }
+    }
+  }
+
+  /* --- today's arc, highlighted --- */
+  if (State.disp.today){
+    const pts = [];
+    for (let t = 0; t <= 1440; t += 4){
+      const p = SolarCore.position(site, State.doy, t, dst);
+      if (p.altitude < -0.35) continue;
+      pts.push(domePoint(Math.max(p.altitude, 0), p.azimuth, R));
+    }
+    if (pts.length > 1) sunPathGroup.add(lineFromPoints(pts, SUN_COLORS.today, 1));
+  }
+
+  /* --- altitude rings --- */
+  if (State.disp.rings){
+    for (let alt = 15; alt < 90; alt += 15){
+      const pts = [];
+      for (let a = 0; a <= 360; a += 4) pts.push(domePoint(alt, a, R));
+      sunPathGroup.add(lineFromPoints(pts, 0x3d4b5a, 0.55));
+      const lab = makeLabel(alt + '°', { size: 30, color: '#5d6e80', scale: R * 0.019 });
+      lab.position.copy(domePoint(alt, 90, R)).multiplyScalar(1.02);
+      sunPathGroup.add(lab);
+    }
+  }
+
+  /* --- compass rose --- */
+  buildCompass(R);
+}
+
+function buildCompass(R){
+  if (!State.disp.compass) return;
+  const ringPts = [];
+  for (let a = 0; a <= 360; a += 2) ringPts.push(domePoint(0, a, R));
+  compassGroup.add(lineFromPoints(ringPts, 0x5a6a7c, 0.85));
+
+  for (let a = 0; a < 360; a += 10){
+    const inner = (a % 90 === 0) ? 0.9 : (a % 30 === 0 ? 0.945 : 0.968);
+    const p0 = domePoint(0, a, R * inner), p1 = domePoint(0, a, R);
+    compassGroup.add(lineFromPoints([p0, p1], a % 90 === 0 ? 0x8f9fb0 : 0x4d5b6b, a % 90 === 0 ? 0.95 : 0.6));
+  }
+  const cardinals = [['N',0,'#ff9a6b'],['E',90,'#a9b8c7'],['S',180,'#a9b8c7'],['W',270,'#a9b8c7']];
+  for (const [t, a, c] of cardinals){
+    const lab = makeLabel(t, { size: 52, color: c, weight: 700, scale: R * 0.038 });
+    lab.position.copy(domePoint(0, a, R * 1.075));
+    lab.position.y = R * 0.028;
+    compassGroup.add(lab);
+  }
+}
+
+/* ============================================================================
+ *  Sun marker and lighting update
+ * ========================================================================== */
+const sunMarker = new THREE.Group();
+{
+  const core = new THREE.Mesh(
+    new THREE.SphereGeometry(1, 24, 16),
+    new THREE.MeshBasicMaterial({ color: 0xfff3d0 }));
+  core.name = 'core';
+  const glowCnv = document.createElement('canvas');
+  glowCnv.width = glowCnv.height = 128;
+  const gx = glowCnv.getContext('2d');
+  const grd = gx.createRadialGradient(64, 64, 2, 64, 64, 62);
+  grd.addColorStop(0, 'rgba(255,226,150,0.95)');
+  grd.addColorStop(0.35, 'rgba(255,179,64,0.45)');
+  grd.addColorStop(1, 'rgba(255,160,40,0)');
+  gx.fillStyle = grd; gx.fillRect(0, 0, 128, 128);
+  const glowTex = new THREE.CanvasTexture(glowCnv);
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: glowTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+  glow.name = 'glow';
+  sunMarker.add(core, glow);
+}
+scene.add(sunMarker);
+
+const sunRay = lineFromPoints([new THREE.Vector3(), new THREE.Vector3()], 0xffb340, 0.45);
+sunRay.name = 'sunRay';
+scene.add(sunRay);
+
+/** Move the sun marker, the shadow-casting light and the ray line. */
+function updateSunVisuals(sun){
+  const R = sunPathRadius;
+  const v = SolarCore.vector(sun.altitude, sun.azimuth);
+  const pos = new THREE.Vector3(v.x, v.y, v.z).multiplyScalar(R);
+  const up = sun.altitude > -0.5;
+
+  sunMarker.visible = up;
+  sunRay.visible = up && State.disp.arcs;
+  sunMarker.position.copy(pos);
+  const s = R * 0.032;
+  sunMarker.getObjectByName('core').scale.setScalar(s);
+  sunMarker.getObjectByName('glow').scale.setScalar(s * 9);
+
+  const rp = sunRay.geometry.attributes.position;
+  rp.setXYZ(0, 0, 0, 0); rp.setXYZ(1, pos.x, pos.y, pos.z);
+  rp.needsUpdate = true;
+  sunRay.geometry.computeBoundingSphere();
+
+  // Directional light: far enough away that the ortho shadow camera covers the site
+  const d = Math.max(R * 2.4, 90);
+  sunLight.position.set(v.x * d, Math.max(v.y, 0.02) * d, v.z * d);
+  sunLight.target.position.set(0, 0, 0);
+  sunLight.target.updateMatrixWorld();
+  sunLight.visible = up && State.disp.shadow;
+  sunLight.intensity = up ? lerp(0.55, 2.55, clamp(Math.sin(sun.altitude * D2R), 0, 1) ** 0.55) : 0;
+  sunLight.color.setHSL(0.108, clamp(0.55 - sun.altitude / 120, 0.06, 0.55), 0.62);
+
+  const cam = sunLight.shadow.camera;
+  const ext = Math.max(State.modelRadius * 1.55, 26);
+  cam.left = -ext; cam.right = ext; cam.top = ext; cam.bottom = -ext;
+  cam.near = 1; cam.far = d * 2.4;
+  cam.updateProjectionMatrix();
+
+  // Ambient sky tint follows the sun height so dusk reads as dusk
+  const dayness = clamp(Math.sin(Math.max(sun.altitude, -6) * D2R) * 1.6 + 0.16, 0.05, 1);
+  skyLight.intensity = lerp(0.28, 1.15, dayness);
+  renderer.setClearColor(new THREE.Color().setHSL(0.58, lerp(0.12, 0.35, dayness), lerp(0.035, 0.10, dayness)), 1);
+  scene.fog.color.copy(new THREE.Color(renderer.getClearColor(new THREE.Color())));
+}
+
+/* ============================================================================
+ *  Sample massing models
+ * ========================================================================== */
+const buildingMat = () => new THREE.MeshStandardMaterial({
+  color: 0xb9c4d0, roughness: 0.82, metalness: 0.02, flatShading: false });
+const contextMat = () => new THREE.MeshStandardMaterial({
+  color: 0x7e8894, roughness: 0.92, metalness: 0.0 });
+
+function box(w, h, d, x, z, mat){
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat || buildingMat());
+  m.position.set(x, h / 2, z);
+  m.castShadow = true; m.receiveShadow = true;
+  return m;
+}
+
+const SAMPLES = {
+  demo(){
+    const g = new THREE.Group();
+    g.add(box(16, 24, 12, -14,  -6));
+    g.add(box(12, 13, 12,   4,   8));
+    g.add(box(10, 34,  10, 16,  -12));
+    g.add(box(22,  8, 10,  -2, -22, contextMat()));
+    g.add(box( 9, 17,  9, -22,  16, contextMat()));
+    return g;
+  },
+  court(){
+    const g = new THREE.Group();
+    const L = 34, t = 9, h = 16;
+    g.add(box(L, h, t, 0, -(L - t) / 2));
+    g.add(box(L, h, t, 0,  (L - t) / 2));
+    g.add(box(t, h, L - 2 * t, -(L - t) / 2, 0));
+    g.add(box(t, h, L - 2 * t,  (L - t) / 2, 0));
+    return g;
+  },
+  tower(){
+    const g = new THREE.Group();
+    g.add(box(14, 56, 14, 0, 0));
+    g.add(box(12, 15, 12, -22, -18, contextMat()));
+    g.add(box(16, 20, 11,  20,  14, contextMat()));
+    g.add(box(10, 26, 10, -20,  20, contextMat()));
+    g.add(box(18, 11, 13,   6, -25, contextMat()));
+    return g;
+  },
+  shading(){
+    const g = new THREE.Group();
+    g.add(box(26, 18, 12, 0, 0));                      // the block
+    const fin = new THREE.MeshStandardMaterial({ color: 0x8e99a6, roughness: 0.7, metalness: 0.1 });
+    for (let i = 1; i <= 5; i++){                      // horizontal louvres on the south face
+      const s = box(26, 0.35, 2.2, 0, 7.1, fin);
+      s.position.y = i * 3;
+      g.add(s);
+    }
+    for (let i = -2; i <= 2; i++){                     // vertical fins
+      const f = box(0.35, 16, 2.2, i * 5.2, 7.1, fin);
+      f.position.y = 8;
+      g.add(f);
+    }
+    return g;
+  },
+  box(){ const g = new THREE.Group(); g.add(box(14, 14, 14, 0, 0)); return g; },
+  none(){ return new THREE.Group(); },
+};
+
+/* ============================================================================
+ *  Model bookkeeping — world-space triangles feed both the analysis and the BVH
+ * ========================================================================== */
+
+/**
+ * Collect every triangle of the current model in world space.
+ * @returns {{tris:Float32Array, count:number, area:number, bbox:THREE.Box3}}
+ */
+function collectTriangles(){
+  modelGroup.updateMatrixWorld(true);
+  const chunks = [];
+  let total = 0;
+  modelGroup.traverse(o => {
+    if (!o.isMesh || !o.geometry || o.userData.noAnalysis) return;
+    let geo = o.geometry;
+    const pos = geo.attributes.position;
+    if (!pos) return;
+    const index = geo.index;
+    const n = index ? index.count : pos.count;
+    const arr = new Float32Array(n * 3);
+    const v = new THREE.Vector3();
+    for (let i = 0; i < n; i++){
+      const vi = index ? index.getX(i) : i;
+      v.fromBufferAttribute(pos, vi).applyMatrix4(o.matrixWorld);
+      arr[i*3] = v.x; arr[i*3+1] = v.y; arr[i*3+2] = v.z;
+    }
+    chunks.push(arr); total += n;
+  });
+  const tris = new Float32Array(total * 3);
+  let off = 0;
+  for (const c of chunks){ tris.set(c, off); off += c.length; }
+
+  const bbox = new THREE.Box3();
+  let area = 0;
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  for (let t = 0; t < tris.length; t += 9){
+    a.set(tris[t], tris[t+1], tris[t+2]);
+    b.set(tris[t+3], tris[t+4], tris[t+5]);
+    c.set(tris[t+6], tris[t+7], tris[t+8]);
+    bbox.expandByPoint(a); bbox.expandByPoint(b); bbox.expandByPoint(c);
+    area += b.clone().sub(a).cross(c.clone().sub(a)).length() * 0.5;
+  }
+  return { tris, count: tris.length / 9, area, bbox };
+}
+
+/** Recompute cached model metrics, frame the sun-path dome around the model. */
+function refreshModelMetrics(){
+  const info = collectTriangles();
+  State.model = info;
+  const size = new THREE.Vector3();
+  if (info.count) info.bbox.getSize(size); else size.set(24, 12, 24);
+  State.modelHeight = size.y;
+  State.modelRadius = Math.max(Math.hypot(size.x, size.z) * 0.5, 12);
+  sunPathRadius = clamp(Math.max(State.modelRadius * 1.9, size.y * 1.5, 26), 26, 240) * State.disp.radius;
+
+  gridHelper.visible = State.disp.grid;
+  const kv = document.getElementById('model-kv');
+  if (info.count){
+    kv.innerHTML =
+      '<dt>Triangles</dt><dd>' + fmtNum(info.count) + '</dd>' +
+      '<dt>Surface area</dt><dd>' + fmtNum(info.area, 0) + ' m²</dd>' +
+      '<dt>Footprint</dt><dd>' + fmtNum(size.x, 1) + ' × ' + fmtNum(size.z, 1) + ' m</dd>' +
+      '<dt>Height</dt><dd>' + fmtNum(size.y, 1) + ' m</dd>';
+  } else {
+    kv.innerHTML = '<dt>Triangles</dt><dd>0</dd>';
+  }
+  const warn = document.getElementById('model-warn');
+  if (info.count > 200000){
+    warn.style.display = 'block';
+    warn.textContent = 'This model has ' + fmtNum(info.count) + ' triangles. Analysis will be slow — ' +
+                       'consider decimating the mesh or increasing the grid size.';
+  } else warn.style.display = 'none';
+  State.bvhDirty = true;
+}
+
+/** Replace the model with one of the built-in samples. */
+function loadSample(key){
+  disposeGroup(modelGroup);
+  modelGroup.add(SAMPLES[key] ? SAMPLES[key]() : SAMPLES.demo());
+  State.objName = null;
+  document.getElementById('obj-chip').innerHTML = '';
+  clearResults();
+  refreshModelMetrics();
+  buildSunPath();
+  frameModel();
+}
+
+/**
+ * Fit the camera so the whole sun-path dome and the model are inside the frame.
+ *
+ * A bounding-sphere fit wastes a lot of screen on a hemisphere, so this solves
+ * the framing exactly: for every representative content point it computes the
+ * smallest camera distance that keeps the point inside both the horizontal and
+ * the vertical frustum planes, and takes the maximum.
+ */
+function frameModel(){
+  const R = sunPathRadius * 1.09;                        // dome plus label overshoot
+  const top = Math.max(sunPathRadius, State.modelHeight);
+  controls.target.set(0, top * 0.40, 0);
+
+  const dir = camera.position.clone().sub(controls.target).normalize();
+  if (!isFinite(dir.x) || dir.lengthSq() < 1e-6) dir.set(0.62, 0.5, 0.6).normalize();
+
+  // camera-space lateral axes for this direction
+  const up = new THREE.Vector3(0, 1, 0);
+  const right = new THREE.Vector3().crossVectors(dir, up).normalize();
+  if (right.lengthSq() < 1e-6) right.set(1, 0, 0);
+  const camUp = new THREE.Vector3().crossVectors(right, dir).normalize();
+
+  const tanV = Math.tan(camera.fov * D2R / 2);
+  const tanH = tanV * clamp(camera.aspect || 1.4, 0.3, 4);
+
+  // representative content: the horizon ring, the zenith, and the model box
+  const pts = [];
+  for (let a = 0; a < 360; a += 22.5){
+    const v = SolarCore.vector(0, a);
+    pts.push(new THREE.Vector3(v.x * R, 0, v.z * R));
+  }
+  pts.push(new THREE.Vector3(0, R, 0));
+  if (State.model.count){
+    const b = State.model.bbox;
+    for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z])
+      pts.push(new THREE.Vector3(x, y, z));
+  }
+
+  let dist = 1;
+  const q = new THREE.Vector3();
+  for (const p of pts){
+    q.subVectors(p, controls.target);
+    const along = q.dot(dir);
+    dist = Math.max(dist,
+      along + Math.abs(q.dot(right)) / tanH,
+      along + Math.abs(q.dot(camUp)) / tanV);
+  }
+  dist *= 1.03;                                          // a hair of breathing room
+
+  camera.position.copy(controls.target).addScaledVector(dir, dist);
+  camera.near = Math.max(dist / 1200, 0.2);
+  camera.far = dist * 16;
+  camera.updateProjectionMatrix();
+  scene.fog.near = dist * 0.95;
+  scene.fog.far = dist * 4.5;
+  controls.update();
+}
+
+
+/* --- OBJ import ---------------------------------------------------------- */
+function importOBJ(text, name){
+  const loader = new OBJLoader();
+  let root;
+  try { root = loader.parse(text); }
+  catch (e){ throw new Error('Could not parse the OBJ file: ' + e.message); }
+
+  const meshes = [];
+  root.traverse(o => { if (o.isMesh && o.geometry && o.geometry.attributes.position) meshes.push(o); });
+  if (!meshes.length) throw new Error('The OBJ file contains no triangle geometry.');
+
+  const g = new THREE.Group();
+  const mat = buildingMat();
+  for (const m of meshes){
+    const geo = m.geometry.clone();
+    geo.applyMatrix4(m.matrixWorld);
+    if (!geo.attributes.normal) geo.computeVertexNormals();
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.castShadow = true; mesh.receiveShadow = true;
+    g.add(mesh);
+  }
+
+  const scale = parseFloat(document.getElementById('i-units').value) || 1;
+  if (document.getElementById('i-objup').value === 'z') g.rotation.x = -Math.PI / 2;
+  g.scale.setScalar(scale);
+  g.updateMatrixWorld(true);
+
+  const bb = new THREE.Box3().setFromObject(g);
+  const ctr = bb.getCenter(new THREE.Vector3());
+  const off = new THREE.Vector3();
+  if (document.getElementById('i-center').checked){ off.x = -ctr.x; off.z = -ctr.z; }
+  if (document.getElementById('i-drop').checked)  off.y = -bb.min.y;
+  g.position.add(off);
+
+  disposeGroup(modelGroup);
+  modelGroup.add(g);
+  State.objName = name;
+  const size = bb.getSize(new THREE.Vector3());
+  document.getElementById('obj-chip').innerHTML =
+    '<div class="chip"><span class="cname" title="' + name.replace(/"/g,'&quot;') + '">' + name +
+    '</span><button class="cx" id="obj-x" title="Remove">&times;</button></div>';
+  document.getElementById('obj-x').onclick = () => loadSample(document.getElementById('i-sample').value);
+  clearResults();
+  refreshModelMetrics();
+  buildSunPath();
+  frameModel();
+  toast('Imported ' + name + ' — ' + fmtNum(State.model.count) + ' triangles, ' +
+        fmtNum(size.x, 1) + ' × ' + fmtNum(size.z, 1) + ' × ' + fmtNum(size.y, 1) + ' m', 'ok');
+}
+
+/* ============================================================================
+ *  Application state
+ * ========================================================================== */
+const State = {
+  site: { lat: 51.48, lon: -0.45, tz: 0, el: 25, name: 'London, United Kingdom' },
+  doy: 172,                 // 21 June
+  minutes: 720,             // 12:00 local clock time
+  dstHours: 0,
+  northRot: 0,              // project north rotation, degrees clockwise
+  weather: null,            // parsed EPW or null (clear-sky fallback)
+  disp: { arcs:true, analemma:true, today:true, compass:true, rings:true,
+          shadow:true, grid:true, dome:false, radius:1 },
+  analysis: { mode:'inst', period:'year', unit:'kwh', gridSize:1.5, offset:0.02,
+              density:1, groundRefl:0.2, useGround:true, shade:true,
+              hourFrom:0, hourTo:24, from:null, to:null },
+  legend: { scheme:'ladybug', mode:'auto', min:0, max:1000 },
+  model: { tris:new Float32Array(0), count:0, area:0, bbox:new THREE.Box3() },
+  modelHeight: 24, modelRadius: 24,
+  objName: null,
+  results: null,
+  bvhDirty: true,
+  playing: false, animMode: 'day', speed: 1.4, autoRun: false,
+  running: false,
+};
+
+/* ============================================================================
+ *  Colour schemes
+ * ========================================================================== */
+const SCHEMES = {
+  // Ladybug Tools "Original" spectrum — the palette architecture students
+  // will already recognise from Grasshopper.
+  ladybug: [[75,107,169],[115,147,202],[170,200,247],[193,213,208],[245,239,103],
+            [252,230,74],[239,156,21],[234,123,0],[234,74,0],[234,38,0]],
+  viridis: [[68,1,84],[72,40,120],[62,74,137],[49,104,142],[38,130,142],
+            [31,158,137],[53,183,121],[109,205,89],[180,222,44],[253,231,37]],
+  turbo:   [[48,18,59],[70,107,227],[54,174,247],[32,225,190],[112,246,111],
+            [190,234,60],[244,188,44],[253,124,26],[219,58,7],[122,4,3]],
+  heat:    [[8,8,20],[64,10,60],[136,20,64],[196,52,38],[236,110,20],
+            [250,168,26],[254,214,90],[255,240,180],[255,252,232],[255,255,255]],
+  gray:    [[24,26,30],[52,56,62],[80,85,92],[108,114,122],[136,142,150],
+            [164,170,178],[192,198,205],[216,221,227],[236,239,242],[255,255,255]],
+};
+
+/** Sample a scheme at t in [0,1] -> {r,g,b} in 0..1. */
+function sampleScheme(name, t){
+  const s = SCHEMES[name] || SCHEMES.ladybug;
+  const x = clamp(t, 0, 1) * (s.length - 1);
+  const i = Math.min(Math.floor(x), s.length - 2), f = x - i;
+  const a = s[i], b = s[i + 1];
+  return { r: lerp(a[0], b[0], f) / 255, g: lerp(a[1], b[1], f) / 255, b: lerp(a[2], b[2], f) / 255 };
+}
+function schemeCss(name){
+  const s = SCHEMES[name] || SCHEMES.ladybug;
+  return 'linear-gradient(90deg,' + s.map((c, i) =>
+    'rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ') ' + (i / (s.length - 1) * 100).toFixed(1) + '%').join(',') + ')';
+}
+
+/* ============================================================================
+ *  Sensor grid — subdivide every triangle until each piece is under grid size
+ * ========================================================================== */
+const MAX_SENSORS = 120000;
+
+/**
+ * @param {Float32Array} tris  world-space triangles, 9 floats each
+ * @param {number} gridSize    target edge length, metres
+ * @param {number} offset      distance to push each sensor off its surface
+ */
+function buildSensorGrid(tris, gridSize, offset){
+  const target = gridSize * gridSize * 0.5;   // triangle area for an edge of gridSize
+  const nTri = tris.length / 9;
+
+  // First pass: how many sub-triangles will each source triangle produce?
+  const levels = new Uint8Array(nTri);
+  let totalSub = 0;
+  const ax = new THREE.Vector3(), bx = new THREE.Vector3(), cx = new THREE.Vector3(),
+        e1 = new THREE.Vector3(), e2 = new THREE.Vector3(), nrm = new THREE.Vector3();
+  for (let t = 0; t < nTri; t++){
+    const o = t * 9;
+    ax.set(tris[o], tris[o+1], tris[o+2]);
+    bx.set(tris[o+3], tris[o+4], tris[o+5]);
+    cx.set(tris[o+6], tris[o+7], tris[o+8]);
+    e1.subVectors(bx, ax); e2.subVectors(cx, ax);
+    const area = nrm.crossVectors(e1, e2).length() * 0.5;
+    let lv = 0;
+    while (lv < 7 && area / (4 ** lv) > target) lv++;
+    levels[t] = lv;
+    totalSub += 4 ** lv;
+  }
+  // If that blows the budget, back off uniformly rather than freezing the tab
+  let reduction = 0;
+  while (totalSub > MAX_SENSORS && reduction < 7){
+    reduction++; totalSub = 0;
+    for (let t = 0; t < nTri; t++) totalSub += 4 ** Math.max(0, levels[t] - reduction);
+  }
+
+  const origins = new Float32Array(totalSub * 3);
+  const normals = new Float32Array(totalSub * 3);
+  const areas   = new Float32Array(totalSub);
+  const verts   = new Float32Array(totalSub * 9);
+  let k = 0;
+
+  // Recursive 4-way midpoint subdivision, iteratively
+  const stack = [];
+  for (let t = 0; t < nTri; t++){
+    const o = t * 9;
+    ax.set(tris[o], tris[o+1], tris[o+2]);
+    bx.set(tris[o+3], tris[o+4], tris[o+5]);
+    cx.set(tris[o+6], tris[o+7], tris[o+8]);
+    e1.subVectors(bx, ax); e2.subVectors(cx, ax);
+    nrm.crossVectors(e1, e2);
+    const len = nrm.length();
+    if (len < 1e-12) continue;                       // degenerate
+    nrm.divideScalar(len);
+    const lv = Math.max(0, levels[t] - reduction);
+
+    stack.length = 0;
+    stack.push([ax.x,ax.y,ax.z, bx.x,bx.y,bx.z, cx.x,cx.y,cx.z, lv]);
+    while (stack.length){
+      const s = stack.pop();
+      const d = s[9];
+      if (d === 0){
+        if (k >= totalSub) break;
+        const cxm = (s[0] + s[3] + s[6]) / 3, cym = (s[1] + s[4] + s[7]) / 3, czm = (s[2] + s[5] + s[8]) / 3;
+        origins[k*3]   = cxm + nrm.x * offset;
+        origins[k*3+1] = cym + nrm.y * offset;
+        origins[k*3+2] = czm + nrm.z * offset;
+        normals[k*3]   = nrm.x; normals[k*3+1] = nrm.y; normals[k*3+2] = nrm.z;
+        const ux = s[3]-s[0], uy = s[4]-s[1], uz = s[5]-s[2];
+        const vx = s[6]-s[0], vy = s[7]-s[1], vz = s[8]-s[2];
+        areas[k] = Math.hypot(uy*vz - uz*vy, uz*vx - ux*vz, ux*vy - uy*vx) * 0.5;
+        for (let q = 0; q < 9; q++) verts[k*9 + q] = s[q];
+        k++;
+      } else {
+        const m01x=(s[0]+s[3])/2, m01y=(s[1]+s[4])/2, m01z=(s[2]+s[5])/2;
+        const m12x=(s[3]+s[6])/2, m12y=(s[4]+s[7])/2, m12z=(s[5]+s[8])/2;
+        const m20x=(s[6]+s[0])/2, m20y=(s[7]+s[1])/2, m20z=(s[8]+s[2])/2;
+        stack.push([s[0],s[1],s[2], m01x,m01y,m01z, m20x,m20y,m20z, d-1]);
+        stack.push([m01x,m01y,m01z, s[3],s[4],s[5], m12x,m12y,m12z, d-1]);
+        stack.push([m20x,m20y,m20z, m12x,m12y,m12z, s[6],s[7],s[8], d-1]);
+        stack.push([m01x,m01y,m01z, m12x,m12y,m12z, m20x,m20y,m20z, d-1]);
+      }
+    }
+  }
+  return {
+    count: k,
+    origins: origins.subarray(0, k * 3),
+    normals: normals.subarray(0, k * 3),
+    areas:   areas.subarray(0, k),
+    verts:   verts.subarray(0, k * 9),
+    reduced: reduction > 0,
+  };
+}
+
+/* ============================================================================
+ *  Ray tracing worker wrapper
+ * ========================================================================== */
+const Tracer = (() => {
+  let worker = null, blobUrl = null, pending = null, built = false;
+
+  function ensure(){
+    if (worker) return worker;
+    blobUrl = URL.createObjectURL(new Blob([WORKER_SOURCE], { type: 'text/javascript' }));
+    worker = new Worker(blobUrl);
+    worker.onmessage = (ev) => {
+      const m = ev.data;
+      if (m.cmd === 'build'){ built = true; if (pending && pending.onBuild) pending.onBuild(m); return; }
+      if (m.cmd === 'progress' && pending && pending.onProgress) pending.onProgress(m.done / m.total);
+      if (m.cmd === 'result' && pending){ const p = pending; pending = null; p.resolve(m); }
+    };
+    worker.onerror = (e) => {
+      if (pending){ const p = pending; pending = null; p.reject(new Error('Ray tracer failed: ' + e.message)); }
+    };
+    return worker;
+  }
+
+  function build(tris){
+    const w = ensure();
+    built = false;
+    const copy = tris.slice();
+    w.postMessage({ cmd: 'build', tris: copy }, [copy.buffer]);
+  }
+
+  function trace(payload, onProgress){
+    const w = ensure();
+    return new Promise((resolve, reject) => {
+      pending = { resolve, reject, onProgress };
+      w.postMessage({ cmd: 'trace', ...payload });
+    });
+  }
+
+  function reset(){
+    if (worker){ worker.terminate(); worker = null; }
+    if (blobUrl){ URL.revokeObjectURL(blobUrl); blobUrl = null; }
+    pending = null; built = false;
+  }
+  return { build, trace, reset, isBuilt: () => built };
+})();
+
+/* ============================================================================
+ *  Analysis runner
+ * ========================================================================== */
+let domeCache = { mf: 0, dome: null };
+function getDome(mf){
+  if (domeCache.mf !== mf) domeCache = { mf, dome: buildSkyDome(mf) };
+  return domeCache.dome;
+}
+
+/** Resolve the UI period selection into a day range. */
+function resolvePeriod(){
+  const a = State.analysis;
+  switch (a.period){
+    case 'day':    return { from: State.doy, to: State.doy, label: fmtDate(State.doy) };
+    case 'month': {
+      const d = dateOfDoy(State.doy);
+      return { from: doyOf(d.month, 1), to: doyOf(d.month, DAYS_IN_MONTH[d.month-1]),
+               label: MONTH_NAMES[d.month-1] };
+    }
+    case 'summer': return { from: doyOf(5,1), to: doyOf(9,30), label: 'May – September' };
+    case 'winter': return { from: doyOf(10,1), to: doyOf(4,30), label: 'October – April', split: true };
+    case 'custom': {
+      const f = a.from || 1, t = a.to || 365;
+      return { from: Math.min(f,t), to: Math.max(f,t), label: fmtDate(Math.min(f,t)) + ' – ' + fmtDate(Math.max(f,t)) };
+    }
+    default:       return { from: 1, to: 365, label: 'Full year' };
+  }
+}
+
+function setBusy(on, msg){
+  document.getElementById('vp-busy').classList.toggle('on', !!on);
+  if (msg) document.getElementById('busy-msg').textContent = msg;
+}
+function setProgress(frac, text){
+  const p = document.getElementById('prog'), t = document.getElementById('prog-txt');
+  if (frac == null){ p.classList.remove('on'); t.classList.remove('on'); return; }
+  p.classList.add('on'); t.classList.add('on');
+  p.querySelector('i').style.width = (clamp(frac, 0, 1) * 100).toFixed(1) + '%';
+  t.textContent = text || '';
+}
+
+/**
+ * Build the source list (directions + energies) for the current settings.
+ * Shared by the analysis run and by the unobstructed reference calculation.
+ */
+function buildSources(onProgress){
+  const a = State.analysis;
+  const dome = getDome(a.density);
+  const common = {
+    dome, site: State.site, weather: State.weather, dstHours: State.dstHours,
+    groundRefl: a.groundRefl, useGround: a.useGround,
+  };
+  if (a.mode === 'inst')
+    return SkyMatrix.instant({ ...common, doy: State.doy, minutes: State.minutes });
+
+  const p = resolvePeriod();
+  if (p.split){
+    // Heating season wraps the new year: accumulate both halves
+    const s1 = SkyMatrix.cumulative({ ...common, doyFrom: p.from, doyTo: 365,
+      hourFrom: a.hourFrom, hourTo: a.hourTo, onProgress });
+    const s2 = SkyMatrix.cumulative({ ...common, doyFrom: 1, doyTo: p.to,
+      hourFrom: a.hourFrom, hourTo: a.hourTo, onProgress });
+    // Same layout for sky+ground; concatenate the sun bins
+    const nFixed = s1.meta.nSky + s1.meta.nGround;
+    const total = nFixed + s1.meta.nSun + s2.meta.nSun;
+    const dirs = new Float32Array(total * 3), vals = new Float64Array(total);
+    dirs.set(s1.dirs.subarray(0, nFixed * 3));
+    for (let i = 0; i < nFixed; i++) vals[i] = s1.vals[i] + s2.vals[i];
+    dirs.set(s1.dirs.subarray(nFixed * 3, (nFixed + s1.meta.nSun) * 3), nFixed * 3);
+    vals.set(s1.vals.subarray(nFixed, nFixed + s1.meta.nSun), nFixed);
+    dirs.set(s2.dirs.subarray(nFixed * 3, (nFixed + s2.meta.nSun) * 3), (nFixed + s1.meta.nSun) * 3);
+    vals.set(s2.vals.subarray(nFixed, nFixed + s2.meta.nSun), nFixed + s1.meta.nSun);
+    return { dirs, vals, count: total, meta: {
+      ...s1.meta, nSun: s1.meta.nSun + s2.meta.nSun,
+      hours: s1.meta.hours + s2.meta.hours,
+      sunUpHours: s1.meta.sunUpHours + s2.meta.sunUpHours,
+      ghiSum: s1.meta.ghiSum + s2.meta.ghiSum,
+      dniSum: s1.meta.dniSum + s2.meta.dniSum,
+      dhiSum: s1.meta.dhiSum + s2.meta.dhiSum } };
+  }
+  return SkyMatrix.cumulative({ ...common, doyFrom: p.from, doyTo: p.to,
+    hourFrom: a.hourFrom, hourTo: a.hourTo, onProgress });
+}
+
+/**
+ * Irradiance on an unobstructed surface with the given normal, using the
+ * current sources. Used for the live GHI cross-check and by the test suite.
+ * @returns {number} W/m2 (instant) or Wh/m2 (cumulative)
+ */
+function unobstructed(nx, ny, nz, sources){
+  const s = sources || buildSources();
+  let acc = 0;
+  for (let j = 0; j < s.count; j++){
+    const v = s.vals[j];
+    if (v <= 0) continue;
+    const dot = nx * s.dirs[j*3] + ny * s.dirs[j*3+1] + nz * s.dirs[j*3+2];
+    if (dot > 0) acc += v * dot;
+  }
+  return acc;
+}
+
+async function runAnalysis(){
+  if (State.running) return;
+  const a = State.analysis;
+  if (!State.model.count){
+    toast('There is no model geometry to analyse. Load a sample massing or import an OBJ file.', 'err');
+    return;
+  }
+  State.running = true;
+  document.getElementById('b-run').disabled = true;
+  setBusy(true, 'Building sky matrix…');
+  setProgress(0, 'Building sky matrix…');
+  await new Promise(r => setTimeout(r, 16));
+
+  try {
+    const t0 = performance.now();
+
+    /* 1 — sources */
+    const sources = buildSources(f => setProgress(f * 0.25, 'Building sky matrix… ' + Math.round(f * 100) + '%'));
+    setProgress(0.28, 'Generating sensor grid…');
+    await new Promise(r => setTimeout(r, 8));
+
+    /* 2 — sensors */
+    const sensors = buildSensorGrid(State.model.tris, a.gridSize, a.offset);
+    if (!sensors.count) throw new Error('The model produced no analysis points.');
+    if (sensors.reduced)
+      toast('Grid size was coarsened automatically to stay under ' + fmtNum(MAX_SENSORS) +
+            ' analysis points.', 'info');
+
+    /* 3 — BVH */
+    if (State.bvhDirty){
+      Tracer.build(State.model.tris);
+      State.bvhDirty = false;
+    }
+    setProgress(0.32, fmtNum(sensors.count) + ' points × ' + fmtNum(sources.count) + ' sky directions…');
+    setBusy(true, 'Ray tracing ' + fmtNum(sensors.count) + ' analysis points…');
+    await new Promise(r => setTimeout(r, 8));
+
+    /* 4 — trace */
+    const firstSun = sources.meta.nSky + sources.meta.nGround;
+    const res = await Tracer.trace({
+      origins: sensors.origins.slice(),
+      normals: sensors.normals.slice(),
+      dirs: sources.dirs.slice(),
+      vals: sources.vals.slice(),
+      shade: a.shade,
+      firstSun,
+      maxT: Math.max(State.modelRadius * 6, 500),
+    }, f => setProgress(0.32 + f * 0.62, 'Ray tracing… ' + Math.round(f * 100) + '%'));
+
+    /* 5 — units */
+    const hours = sources.meta.hours || 1;
+    let scale = 1, unit = 'W/m²', unitLong = 'Irradiance';
+    if (a.mode === 'cum'){
+      if (a.unit === 'kwh'){ scale = 1 / 1000; unit = 'kWh/m²'; unitLong = 'Cumulative radiation'; }
+      else { scale = 1 / hours; unit = 'W/m²'; unitLong = 'Average irradiance'; }
+    }
+    const values = new Float64Array(res.values.length);
+    const direct = new Float64Array(res.direct.length);
+    for (let i = 0; i < values.length; i++){ values[i] = res.values[i] * scale; direct[i] = res.direct[i] * scale; }
+
+    setProgress(0.97, 'Building result mesh…');
+    State.results = {
+      sensors, values, direct, unit, unitLong, sources, hours,
+      mode: a.mode, period: a.mode === 'cum' ? resolvePeriod().label : (fmtDate(State.doy) + ' ' + fmtHM(State.minutes)),
+      ms: performance.now() - t0,
+    };
+    renderResults();
+    setProgress(null);
+    const secs = (State.results.ms / 1000).toFixed(1);
+    toast('Analysis complete — ' + fmtNum(sensors.count) + ' points in ' + secs + ' s', 'ok');
+  } catch (err){
+    console.error(err);
+    setProgress(null);
+    toast(err.message || String(err), 'err');
+  } finally {
+    setBusy(false);
+    State.running = false;
+    document.getElementById('b-run').disabled = false;
+  }
+}
+
+/* ============================================================================
+ *  Result visualisation
+ * ========================================================================== */
+function clearResults(){
+  disposeGroup(resultGroup);
+  State.results = null;
+  document.getElementById('no-results').style.display = '';
+  document.getElementById('have-results').style.display = 'none';
+  modelGroup.visible = true;
+  updateStatusBar();
+}
+
+function legendRange(){
+  const r = State.results;
+  if (!r) return [0, 1];
+  if (State.legend.mode === 'manual') return [State.legend.min, Math.max(State.legend.max, State.legend.min + 1e-6)];
+  let mn = Infinity, mx = -Infinity;
+  for (let i = 0; i < r.values.length; i++){ const v = r.values[i]; if (v < mn) mn = v; if (v > mx) mx = v; }
+  if (!isFinite(mn)) { mn = 0; mx = 1; }
+  if (mx - mn < 1e-9) mx = mn + 1;
+  return [mn, mx];
+}
+
+function renderResults(){
+  const r = State.results;
+  disposeGroup(resultGroup);
+  if (!r) return;
+
+  const [mn, mx] = legendRange();
+  const n = r.sensors.count;
+  const pos = new Float32Array(n * 9);
+  const col = new Float32Array(n * 9);
+  const off = Math.max(State.analysis.offset, 0.012);
+
+  for (let i = 0; i < n; i++){
+    const nx = r.sensors.normals[i*3], ny = r.sensors.normals[i*3+1], nz = r.sensors.normals[i*3+2];
+    for (let v = 0; v < 3; v++){
+      pos[i*9 + v*3    ] = r.sensors.verts[i*9 + v*3    ] + nx * off;
+      pos[i*9 + v*3 + 1] = r.sensors.verts[i*9 + v*3 + 1] + ny * off;
+      pos[i*9 + v*3 + 2] = r.sensors.verts[i*9 + v*3 + 2] + nz * off;
+    }
+    const c = sampleScheme(State.legend.scheme, (r.values[i] - mn) / (mx - mn));
+    for (let v = 0; v < 3; v++){
+      col[i*9 + v*3] = c.r; col[i*9 + v*3 + 1] = c.g; col[i*9 + v*3 + 2] = c.b;
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  const mat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.userData.noAnalysis = true;
+  resultGroup.add(mesh);
+
+  document.getElementById('no-results').style.display = 'none';
+  document.getElementById('have-results').style.display = '';
+  updateLegend(mn, mx);
+  updateResultStats();
+  updateStatusBar();
+}
+
+function updateLegend(mn, mx){
+  const r = State.results;
+  const dp = (mx < 20) ? 1 : 0;
+  document.getElementById('legend-bar').style.background = schemeCss(State.legend.scheme);
+  document.getElementById('lg-min').textContent = fmtNum(mn, dp);
+  document.getElementById('lg-mid').textContent = fmtNum((mn + mx) / 2, dp);
+  document.getElementById('lg-max').textContent = fmtNum(mx, dp);
+  document.getElementById('lg-unit').textContent = r.unitLong + ' — ' + r.unit;
+  if (State.legend.mode === 'auto'){
+    document.getElementById('i-lgmin').value = mn.toFixed(dp);
+    document.getElementById('i-lgmax').value = mx.toFixed(dp);
+  }
+}
+
+const ORIENTS = ['N','NE','E','SE','S','SW','W','NW'];
+/** Classify a surface normal into Roof / Soffit / one of eight bearings. */
+function orientOf(nx, ny, nz){
+  if (ny >  0.7) return 'Roof';
+  if (ny < -0.7) return 'Soffit';
+  let az = Math.atan2(nx, -nz) * R2D;         // clockwise from north
+  az = (az % 360 + 360) % 360;
+  return ORIENTS[Math.round(az / 45) % 8];
+}
+
+function updateResultStats(){
+  const r = State.results;
+  if (!r) return;
+  const n = r.sensors.count;
+  let wsum = 0, area = 0, mx = -Infinity, mn = Infinity, dsum = 0;
+  const groups = new Map();
+  for (let i = 0; i < n; i++){
+    const v = r.values[i], a = r.sensors.areas[i];
+    wsum += v * a; area += a; dsum += r.direct[i] * a;
+    if (v > mx) mx = v; if (v < mn) mn = v;
+    const key = orientOf(r.sensors.normals[i*3], r.sensors.normals[i*3+1], r.sensors.normals[i*3+2]);
+    let g = groups.get(key);
+    if (!g) { g = { area: 0, sum: 0, max: -Infinity }; groups.set(key, g); }
+    g.area += a; g.sum += v * a; if (v > g.max) g.max = v;
+  }
+  const avg = area > 0 ? wsum / area : 0;
+  const dp = (mx < 20) ? 1 : 0;
+
+  document.getElementById('res-kv').innerHTML =
+    '<dt>Analysis</dt><dd>' + r.unitLong + '</dd>' +
+    '<dt>Period</dt><dd>' + r.period + '</dd>' +
+    '<dt>Analysis points</dt><dd>' + fmtNum(n) + '</dd>' +
+    '<dt>Area-weighted mean</dt><dd>' + fmtNum(avg, dp) + ' ' + r.unit + '</dd>' +
+    '<dt>Minimum</dt><dd>' + fmtNum(mn, dp) + ' ' + r.unit + '</dd>' +
+    '<dt>Maximum</dt><dd>' + fmtNum(mx, dp) + ' ' + r.unit + '</dd>' +
+    '<dt>Direct beam share</dt><dd>' + (wsum > 0 ? fmtNum(dsum / wsum * 100, 0) : '0') + ' %</dd>' +
+    '<dt>Total on model</dt><dd>' + fmtNum(wsum / (r.unit === 'kWh/m²' ? 1 : 1000), 0) +
+      (r.unit === 'kWh/m²' ? ' kWh' : ' kW') + '</dd>' +
+    '<dt>Compute time</dt><dd>' + (r.ms / 1000).toFixed(1) + ' s</dd>';
+
+  const [lmn, lmx] = legendRange();
+  const order = ['Roof','N','NE','E','SE','S','SW','W','NW','Soffit'];
+  let html = '<tr><th>Face</th><th>Area m²</th><th>Mean</th><th>Max</th></tr>';
+  for (const k of order){
+    const g = groups.get(k);
+    if (!g || g.area < 1e-6) continue;
+    const m = g.sum / g.area;
+    const c = sampleScheme(State.legend.scheme, (m - lmn) / (lmx - lmn));
+    const rgb = 'rgb(' + Math.round(c.r*255) + ',' + Math.round(c.g*255) + ',' + Math.round(c.b*255) + ')';
+    html += '<tr><td><span class="swatch" style="background:' + rgb + '"></span>' + k + '</td>' +
+            '<td>' + fmtNum(g.area, 0) + '</td>' +
+            '<td class="hi">' + fmtNum(m, dp) + '</td>' +
+            '<td>' + fmtNum(g.max, dp) + '</td></tr>';
+  }
+  document.getElementById('orient-tbl').innerHTML = html;
+}
+
+/* ============================================================================
+ *  Sky dome patch visualisation — shows the sky matrix itself
+ * ========================================================================== */
+function buildDomeMesh(){
+  disposeGroup(domeGroup);
+  if (!State.disp.dome) return;
+
+  const mf = State.analysis.density;
+  const dome = getDome(mf);
+  const src = (State.results && State.results.sources) ? State.results.sources : buildSources();
+  const nSky = src.meta.nSky;
+
+  let mx = 0;
+  for (let i = 0; i < nSky; i++) mx = Math.max(mx, src.vals[i] / dome.solidAngle[i]);
+  if (mx <= 0) mx = 1;
+
+  const TNAZ = [30, 30, 24, 24, 18, 12, 6];
+  const alpha = (Math.PI / 2) / (7 * mf + 0.5);
+  const R = sunPathRadius * 0.96;
+  const positions = [], colors = [];
+  const P = (alt, az) => { const v = SolarCore.vector(alt * R2D, az * R2D); return [v.x*R, v.y*R, v.z*R]; };
+
+  let p = 0;
+  for (let i = 0; i < 7 * mf; i++){
+    const nInRow = TNAZ[Math.floor(i / mf)] * mf;
+    const a0 = alpha * i, a1 = alpha * (i + 1), hw = Math.PI / nInRow;
+    for (let j = 0; j < nInRow; j++){
+      const az = TWO_PI * j / nInRow;
+      const q = [P(a0, az - hw), P(a0, az + hw), P(a1, az + hw), P(a1, az - hw)];
+      const c = sampleScheme(State.legend.scheme, (src.vals[p] / dome.solidAngle[p]) / mx);
+      for (const [ia, ib, ic] of [[0,1,2],[0,2,3]]){
+        for (const k of [ia, ib, ic]){ positions.push(q[k][0], q[k][1], q[k][2]); colors.push(c.r, c.g, c.b); }
+      }
+      p++;
+    }
+  }
+  // zenith cap
+  {
+    const c = sampleScheme(State.legend.scheme, (src.vals[p] / dome.solidAngle[p]) / mx);
+    const a0 = alpha * 7 * mf;
+    const seg = 12, top = P(Math.PI / 2, 0);
+    for (let j = 0; j < seg; j++){
+      const az0 = TWO_PI * j / seg, az1 = TWO_PI * (j + 1) / seg;
+      const p0 = P(a0, az0), p1 = P(a0, az1);
+      for (const q of [p0, p1, top]){ positions.push(q[0], q[1], q[2]); colors.push(c.r, c.g, c.b); }
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  const mat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide,
+    transparent: true, opacity: 0.42, depthWrite: false });
+  domeGroup.add(new THREE.Mesh(geo, mat));
+}
+
+/* ============================================================================
+ *  Readouts — viewport panel, status bar, compass
+ * ========================================================================== */
+function currentSun(){ return SolarCore.position(State.site, State.doy, State.minutes, State.dstHours); }
+function currentDayInfo(){ return SolarCore.dayInfo(State.site, State.doy, State.dstHours); }
+
+/** DNI / DHI / GHI for the hour containing the current time. */
+function currentIrradiance(sun){
+  const h = clamp(Math.floor(State.minutes / 60), 0, 23);
+  if (State.weather){
+    const i = (State.doy - 1) * 24 + h;
+    return { dni: State.weather.dni[i], dhi: State.weather.dhi[i], ghi: State.weather.ghi[i],
+             temp: State.weather.temp[i], source: 'EPW' };
+  }
+  const cs = ClearSky.irradiance(sun.altitude, State.doy, State.site.el);
+  return { ...cs, temp: null, source: 'Clear sky' };
+}
+
+function updateReadout(sun){
+  const el = document.getElementById('vp-readout');
+  const d = dateOfDoy(State.doy);
+  el.innerHTML =
+    '<span class="t">' + d.day + ' ' + MONTH_NAMES[d.month-1] + ' · ' + fmtHM(State.minutes) +
+      (State.dstHours ? ' DST' : '') + '</span>' +
+    '<div class="r"><span>Altitude</span><b>' + sun.altitude.toFixed(1) + '°</b></div>' +
+    '<div class="r"><span>Azimuth</span><b>' + sun.azimuth.toFixed(1) + '°</b></div>';
+}
+
+function updateStatusBar(){
+  const sun = currentSun(), info = currentDayInfo(), rad = currentIrradiance(sun);
+  const sb = document.getElementById('statusbar');
+  const bits = [];
+  const st = (k, v, cls) => bits.push('<div class="st ' + (cls||'') + '"><span class="k">' + k +
+                                      '</span><span class="v">' + v + '</span></div>');
+
+  st('Site', State.site.name || 'Custom', '');
+  st('Lat/Long', State.site.lat.toFixed(2) + '°, ' + State.site.lon.toFixed(2) + '°', 'sec-only');
+  st('Altitude', sun.altitude.toFixed(1) + '°', 'accent');
+  st('Azimuth', sun.azimuth.toFixed(1) + '°', 'accent');
+  if (info.polar === 'day')        st('Sun', 'Above horizon all day', '');
+  else if (info.polar === 'night') st('Sun', 'Below horizon all day', '');
+  else {
+    st('Sunrise', fmtHM(info.sunrise), '');
+    st('Noon', fmtHM(info.solarNoon), 'sec-only');
+    st('Sunset', fmtHM(info.sunset), '');
+    st('Day length', info.dayLength.toFixed(1) + ' h', 'sec-only');
+  }
+  st('DNI', Math.round(rad.dni) + ' W/m²', '');
+  st('DHI', Math.round(rad.dhi) + ' W/m²', '');
+  st('GHI', Math.round(rad.ghi) + ' W/m²', '');
+  if (rad.temp != null) st('Dry bulb', rad.temp.toFixed(1) + ' °C', 'sec-only');
+  st('Sky data', rad.source, 'sec-only');
+
+  // Live cross-check: the model's own horizontal irradiance vs. the source GHI.
+  // With an EPW loaded these must agree, because the Perez sky is normalised to DHI.
+  try {
+    const saveMode = State.analysis.mode;
+    State.analysis.mode = 'inst';
+    const src = buildSources();
+    State.analysis.mode = saveMode;
+    const horiz = unobstructed(0, 1, 0, src);
+    const ghi = rad.ghi;
+    const ok = ghi < 5 || Math.abs(horiz - ghi) / Math.max(ghi, 1) < 0.05;
+    st('Horizontal check', Math.round(horiz) + ' vs ' + Math.round(ghi) + ' W/m²', ok ? 'ok sec-only' : 'bad sec-only');
+  } catch (e) { /* non-fatal */ }
+
+  sb.innerHTML = bits.join('');
+}
+
+function updateCompassOverlay(){
+  const svg = document.getElementById('vp-compass');
+  const dir = new THREE.Vector3();
+  camera.getWorldDirection(dir);
+  const heading = Math.atan2(dir.x, -dir.z) * R2D;      // camera bearing, clockwise from north
+  const rot = -heading;
+  svg.innerHTML =
+    '<circle cx="50" cy="50" r="34" fill="rgba(13,17,23,.6)" stroke="rgba(120,140,160,.45)" stroke-width="1.5"/>' +
+    '<g transform="rotate(' + rot.toFixed(2) + ' 50 50)">' +
+      '<path d="M50 13 L57 50 L50 44 L43 50 Z" fill="#ff9a6b"/>' +
+      '<path d="M50 87 L43 50 L50 56 L57 50 Z" fill="#7d8b9a"/>' +
+      '<text x="50" y="9" text-anchor="middle" font-size="11" font-weight="700" fill="#ff9a6b" font-family="Inter,sans-serif">N</text>' +
+    '</g>';
+}
+
+/* ============================================================================
+ *  Toast
+ * ========================================================================== */
+let toastTimer = null;
+function toast(msg, kind = 'info', ms = 4200){
+  const wrap = document.getElementById('toast-wrap');
+  const el = document.createElement('div');
+  el.className = 'toast ' + kind;
+  el.textContent = msg;
+  wrap.appendChild(el);
+  setTimeout(() => { el.style.transition = 'opacity .3s'; el.style.opacity = '0';
+                     setTimeout(() => el.remove(), 320); }, ms);
+  while (wrap.children.length > 3) wrap.firstChild.remove();
+}
+
+/* ============================================================================
+ *  Export
+ * ========================================================================== */
+function download(name, blob){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+function exportCSV(){
+  const r = State.results;
+  if (!r) { toast('Run an analysis first.', 'err'); return; }
+  const lines = [
+    '# Sun Path & Solar Radiation Studio — analysis export',
+    '# Site,' + (State.site.name || 'custom') + ',lat,' + State.site.lat + ',lon,' + State.site.lon + ',tz,' + State.site.tz,
+    '# Climate,' + (State.weather ? State.weather.fileName : 'synthetic clear sky (ASHRAE/Hottel)'),
+    '# Analysis,' + r.unitLong + ',' + r.period + ',unit,' + r.unit,
+    '# Sky,' + (State.analysis.density === 2 ? 'Reinhart 577' : 'Tregenza 145') +
+      ',ground reflectance,' + State.analysis.groundRefl,
+    'x_m,y_m,z_m,nx,ny,nz,area_m2,orientation,value_' + r.unit.replace(/[^\w]/g,'_') + ',direct_component',
+  ];
+  for (let i = 0; i < r.sensors.count; i++){
+    const o = r.sensors.origins, n = r.sensors.normals;
+    lines.push([
+      o[i*3].toFixed(3), o[i*3+1].toFixed(3), o[i*3+2].toFixed(3),
+      n[i*3].toFixed(4), n[i*3+1].toFixed(4), n[i*3+2].toFixed(4),
+      r.sensors.areas[i].toFixed(4),
+      orientOf(n[i*3], n[i*3+1], n[i*3+2]),
+      r.values[i].toFixed(3), r.direct[i].toFixed(3),
+    ].join(','));
+  }
+  download('solar-radiation-' + (State.site.name || 'site').replace(/\W+/g,'-').toLowerCase() + '.csv',
+           new Blob([lines.join('\n')], { type: 'text/csv' }));
+  toast('Exported ' + fmtNum(r.sensors.count) + ' analysis points to CSV.', 'ok');
+}
+
+function exportPNG(){
+  render();
+  renderer.domElement.toBlob(b => {
+    if (!b) { toast('Could not capture the viewport.', 'err'); return; }
+    download('sun-study-' + fmtDate(State.doy).replace(' ','') + '-' + fmtHM(State.minutes).replace(':','') + '.png', b);
+    toast('Viewport exported as PNG.', 'ok');
+  }, 'image/png');
+}
+
+/* ============================================================================
+ *  UI wiring
+ * ========================================================================== */
+const $ = (id) => document.getElementById(id);
+const on = (id, ev, fn) => { const el = $(id); if (el) el.addEventListener(ev, fn); };
+
+let statusThrottle = 0;
+/** Refresh everything that depends on the current instant. */
+function refresh(force = false){
+  const sun = currentSun();
+  updateSunVisuals(sun);
+  updateReadout(sun);
+  $('v-date').textContent = fmtDate(State.doy);
+  $('v-time').textContent = fmtHM(State.minutes);
+  $('scrub-t').textContent = fmtHM(State.minutes);
+  const now = performance.now();
+  if (force || now - statusThrottle > 110){ statusThrottle = now; updateStatusBar(); }
+  if (State.disp.today) rebuildTodayArc();
+}
+
+let todayArc = null;
+function rebuildTodayArc(){
+  if (todayArc && todayArc.userData.doy === State.doy && todayArc.userData.key === State.siteKey) return;
+  if (todayArc){ todayArc.geometry.dispose(); todayArc.material.dispose(); sunPathGroup.remove(todayArc); }
+  const pts = [];
+  for (let t = 0; t <= 1440; t += 4){
+    const p = SolarCore.position(State.site, State.doy, t, State.dstHours);
+    if (p.altitude < -0.35) continue;
+    pts.push(domePoint(Math.max(p.altitude, 0), p.azimuth, sunPathRadius));
+  }
+  if (pts.length < 2){ todayArc = null; return; }
+  todayArc = lineFromPoints(pts, SUN_COLORS.today, 1);
+  todayArc.userData = { doy: State.doy, key: State.siteKey };
+  sunPathGroup.add(todayArc);
+}
+
+function siteKey(){
+  return [State.site.lat, State.site.lon, State.site.tz, State.dstHours, sunPathRadius].join('|');
+}
+
+/** Rebuild the diagram after anything that changes the geometry of the sun path. */
+function rebuildAll({ frame = false } = {}){
+  State.siteKey = siteKey();
+  todayArc = null;
+  buildSunPath();
+  buildDomeMesh();
+  if (frame) frameModel();
+  refresh(true);
+}
+
+/* --- location ------------------------------------------------------------ */
+function applySiteFields(){
+  State.site.lat = clamp(parseFloat($('i-lat').value) || 0, -89.9, 89.9);
+  State.site.lon = clamp(parseFloat($('i-lon').value) || 0, -180, 180);
+  State.site.tz  = clamp(parseFloat($('i-tz').value) || 0, -12, 14);
+  State.site.el  = parseFloat($('i-elev').value) || 0;
+  rebuildAll();
+}
+['i-lat','i-lon','i-tz','i-elev'].forEach(id => on(id, 'change', applySiteFields));
+
+on('i-city', 'change', (e) => {
+  const c = CITIES[+e.target.value];
+  if (!c) return;
+  State.site = { lat: c.lat, lon: c.lon, tz: c.tz, el: c.el, name: c.n };
+  $('i-lat').value = c.lat; $('i-lon').value = c.lon; $('i-tz').value = c.tz; $('i-elev').value = c.el;
+  rebuildAll();
+});
+
+on('i-north', 'input', (e) => {
+  State.northRot = +e.target.value;
+  $('v-north').textContent = State.northRot + '°';
+  modelGroup.rotation.y = -State.northRot * D2R;
+  refreshModelMetrics();
+  clearResults();
+  refresh(true);
+});
+on('i-dst', 'change', (e) => { State.dstHours = e.target.checked ? 1 : 0; rebuildAll(); });
+
+/* --- EPW import ---------------------------------------------------------- */
+on('b-epw', 'click', () => $('f-epw').click());
+on('f-epw', 'change', (e) => {
+  const f = e.target.files && e.target.files[0];
+  if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => { try { applyEPW(EPW.parse(String(rd.result), f.name)); }
+                      catch (err){ toast(err.message, 'err', 7000); } };
+  rd.onerror = () => toast('Could not read the file.', 'err');
+  rd.readAsText(f);
+  e.target.value = '';
+});
+
+function applyEPW(w){
+  State.weather = w;
+  State.site = { lat: w.site.lat, lon: w.site.lon, tz: w.site.tz, el: w.site.el,
+                 name: [w.site.city, w.site.country].filter(Boolean).join(', ') };
+  $('i-lat').value = w.site.lat; $('i-lon').value = w.site.lon;
+  $('i-tz').value = w.site.tz;  $('i-elev').value = w.site.el;
+  $('i-city').value = '';
+  $('epw-hint').style.display = 'none';
+  $('epw-chip').innerHTML =
+    '<div class="chip"><span class="cname" title="' + w.fileName + '">' + w.fileName +
+    '</span><button class="cx" id="epw-x" title="Remove">&times;</button></div>';
+  $('epw-x').onclick = clearEPW;
+  const s = w.summary;
+  const kv = $('epw-kv');
+  kv.style.display = '';
+  kv.innerHTML =
+    '<dt>Station</dt><dd>' + (w.site.city || '–') + '</dd>' +
+    '<dt>Annual global</dt><dd>' + fmtNum(s.annualGhi, 0) + ' kWh/m²</dd>' +
+    '<dt>Annual direct</dt><dd>' + fmtNum(s.annualDni, 0) + ' kWh/m²</dd>' +
+    '<dt>Annual diffuse</dt><dd>' + fmtNum(s.annualDhi, 0) + ' kWh/m²</dd>' +
+    '<dt>Sun-up hours</dt><dd>' + fmtNum(s.sunUpHours) + ' h</dd>' +
+    '<dt>Dry bulb</dt><dd>' + s.tMin.toFixed(1) + ' … ' + s.tMax.toFixed(1) + ' °C</dd>';
+  clearResults();
+  rebuildAll();
+  toast('Loaded ' + (w.site.city || w.fileName) + ' — annual global horizontal ' +
+        fmtNum(s.annualGhi, 0) + ' kWh/m².', 'ok', 6000);
+}
+
+function clearEPW(){
+  State.weather = null;
+  $('epw-chip').innerHTML = '';
+  $('epw-kv').style.display = 'none';
+  $('epw-hint').style.display = '';
+  clearResults();
+  rebuildAll();
+  toast('EPW removed — back to the synthetic clear-sky model.', 'info');
+}
+
+/* --- date & time --------------------------------------------------------- */
+function setDoy(doy, fromInput){
+  State.doy = clamp(Math.round(doy), 1, 365);
+  const d = dateOfDoy(State.doy);
+  $('i-doy').value = State.doy;
+  if (!fromInput)
+    $('i-date').value = YEAR + '-' + String(d.month).padStart(2,'0') + '-' + String(d.day).padStart(2,'0');
+  refresh();
+}
+function setMinutes(min){
+  State.minutes = clamp(Math.round(min), 0, 1439);
+  $('i-min').value = State.minutes;
+  $('i-min2').value = State.minutes;
+  $('i-time').value = fmtHM(State.minutes);
+  refresh();
+  if (State.autoRun && !State.running && State.analysis.mode === 'inst') scheduleAutoRun();
+}
+on('i-doy', 'input', (e) => setDoy(+e.target.value));
+on('i-date', 'change', (e) => {
+  const p = e.target.value.split('-');
+  if (p.length === 3) setDoy(doyOf(clamp(+p[1],1,12), clamp(+p[2],1,31)), true);
+});
+on('i-min', 'input', (e) => setMinutes(+e.target.value));
+on('i-min2', 'input', (e) => setMinutes(+e.target.value));
+on('i-time', 'change', (e) => {
+  const p = e.target.value.split(':');
+  if (p.length >= 2) setMinutes(+p[0] * 60 + +p[1]);
+});
+on('b-noon', 'click', () => {
+  const info = currentDayInfo();
+  setMinutes(((info.solarNoon % 1440) + 1440) % 1440);
+});
+$('seg-quick').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  const q = b.dataset.q;
+  setDoy(q === 'jun' ? 172 : q === 'dec' ? 355 : 80);
+});
+$('seg-anim').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  State.animMode = b.dataset.a;
+  [...e.currentTarget.children].forEach(c => c.classList.toggle('on', c === b));
+});
+on('i-speed', 'input', (e) => { State.speed = +e.target.value; $('v-speed').textContent = State.speed.toFixed(1) + '×'; });
+
+/* --- display toggles ----------------------------------------------------- */
+const DISP_IDS = { 'd-arcs':'arcs','d-analemma':'analemma','d-today':'today','d-compass':'compass',
+                   'd-rings':'rings','d-shadow':'shadow','d-grid':'grid','d-dome':'dome' };
+for (const [id, key] of Object.entries(DISP_IDS)){
+  on(id, 'change', (e) => {
+    State.disp[key] = e.target.checked;
+    if (key === 'grid') gridHelper.visible = e.target.checked;
+    if (key === 'shadow') renderer.shadowMap.enabled = e.target.checked;
+    if (key === 'dome') buildDomeMesh();
+    else rebuildAll();
+    refresh(true);
+  });
+}
+on('d-radius', 'input', (e) => {
+  State.disp.radius = +e.target.value;
+  $('v-radius').textContent = State.disp.radius.toFixed(2) + '×';
+  refreshModelMetrics();
+  rebuildAll();
+});
+
+/* --- model --------------------------------------------------------------- */
+on('i-sample', 'change', (e) => loadSample(e.target.value));
+on('b-obj', 'click', () => $('f-obj').click());
+on('f-obj', 'change', (e) => {
+  const f = e.target.files && e.target.files[0];
+  if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => { try { importOBJ(String(rd.result), f.name); }
+                      catch (err){ toast(err.message, 'err', 7000); } };
+  rd.onerror = () => toast('Could not read the file.', 'err');
+  rd.readAsText(f);
+  e.target.value = '';
+});
+
+/* --- analysis ------------------------------------------------------------ */
+$('seg-mode').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  State.analysis.mode = b.dataset.m;
+  [...e.currentTarget.children].forEach(c => c.classList.toggle('on', c === b));
+  $('cum-opts').style.display = State.analysis.mode === 'cum' ? '' : 'none';
+  updateRunHint();
+});
+$('seg-unit').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  State.analysis.unit = b.dataset.u;
+  [...e.currentTarget.children].forEach(c => c.classList.toggle('on', c === b));
+});
+on('i-period', 'change', (e) => {
+  State.analysis.period = e.target.value;
+  $('custom-range').style.display = e.target.value === 'custom' ? '' : 'none';
+  updateRunHint();
+});
+on('i-from', 'change', (e) => { const p = e.target.value.split('-'); if (p.length===3) State.analysis.from = doyOf(+p[1], +p[2]); updateRunHint(); });
+on('i-to',   'change', (e) => { const p = e.target.value.split('-'); if (p.length===3) State.analysis.to   = doyOf(+p[1], +p[2]); updateRunHint(); });
+on('i-h0', 'change', (e) => { State.analysis.hourFrom = clamp(+e.target.value|0, 0, 23); updateRunHint(); });
+on('i-h1', 'change', (e) => { State.analysis.hourTo   = clamp(+e.target.value|0, 1, 24); updateRunHint(); });
+on('i-grid', 'change', (e) => { State.analysis.gridSize = clamp(+e.target.value || 1.5, 0.2, 20); updateRunHint(); });
+on('i-offset', 'change', (e) => { State.analysis.offset = clamp(+e.target.value || 0.02, 0.001, 1); });
+on('i-density', 'change', (e) => { State.analysis.density = +e.target.value; buildDomeMesh(); updateRunHint(); });
+on('i-ground', 'change', (e) => { State.analysis.groundRefl = clamp(+e.target.value, 0, 1); });
+on('i-useground', 'change', (e) => { State.analysis.useGround = e.target.checked; });
+on('i-ctx', 'change', (e) => { State.analysis.shade = e.target.checked; });
+on('b-run', 'click', runAnalysis);
+on('b-clear', 'click', () => { clearResults(); toast('Results cleared.', 'info', 2200); });
+on('b-auto', 'click', () => {
+  State.autoRun = !State.autoRun;
+  $('b-auto').textContent = 'Auto: ' + (State.autoRun ? 'on' : 'off');
+  $('b-auto').classList.toggle('primary', State.autoRun);
+  if (State.autoRun){
+    State.analysis.mode = 'inst';
+    [...$('seg-mode').children].forEach(c => c.classList.toggle('on', c.dataset.m === 'inst'));
+    $('cum-opts').style.display = 'none';
+    scheduleAutoRun();
+  }
+});
+
+let autoTimer = null;
+function scheduleAutoRun(){
+  clearTimeout(autoTimer);
+  autoTimer = setTimeout(() => { if (State.autoRun && !State.running) runAnalysis(); }, 190);
+}
+
+function updateRunHint(){
+  const a = State.analysis;
+  const h = $('run-hint');
+  if (a.mode === 'inst'){
+    h.textContent = 'Instantaneous irradiance on every surface at the selected date and time, in W/m².';
+    return;
+  }
+  const p = resolvePeriod();
+  const days = p.split ? (365 - p.from + 1 + p.to) : (p.to - p.from + 1);
+  const hrs = days * Math.max(0, a.hourTo - a.hourFrom);
+  h.textContent = p.label + ' — ' + fmtNum(days) + ' days, ' + fmtNum(hrs) + ' hours, ' +
+                  (a.density === 2 ? '577' : '145') + ' sky patches.';
+}
+
+/* --- results ------------------------------------------------------------- */
+on('i-scheme', 'change', (e) => { State.legend.scheme = e.target.value; renderResults(); buildDomeMesh(); });
+on('i-legmode', 'change', (e) => {
+  State.legend.mode = e.target.value;
+  $('legend-manual').style.display = e.target.value === 'manual' ? '' : 'none';
+  renderResults();
+});
+on('i-lgmin', 'change', (e) => { State.legend.min = +e.target.value; renderResults(); });
+on('i-lgmax', 'change', (e) => { State.legend.max = +e.target.value; renderResults(); });
+on('b-csv', 'click', exportCSV);
+on('b-png', 'click', exportPNG);
+
+/* --- accordion sections -------------------------------------------------- */
+document.querySelectorAll('.sec-head').forEach(h => {
+  h.addEventListener('click', () => h.parentElement.classList.toggle('closed'));
+});
+
+/* --- panels & views ------------------------------------------------------ */
+const app = $('app');
+function setPanel(side, open){
+  app.classList.toggle('no-' + side, !open);
+  $('tb-' + side).classList.toggle('on', open);
+  const narrow = innerWidth <= 1100;
+  if (narrow && open){
+    // only one overlay panel at a time on small screens
+    const other = side === 'left' ? 'right' : 'left';
+    app.classList.add('no-' + other);
+    $('tb-' + other).classList.remove('on');
+  }
+  $('scrim').classList.toggle('on', narrow && (!app.classList.contains('no-left') || !app.classList.contains('no-right')));
+  onResize();
+}
+on('tb-left',  'click', () => setPanel('left',  app.classList.contains('no-left')));
+on('tb-right', 'click', () => setPanel('right', app.classList.contains('no-right')));
+document.querySelectorAll('.panel-close').forEach(b =>
+  b.addEventListener('click', () => setPanel(b.dataset.close, false)));
+on('scrim', 'click', () => { setPanel('left', false); setPanel('right', false); });
+
+const VIEWS = {
+  axo: [0.66, 0.52, 0.68], top: [0.0001, 1, 0.0001],
+  N:   [0, 0.34, -1], S: [0, 0.34, 1], E: [1, 0.34, 0], W: [-1, 0.34, 0],
+};
+$('view-cube').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  [...e.currentTarget.children].forEach(c => c.classList.toggle('on', c === b));
+  const v = VIEWS[b.dataset.view];
+  const dist = camera.position.distanceTo(controls.target);
+  camera.position.copy(controls.target).add(new THREE.Vector3(...v).normalize().multiplyScalar(dist));
+  controls.update();
+});
+
+/* --- animation ----------------------------------------------------------- */
+function setPlaying(p){
+  State.playing = p;
+  for (const id of ['tb-play','b-play2','b-play3']){
+    const el = $(id); if (!el) continue;
+    el.classList.toggle('on', p);
+    const svg = el.querySelector('svg');
+    if (svg) svg.innerHTML = p ? '<rect x="6" y="4.5" width="4" height="15"/><rect x="14" y="4.5" width="4" height="15"/>'
+                               : '<path d="M7 4.5v15l13-7.5z"/>';
+  }
+}
+['tb-play','b-play2','b-play3'].forEach(id => on(id, 'click', () => setPlaying(!State.playing)));
+
+/* --- fullscreen & help --------------------------------------------------- */
+on('tb-full', 'click', () => {
+  if (!document.fullscreenElement) (document.documentElement.requestFullscreen || (()=>{})).call(document.documentElement);
+  else document.exitFullscreen();
+});
+on('tb-help', 'click', () => {
+  toast('Sun path + shadows update live. Import an EPW for real climate data and an OBJ for your own massing, ' +
+        'then Run analysis for irradiance on every surface. Keys: L/R panels, Space play, F fullscreen.', 'info', 9000);
+});
+
+/* --- keyboard ------------------------------------------------------------ */
+addEventListener('keydown', (e) => {
+  if (/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)) return;
+  const k = e.key.toLowerCase();
+  if (k === ' ') { e.preventDefault(); setPlaying(!State.playing); }
+  else if (k === 'l') setPanel('left', app.classList.contains('no-left'));
+  else if (k === 'r') setPanel('right', app.classList.contains('no-right'));
+  else if (k === 'f') $('tb-full').click();
+  else if (k === 'arrowleft')  setMinutes(State.minutes - (e.shiftKey ? 60 : 10));
+  else if (k === 'arrowright') setMinutes(State.minutes + (e.shiftKey ? 60 : 10));
+  else if (k === 'arrowup')    setDoy(State.doy + (e.shiftKey ? 30 : 1));
+  else if (k === 'arrowdown')  setDoy(State.doy - (e.shiftKey ? 30 : 1));
+});
+
+/* ============================================================================
+ *  Render loop
+ * ========================================================================== */
+let wasNarrow = null;
+function onResize(){
+  const w = viewportEl.clientWidth || 1, h = viewportEl.clientHeight || 1;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  $('vp-scrub').classList.toggle('avail', innerWidth <= 1100);
+
+  const narrow = innerWidth <= 1100;
+  if (wasNarrow !== null && narrow !== wasNarrow){
+    // Crossing the breakpoint changes panels from docked to overlay; docked
+    // panels that stay open would bury the viewport, so fold them away.
+    if (narrow){ app.classList.add('no-left', 'no-right');
+                 $('tb-left').classList.remove('on'); $('tb-right').classList.remove('on');
+                 $('scrim').classList.remove('on'); }
+    else { setPanel('left', true); setPanel('right', true); }
+    requestAnimationFrame(() => { onResize(); frameModel(); });
+  }
+  wasNarrow = narrow;
+}
+addEventListener('resize', onResize);
+if (window.ResizeObserver) new ResizeObserver(onResize).observe(viewportEl);
+
+function render(){ renderer.render(scene, camera); }
+
+let lastT = performance.now(), compassT = 0;
+function loop(now){
+  requestAnimationFrame(loop);
+  const dt = Math.min((now - lastT) / 1000, 0.1);
+  lastT = now;
+
+  if (State.playing){
+    if (State.animMode === 'day') setMinutes((State.minutes + dt * 60 * State.speed * 3) % 1440);
+    else setDoy((State.doy + dt * State.speed * 6 - 1) % 365 + 1);
+  }
+  controls.update();
+  if (now - compassT > 120){ compassT = now; updateCompassOverlay(); }
+  render();
+}
+
+/* ============================================================================
+ *  Init
+ * ========================================================================== */
+function init(){
+  if (new URLSearchParams(location.search).has('embed')) document.body.classList.add('embed');
+
+  const sel = $('i-city');
+  sel.innerHTML = '<option value="">Custom coordinates…</option>' +
+    CITIES.map((c, i) => '<option value="' + i + '">' + c.n + '</option>').join('');
+  const londonIdx = CITIES.findIndex(c => c.n.startsWith('London'));
+  sel.value = String(londonIdx);
+  const c = CITIES[londonIdx];
+  State.site = { lat: c.lat, lon: c.lon, tz: c.tz, el: c.el, name: c.n };
+  $('i-lat').value = c.lat; $('i-lon').value = c.lon; $('i-tz').value = c.tz; $('i-elev').value = c.el;
+
+  $('i-from').value = YEAR + '-01-01';
+  $('i-to').value   = YEAR + '-12-31';
+  State.analysis.from = 1; State.analysis.to = 365;
+
+  setDoy(172); setMinutes(720);
+  $('v-speed').textContent = State.speed.toFixed(1) + '×';
+  $('i-speed').value = State.speed;
+
+  loadSample('demo');
+  setPanel('left', innerWidth > 1100);
+  setPanel('right', innerWidth > 1100);
+  onResize();
+  rebuildAll({ frame: true });
+  updateRunHint();
+  requestAnimationFrame(loop);
+
+  // Public surface for the automated test suite
+  window.__SUNAPP = {
+    State, SolarCore, EPW, Perez, ClearSky, SkyMatrix,
+    buildSkyDome, buildSources, unobstructed, buildSensorGrid,
+    runAnalysis, applyEPW, setDoy, setMinutes, loadSample, refresh,
+    getDome, resolvePeriod, orientOf,
+    setSite(s){ Object.assign(State.site, s);
+      $('i-lat').value = State.site.lat; $('i-lon').value = State.site.lon;
+      $('i-tz').value = State.site.tz; $('i-elev').value = State.site.el;
+      rebuildAll(); },
+    setAnalysis(a){
+      Object.assign(State.analysis, a);
+      // keep the visible controls truthful when the API drives the analysis
+      [...$('seg-mode').children].forEach(c => c.classList.toggle('on', c.dataset.m === State.analysis.mode));
+      [...$('seg-unit').children].forEach(c => c.classList.toggle('on', c.dataset.u === State.analysis.unit));
+      $('cum-opts').style.display = State.analysis.mode === 'cum' ? '' : 'none';
+      $('i-period').value = State.analysis.period;
+      $('i-grid').value = State.analysis.gridSize;
+      $('i-density').value = State.analysis.density;
+      $('i-ground').value = State.analysis.groundRefl;
+      $('i-useground').checked = State.analysis.useGround;
+      $('i-ctx').checked = State.analysis.shade;
+      $('i-h0').value = State.analysis.hourFrom;
+      $('i-h1').value = State.analysis.hourTo;
+      updateRunHint();
+    },
+    ready: true,
+  };
+  document.documentElement.dataset.sunappReady = '1';
+}
+
+init();
+</script>
+</body>
+</html>
