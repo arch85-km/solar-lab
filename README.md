@@ -29,7 +29,8 @@ Below: the first-load state (London, clear-sky model) and the phone layout.
 | **Solar radiation on all surfaces** | Instantaneous irradiance in W/m², or cumulative radiation in kWh/m² over any period, mapped face-by-face onto the model. |
 | **Real climate data** | Drag in any EnergyPlus `.epw` weather file — location, time zone and 8 760 hours of DNI/DHI/GHI are read straight from it. |
 | **Your own geometry** | Import an `.obj` model with unit scaling, up-axis selection, centring and drop-to-ground. |
-| **Results you can use** | Legend with selectable colour schemes, a by-orientation summary table (roof, N, NE, E … NW, soffit), CSV export of every analysis point, PNG export of the viewport. |
+| **Results you can use** | Legend with selectable colour schemes, a by-orientation summary table (roof, N, NE, E … NW, soffit), and CSV export of every analysis point. |
+| **Presentation-ready image export** | One click produces a titled study sheet: the view cropped to its content, with site, date, time, sun angles and the legend burned in — in dark or in a light print theme, at up to 3× resolution. |
 
 ---
 
@@ -97,12 +98,23 @@ sky density and ground reflectance, then **Run analysis**.
 - **Cumulative** — total kWh/m² (or period-average W/m²) over the year, a season, a
   month, a day, or a custom date and hour range.
 
+**Export** — the toolbar `Export` button (or `E`) opens a small panel: choose **Dark** or
+**Light (print)**, pick 1× / 2× / 3×, and export. The sheet carries the site name, date,
+local time, sun altitude and azimuth, project north, the hour's global horizontal
+irradiance, the climate source, and — once an analysis has been run — the legend with its
+units and period, so the image needs no caption. The render is cropped to the sun path and
+the model rather than to the empty viewport. Results CSV is available from the same panel.
+
+![Light print sheet](docs/screenshot-sheet.png)
+
+<sub>A light-theme study sheet, ready to drop into a report.</sub>
+
 **Status bar** — sun altitude and azimuth, sunrise, solar noon, sunset, day length, and
 the hour's DNI/DHI/GHI. It also shows a live **horizontal check**: the irradiance the
 app computes on a flat unobstructed surface next to the value in the weather file.
 Those two agreeing is the quickest way to confirm the model is behaving.
 
-**Keyboard** — `L`/`R` panels, `Space` play/pause, `F` fullscreen, `←`/`→` time
+**Keyboard** — `L`/`R` panels, `Space` play/pause, `E` export, `F` fullscreen, `←`/`→` time
 (`Shift` = 1 hour), `↑`/`↓` date (`Shift` = 30 days).
 
 ---
@@ -160,7 +172,7 @@ It is clearly labelled as synthetic; it is not real climate.
 
 ## Validation
 
-`npm test` runs 34 headless checks. Every number below is produced by that suite, not
+`npm test` runs 46 headless checks. Every number below is produced by that suite, not
 asserted by hand.
 
 | Check | Result |
@@ -178,6 +190,20 @@ asserted by hand.
 | Box east vs west face (should be near-symmetric) | 841 vs 821 kWh/m² |
 | Courtyard block, self-shading on vs off | 586 vs 799 kWh/m² |
 | Horizontal overflow at 1440×900, 900×700, 390×844 | none |
+
+The suite also covers the interface: the results table's numeric cells and headers both
+compute to `right`, the page declares a dark `color-scheme` so native dropdowns cannot
+flash light, focusing a `<select>` does not wipe its chevron, and an image export restores
+the live theme and canvas size afterwards.
+
+### On the dropdown flash
+
+The native `<select>` popups used to flash. Three separate causes, all fixed: the page
+never declared `color-scheme`, so the browser drew its popups with the light-mode engine
+over a dark page; `<option>` rows had no explicit background; and the focus rule used the
+`background` **shorthand**, which resets `background-image` — so clicking a dropdown wiped
+its chevron and repainted the whole control through a CSS transition. The focus rule now
+sets `background-color` only.
 
 The headline test is the third-from-last group: with no geometry in the way, a year of
 Perez skies plus binned direct sun reconstructs the weather file's own measured annual
@@ -227,7 +253,7 @@ rebuilds live on every change, with no "apply" step.
 ```bash
 npm install          # playwright, for the test suite only
 npm run vendor       # fetch three.js and the validation EPW
-npm test             # 34 headless checks + responsive screenshots
+npm test             # 46 headless checks, screenshots and sample export sheets
 npm run serve        # serve the folder at http://localhost:8080
 ```
 
@@ -279,3 +305,7 @@ tests/assets/         downloaded on demand (Chicago O'Hare TMY3, for validation)
 - Hottel, H. C. (1976); Liu, B. Y. H. & Jordan, R. C. (1960) — clear-sky correlations.
 - NOAA Global Monitoring Laboratory solar position algorithm.
 - Ladybug Tools — *Incident Radiation* and *Cumulative Sky Matrix* documentation.
+
+---
+
+© Karam Al-Obaidi

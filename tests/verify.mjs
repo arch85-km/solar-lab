@@ -330,6 +330,125 @@ const obj = await page.evaluate((text) => {
 check('OBJ import replaces the model', obj.after === 12 && obj.name === 'cube.obj',
       obj.after + ' triangles, ' + obj.height.toFixed(1) + ' m tall');
 
+/* ------------------------------------------------------ chrome and credit --- */
+console.log('\n=== chrome, credit and controls ===');
+
+const chrome = await page.evaluate(() => {
+  const A = window.__SUNAPP;
+  A.refresh(true);
+  const credit = document.querySelector('#statusbar .credit');
+  const items = document.getElementById('status-items');
+  return {
+    credit: credit ? credit.textContent.trim() : null,
+    statusItems: items ? items.children.length : 0,
+    statusText: items ? items.textContent : '',
+    colorScheme: getComputedStyle(document.documentElement).colorScheme,
+  };
+});
+check('author credit is present at the bottom left',
+      chrome.credit === '© Karam Al-Obaidi', String(chrome.credit));
+check('status bar still renders after the footer was split',
+      chrome.statusItems > 5 && /Chicago|London/.test(chrome.statusText),
+      chrome.statusItems + ' readouts');
+
+// The orientation table only exists once an analysis has been run
+const tableAlign = await page.evaluate(async () => {
+  const A = window.__SUNAPP;
+  A.loadSample('box');
+  A.setAnalysis({ mode: 'inst', gridSize: 4 });
+  await A.runAnalysis();
+  const rows = document.querySelectorAll('#orient-tbl tr');
+  const body = rows[1];
+  const cells = body ? [...body.children] : [];
+  const heads = [...(rows[0] ? rows[0].children : [])];
+  return {
+    rows: rows.length,
+    firstCell: cells[0] ? getComputedStyle(cells[0]).textAlign : null,
+    numCell:   cells[2] ? getComputedStyle(cells[2]).textAlign : null,
+    firstHead: heads[0] ? getComputedStyle(heads[0]).textAlign : null,
+    numHead:   heads[2] ? getComputedStyle(heads[2]).textAlign : null,
+  };
+});
+check('results table: numeric cells align with their headers',
+      tableAlign.numCell === 'right' && tableAlign.numHead === 'right',
+      'cell ' + tableAlign.numCell + ', header ' + tableAlign.numHead);
+check('results table: the face column stays left-aligned',
+      tableAlign.firstCell === 'left' && tableAlign.firstHead === 'left',
+      'cell ' + tableAlign.firstCell + ', header ' + tableAlign.firstHead);
+
+/* ---------------------------------------------------------- dropdown flash --- */
+check('page declares a dark color-scheme so native popups are not light',
+      /dark/.test(chrome.colorScheme), chrome.colorScheme);
+
+const selFocus = await page.evaluate(() => {
+  const el = document.getElementById('i-city');
+  const before = getComputedStyle(el).backgroundImage;
+  el.focus();
+  const after = getComputedStyle(el).backgroundImage;
+  const opt = document.querySelector('#i-city option');
+  return { before, after, optBg: opt ? getComputedStyle(opt).backgroundColor : null };
+});
+check('focusing a dropdown does not wipe its chevron (no background shorthand)',
+      selFocus.before !== 'none' && selFocus.after !== 'none',
+      'before ' + (selFocus.before === 'none' ? 'none' : 'image') +
+      ', after ' + (selFocus.after === 'none' ? 'none' : 'image'));
+check('option rows carry an explicit dark background',
+      !!selFocus.optBg && selFocus.optBg !== 'rgba(0, 0, 0, 0)', String(selFocus.optBg));
+
+/* ------------------------------------------------------------ image export --- */
+console.log('\n=== annotated image export ===');
+
+const exp = await page.evaluate(() => {
+  const A = window.__SUNAPP;
+  const before = { w: A.State ? 0 : 0 };
+  const vp = document.getElementById('viewport');
+  const vw = vp.clientWidth, vh = vp.clientHeight;
+  const cnv = document.querySelector('#viewport canvas');
+  const liveW = cnv.width, liveH = cnv.height;
+
+  const probe = (sheet) => {
+    const g = sheet.getContext('2d');
+    const p = g.getImageData(3, 3, 1, 1).data;
+    return (p[0] + p[1] + p[2]) / 3;
+  };
+  const dark = A.exportSheet({ theme: 'dark', scale: 2, save: false });
+  const light = A.exportSheet({ theme: 'light', scale: 2, save: false });
+  return {
+    vw, vh, liveW, liveH,
+    darkW: dark.width, darkH: dark.height, darkInfo: {
+      headerH: dark.sheetInfo.headerH, footerH: dark.sheetInfo.footerH, imageH: dark.sheetInfo.imageH,
+      cropH: Math.round(dark.sheetInfo.crop.h), renderH: 0 },
+    lightW: light.width, lightH: light.height,
+    darkLum: probe(dark), lightLum: probe(light),
+    themeAfter: A.getTheme(),
+    canvasAfterW: cnv.width, canvasAfterH: cnv.height,
+  };
+});
+const di = exp.darkInfo;
+check('sheet is a title block plus the render plus a footer',
+      exp.darkH === di.headerH + di.imageH + di.footerH &&
+      di.headerH > 0 && di.footerH > 0 && exp.darkW === Math.round(exp.vw * 2),
+      exp.darkW + ' × ' + exp.darkH + ' px (header ' + di.headerH + ' + image ' + di.imageH +
+      ' + footer ' + di.footerH + ')');
+check('the render is cropped to the sun path and model, not the empty viewport',
+      di.cropH < exp.vh * 2 * 0.97, 'crop height ' + di.cropH + ' of ' + exp.vh * 2 + ' rendered px');
+check('light sheet is light and dark sheet is dark',
+      exp.lightLum > 200 && exp.darkLum < 60,
+      'light luminance ' + Math.round(exp.lightLum) + ', dark ' + Math.round(exp.darkLum));
+check('export restores the live theme and canvas size',
+      exp.themeAfter === 'dark' && exp.canvasAfterW === exp.liveW && exp.canvasAfterH === exp.liveH,
+      'theme ' + exp.themeAfter + ', canvas ' + exp.canvasAfterW + '×' + exp.canvasAfterH);
+
+const expNoResults = await page.evaluate(() => {
+  const A = window.__SUNAPP;
+  A.loadSample('demo');                       // loadSample clears results
+  const sheet = A.exportSheet({ theme: 'dark', scale: 1, save: false });
+  return { hasResults: !!A.State.results, w: sheet.width, h: sheet.height };
+});
+check('a sun-path study can be exported with no analysis run',
+      !expNoResults.hasResults && expNoResults.w > 0 && expNoResults.h > expNoResults.w * 0,
+      expNoResults.w + ' × ' + expNoResults.h + ' px, results = ' + expNoResults.hasResults);
+
 /* -------------------------------------------------------------- console --- */
 console.log('\n=== runtime health ===');
 check('no console errors during the whole run', consoleErrors.length === 0,
@@ -345,6 +464,18 @@ await page.evaluate(() => {
   return A.runAnalysis();
 });
 await page.waitForTimeout(500);
+
+// Save one dark and one light study sheet for visual review
+{
+  const { writeFile } = await import('node:fs/promises');
+  for (const theme of ['dark', 'light']){
+    const b64 = await page.evaluate((t) =>
+      window.__SUNAPP.exportSheet({ theme: t, scale: 1, save: false })
+        .toDataURL('image/png').split(',')[1], theme);
+    await writeFile(join(SHOTS, 'sheet-' + theme + '.png'), Buffer.from(b64, 'base64'));
+  }
+  console.log('  saved sheet-dark.png / sheet-light.png');
+}
 
 const sizes = [
   { w: 1440, h: 900, tag: 'desktop' },

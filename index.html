@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="author" content="Karam Al-Obaidi">
 <meta name="description" content="Interactive 3D sun path and solar radiation analysis for architectural design teaching. EPW climate import, OBJ model import, Perez sky model, W/m2 irradiance on all surfaces.">
 <title>Sun Path &amp; Solar Radiation Studio</title>
 <style>
@@ -35,6 +36,10 @@
   --status-h:34px;
   --fs:13px;
   font-synthesis-weight:none;
+  /* Tell the browser to render native UI — select popups, date pickers,
+     scrollbars — with its dark engine. Without this the popup paints on a
+     light substrate over a dark page, which reads as a black flash. */
+  color-scheme:dark;
 }
 *,*::before,*::after{box-sizing:border-box}
 html,body{margin:0;padding:0;height:100%;overflow:hidden;overscroll-behavior:none}
@@ -175,19 +180,22 @@ input[type=text],input[type=number],input[type=date],input[type=time],select,tex
   width:100%;height:28px;padding:0 8px;
   background:var(--panel-2);border:1px solid var(--line);border-radius:5px;
   font-size:12px;outline:none;
-  transition:border-color .13s,background .13s;
+  transition:border-color .13s,background-color .13s;
   min-width:0;
 }
 select{height:28px;padding-right:22px;cursor:pointer;
   appearance:none;-webkit-appearance:none;
+  background-color:var(--panel-2);
   background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' fill='none' stroke='%239aa8b8' stroke-width='1.4'/></svg>");
   background-repeat:no-repeat;background-position:right 7px center;background-size:9px;
 }
-input:focus,select:focus,textarea:focus{border-color:var(--accent);background:var(--panel-3)}
+/* background-color, never the shorthand: the shorthand resets background-image
+   and would wipe the select chevron the moment the control takes focus. */
+input:focus,select:focus,textarea:focus{border-color:var(--accent);background-color:var(--panel-3)}
+select option,select optgroup{background:var(--panel-2);color:var(--text)}
 input[type=number]{-moz-appearance:textfield}
 input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 input[type=date],input[type=time]{cursor:pointer}
-::-webkit-calendar-picker-indicator{filter:invert(.62) sepia(.2)}
 
 /* --- range sliders --- */
 input[type=range]{
@@ -281,7 +289,11 @@ table.tbl th{
   border-bottom:1px solid var(--line);font-size:10px;letter-spacing:.4px;text-transform:uppercase;
 }
 table.tbl th:first-child,table.tbl td:first-child{text-align:left}
-table.tbl td{padding:4px 5px;border-bottom:1px solid var(--line-soft);font-variant-numeric:tabular-nums;color:var(--text-dim)}
+table.tbl td{
+  padding:4px 5px;text-align:right;white-space:nowrap;
+  border-bottom:1px solid var(--line-soft);font-variant-numeric:tabular-nums;color:var(--text-dim);
+}
+table.tbl th:first-child{width:34%}
 table.tbl tr:last-child td{border-bottom:0}
 table.tbl td.hi{color:var(--text);font-weight:600}
 table.tbl .swatch{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;vertical-align:middle}
@@ -366,10 +378,22 @@ table.tbl .swatch{display:inline-block;width:8px;height:8px;border-radius:2px;ma
   background:linear-gradient(180deg,#141a21,#111720);
   border-top:1px solid var(--line);
   font-size:11px;font-variant-numeric:tabular-nums;
-  overflow-x:auto;overflow-y:hidden;white-space:nowrap;
+  overflow:hidden;white-space:nowrap;
+}
+/* The credit is pinned; only the readouts scroll past it. */
+#statusbar .credit{
+  flex:0 0 auto;
+  padding-right:11px;margin-right:2px;
+  border-right:1px solid var(--line-soft);
+  color:var(--text-faint);font-size:10.5px;letter-spacing:.2px;
+}
+#status-items{
+  flex:1 1 auto;min-width:0;
+  display:flex;align-items:center;
+  overflow-x:auto;overflow-y:hidden;
   scrollbar-width:none;
 }
-#statusbar::-webkit-scrollbar{display:none}
+#status-items::-webkit-scrollbar{display:none}
 .st{display:inline-flex;align-items:baseline;gap:5px;padding:0 11px;border-right:1px solid var(--line-soft);flex:0 0 auto;height:16px}
 .st:last-child{border-right:0}
 .st .k{color:var(--text-faint);font-size:10px;letter-spacing:.4px;text-transform:uppercase}
@@ -378,6 +402,20 @@ table.tbl .swatch{display:inline-block;width:8px;height:8px;border-radius:2px;ma
 .st.ok .v{color:var(--green)}
 .st.bad .v{color:var(--red)}
 .st.hide{display:none}
+
+/* ============================================================
+   Popover
+   ============================================================ */
+.pop{
+  position:fixed;z-index:90;width:252px;padding:13px;
+  background:var(--panel);border:1px solid var(--line);border-radius:9px;
+  box-shadow:var(--shadow);
+}
+.pop[hidden]{display:none}
+.pop-t{
+  font-size:11px;font-weight:650;letter-spacing:.55px;text-transform:uppercase;
+  color:var(--text-dim);margin:0 0 10px;
+}
 
 /* ============================================================
    Toast
@@ -449,6 +487,7 @@ table.tbl .swatch{display:inline-block;width:8px;height:8px;border-radius:2px;ma
   #vp-compass{width:40px;height:40px;top:9px;right:9px}
   .grid3{grid-template-columns:1fr 1fr}
   #statusbar{min-height:auto;padding:5px 8px}
+  #statusbar .credit{padding-right:8px;font-size:9.5px}
   .st{padding:0 8px;height:15px}
   .st.sec-only{display:none}
   #vp-scrub{width:calc(100% - 18px);bottom:9px}
@@ -457,6 +496,7 @@ table.tbl .swatch{display:inline-block;width:8px;height:8px;border-radius:2px;ma
   .brand-text{display:none}
   .st .k{display:none}
   .st{gap:0}
+  #statusbar .credit{padding-right:6px;margin-right:0;font-size:9px}
 }
 /* embed mode: hide brand for tight iframes */
 body.embed .brand{display:none}
@@ -506,6 +546,10 @@ body.embed{--topbar-h:44px}
       <button data-view="W" title="Looking from west">W</button>
     </div>
     <span class="tb-sep"></span>
+    <button class="tb-btn" id="tb-export" title="Export a study sheet or results (E)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 3.6v12M8.4 12l3.6 3.6L15.6 12"/><path d="M4 15.5v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+      <span class="tb-label">Export</span>
+    </button>
     <button class="tb-btn" id="tb-help" title="Help &amp; methodology (?)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9.2"/><path d="M9.3 9.2a2.8 2.8 0 1 1 3.6 2.7c-.7.25-.9.8-.9 1.5v.5"/><circle cx="12" cy="17.2" r="1.05" fill="currentColor" stroke="none"/></svg>
       <span class="tb-label">Help</span>
@@ -819,7 +863,31 @@ body.embed{--topbar-h:44px}
   </div>
 
   <!-- ================= STATUS BAR ================= -->
-  <footer id="statusbar"></footer>
+  <footer id="statusbar">
+    <div class="credit">&copy; Karam Al-Obaidi</div>
+    <div id="status-items"></div>
+  </footer>
+</div>
+<div id="export-pop" class="pop" hidden>
+  <div class="pop-t">Export study sheet</div>
+  <div class="row col">
+    <label>Sheet theme</label>
+    <div class="seg sm" id="seg-exp-theme">
+      <button data-t="dark" class="on">Dark</button>
+      <button data-t="light">Light (print)</button>
+    </div>
+  </div>
+  <div class="row col">
+    <label>Resolution</label>
+    <div class="seg sm" id="seg-exp-scale">
+      <button data-s="1">1&times;</button>
+      <button data-s="2" class="on">2&times;</button>
+      <button data-s="3">3&times;</button>
+    </div>
+  </div>
+  <p class="hint" id="exp-size"></p>
+  <button class="btn primary wide" id="b-exp-img" style="margin-top:8px">Export image</button>
+  <button class="btn wide" id="b-exp-csv" style="margin-top:6px">Export results CSV</button>
 </div>
 <div id="toast-wrap"></div>
 
@@ -1660,6 +1728,50 @@ self.onmessage = function(ev){
 `;
 
 /* ============================================================================
+ *  Themes
+ *
+ *  The viewport is dark on screen, but an exported study sheet often has to go
+ *  into a printed report, so every piece of scene *chrome* is declared here and
+ *  can be swapped wholesale. Result-mesh colours are deliberately absent: those
+ *  are data, and they must not change with the theme.
+ * ========================================================================== */
+const THEMES = {
+  dark: {
+    name: 'dark',
+    bgHue: 0.58, bgSat: [0.12, 0.35], bgLight: [0.035, 0.10],
+    ground: 0x2b3038,
+    gridMajor: 0x4a5563, gridMinor: 0x333c47, gridOpacity: 0.5,
+    building: 0xb9c4d0, context: 0x7e8894, fin: 0x8e99a6,
+    hemiSky: 0x9dc3ee, hemiGround: 0x2a2f38, hemiRange: [0.28, 1.15],
+    fill: 0x93b4de, fillIntensity: 0.32,
+    sun: { summer: 0xffb340, winter: 0x62b8ff, today: 0xffe27a, analemma: 0x6d8398 },
+    ray: 0xffb340, rayOpacity: 0.45,
+    ring: 0x3d4b5a, ringLabel: '#5d6e80',
+    compass: 0x5a6a7c, tickMajor: 0x8f9fb0, tickMinor: 0x4d5b6b,
+    cardinalN: '#ff9a6b', cardinal: '#a9b8c7', hourLabel: '#8ea3b7',
+    sheetBg: '#0d1117', sheetPanel: '#151b23', sheetLine: '#2a3441',
+    sheetText: '#e8eef5', sheetDim: '#9aa8b8', sheetFaint: '#6b7887', sheetAccent: '#ffb340',
+  },
+  light: {
+    name: 'light',
+    bgHue: 0.58, bgSat: [0.05, 0.16], bgLight: [0.90, 0.975],
+    ground: 0xe6e9ee,
+    gridMajor: 0xbcc4ce, gridMinor: 0xd6dbe2, gridOpacity: 0.9,
+    building: 0xf4f6f9, context: 0xd6dbe2, fin: 0xc6ccd4,
+    hemiSky: 0xe8f0fb, hemiGround: 0xbfc5cd, hemiRange: [0.55, 1.0],
+    fill: 0xc6d6ea, fillIntensity: 0.42,
+    sun: { summer: 0xd97706, winter: 0x1d6fbf, today: 0xb45309, analemma: 0x8b97a5 },
+    ray: 0xd97706, rayOpacity: 0.55,
+    ring: 0xb4bdc8, ringLabel: '#78838f',
+    compass: 0x94a0ac, tickMajor: 0x5a6673, tickMinor: 0xafb8c2,
+    cardinalN: '#c2410c', cardinal: '#5a6673', hourLabel: '#68737f',
+    sheetBg: '#ffffff', sheetPanel: '#f3f5f8', sheetLine: '#d4dae2',
+    sheetText: '#111a24', sheetDim: '#4a5765', sheetFaint: '#7b8794', sheetAccent: '#b45309',
+  },
+};
+let THEME = THEMES.dark;
+
+/* ============================================================================
  *  Scene — renderer, camera, lighting, ground
  * ========================================================================== */
 const viewportEl = document.getElementById('viewport');
@@ -1668,7 +1780,7 @@ const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffe
 renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-renderer.setClearColor(0x0a0e14, 1);
+renderer.setClearColor(0x0a0e14, 1);   // replaced on the first updateSunVisuals()
 if ('outputColorSpace' in renderer) renderer.outputColorSpace = THREE.SRGBColorSpace;
 viewportEl.appendChild(renderer.domElement);
 
@@ -1694,26 +1806,33 @@ sunLight.shadow.bias = -0.0006;
 sunLight.shadow.normalBias = 0.035;
 scene.add(sunLight, sunLight.target);
 
-const skyLight = new THREE.HemisphereLight(0x9dc3ee, 0x2a2f38, 1.05);
+const skyLight = new THREE.HemisphereLight(THEME.hemiSky, THEME.hemiGround, 1.05);
 scene.add(skyLight);
-const fillLight = new THREE.DirectionalLight(0x93b4de, 0.32);
+const fillLight = new THREE.DirectionalLight(THEME.fill, THEME.fillIntensity);
 fillLight.position.set(-40, 55, -35);
 scene.add(fillLight);
 
 /* --- ground -------------------------------------------------------------- */
 const GROUND_SIZE = 900;
-const groundMat = new THREE.MeshStandardMaterial({ color: 0x2b3038, roughness: 0.98, metalness: 0 });
+const groundMat = new THREE.MeshStandardMaterial({ color: THEME.ground, roughness: 0.98, metalness: 0 });
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(GROUND_SIZE, GROUND_SIZE), groundMat);
 ground.rotation.x = -Math.PI / 2;
 ground.position.y = -0.015;
 ground.receiveShadow = true;
 scene.add(ground);
 
-const gridHelper = new THREE.GridHelper(200, 40, 0x4a5563, 0x333c47);
-gridHelper.material.opacity = 0.5;
-gridHelper.material.transparent = true;
-gridHelper.position.y = 0.006;
-scene.add(gridHelper);
+// GridHelper bakes its colours into vertex data, so a theme change rebuilds it.
+let gridHelper = null;
+function makeGrid(visible = true){
+  if (gridHelper){ scene.remove(gridHelper); gridHelper.geometry.dispose(); gridHelper.material.dispose(); }
+  gridHelper = new THREE.GridHelper(200, 40, THEME.gridMajor, THEME.gridMinor);
+  gridHelper.material.opacity = THEME.gridOpacity;
+  gridHelper.material.transparent = true;
+  gridHelper.position.y = 0.006;
+  gridHelper.visible = visible;
+  scene.add(gridHelper);
+}
+makeGrid();
 
 /* --- groups -------------------------------------------------------------- */
 const modelGroup   = new THREE.Group();   // buildings (rotated by project north)
@@ -1757,10 +1876,10 @@ function disposeGroup(g){
  *  Sun path diagram
  * ========================================================================== */
 const SUN_COLORS = {
-  summer: new THREE.Color(0xffb340),
-  winter: new THREE.Color(0x62b8ff),
-  today:  new THREE.Color(0xffe27a),
-  analemma: new THREE.Color(0x6d8398),
+  summer: new THREE.Color(THEME.sun.summer),
+  winter: new THREE.Color(THEME.sun.winter),
+  today:  new THREE.Color(THEME.sun.today),
+  analemma: new THREE.Color(THEME.sun.analemma),
 };
 
 let sunPathRadius = 40;
@@ -1828,7 +1947,7 @@ function buildSunPath(){
         sunPathGroup.add(lineFromPoints(pts, SUN_COLORS.analemma, 0.42));
         const noonish = SolarCore.position(site, 172, h * 60, dst);
         if (noonish.altitude > 3){
-          const lab = makeLabel(String(h).padStart(2,'0'), { size: 34, color: '#8ea3b7', scale: R * 0.021 });
+          const lab = makeLabel(String(h).padStart(2,'0'), { size: 34, color: THEME.hourLabel, scale: R * 0.021 });
           lab.position.copy(domePoint(noonish.altitude, noonish.azimuth, R)).multiplyScalar(1.06);
           sunPathGroup.add(lab);
         }
@@ -1852,8 +1971,8 @@ function buildSunPath(){
     for (let alt = 15; alt < 90; alt += 15){
       const pts = [];
       for (let a = 0; a <= 360; a += 4) pts.push(domePoint(alt, a, R));
-      sunPathGroup.add(lineFromPoints(pts, 0x3d4b5a, 0.55));
-      const lab = makeLabel(alt + '°', { size: 30, color: '#5d6e80', scale: R * 0.019 });
+      sunPathGroup.add(lineFromPoints(pts, THEME.ring, 0.55));
+      const lab = makeLabel(alt + '°', { size: 30, color: THEME.ringLabel, scale: R * 0.019 });
       lab.position.copy(domePoint(alt, 90, R)).multiplyScalar(1.02);
       sunPathGroup.add(lab);
     }
@@ -1867,14 +1986,14 @@ function buildCompass(R){
   if (!State.disp.compass) return;
   const ringPts = [];
   for (let a = 0; a <= 360; a += 2) ringPts.push(domePoint(0, a, R));
-  compassGroup.add(lineFromPoints(ringPts, 0x5a6a7c, 0.85));
+  compassGroup.add(lineFromPoints(ringPts, THEME.compass, 0.85));
 
   for (let a = 0; a < 360; a += 10){
     const inner = (a % 90 === 0) ? 0.9 : (a % 30 === 0 ? 0.945 : 0.968);
     const p0 = domePoint(0, a, R * inner), p1 = domePoint(0, a, R);
-    compassGroup.add(lineFromPoints([p0, p1], a % 90 === 0 ? 0x8f9fb0 : 0x4d5b6b, a % 90 === 0 ? 0.95 : 0.6));
+    compassGroup.add(lineFromPoints([p0, p1], a % 90 === 0 ? THEME.tickMajor : THEME.tickMinor, a % 90 === 0 ? 0.95 : 0.6));
   }
-  const cardinals = [['N',0,'#ff9a6b'],['E',90,'#a9b8c7'],['S',180,'#a9b8c7'],['W',270,'#a9b8c7']];
+  const cardinals = [['N',0,THEME.cardinalN],['E',90,THEME.cardinal],['S',180,THEME.cardinal],['W',270,THEME.cardinal]];
   for (const [t, a, c] of cardinals){
     const lab = makeLabel(t, { size: 52, color: c, weight: 700, scale: R * 0.038 });
     lab.position.copy(domePoint(0, a, R * 1.075));
@@ -1908,7 +2027,7 @@ const sunMarker = new THREE.Group();
 }
 scene.add(sunMarker);
 
-const sunRay = lineFromPoints([new THREE.Vector3(), new THREE.Vector3()], 0xffb340, 0.45);
+const sunRay = lineFromPoints([new THREE.Vector3(), new THREE.Vector3()], THEME.ray, THEME.rayOpacity);
 sunRay.name = 'sunRay';
 scene.add(sunRay);
 
@@ -1948,18 +2067,23 @@ function updateSunVisuals(sun){
 
   // Ambient sky tint follows the sun height so dusk reads as dusk
   const dayness = clamp(Math.sin(Math.max(sun.altitude, -6) * D2R) * 1.6 + 0.16, 0.05, 1);
-  skyLight.intensity = lerp(0.28, 1.15, dayness);
-  renderer.setClearColor(new THREE.Color().setHSL(0.58, lerp(0.12, 0.35, dayness), lerp(0.035, 0.10, dayness)), 1);
-  scene.fog.color.copy(new THREE.Color(renderer.getClearColor(new THREE.Color())));
+  skyLight.intensity = lerp(THEME.hemiRange[0], THEME.hemiRange[1], dayness);
+  const bg = new THREE.Color().setHSL(THEME.bgHue,
+    lerp(THEME.bgSat[0], THEME.bgSat[1], dayness),
+    lerp(THEME.bgLight[0], THEME.bgLight[1], dayness));
+  renderer.setClearColor(bg, 1);
+  scene.fog.color.copy(bg);
 }
 
 /* ============================================================================
  *  Sample massing models
  * ========================================================================== */
-const buildingMat = () => new THREE.MeshStandardMaterial({
-  color: 0xb9c4d0, roughness: 0.82, metalness: 0.02, flatShading: false });
-const contextMat = () => new THREE.MeshStandardMaterial({
-  color: 0x7e8894, roughness: 0.92, metalness: 0.0 });
+/** Tag a material with its theme role so applyTheme() can retint it later. */
+function themed(mat, kind){ mat.userData.kind = kind; return mat; }
+const buildingMat = () => themed(new THREE.MeshStandardMaterial({
+  color: THEME.building, roughness: 0.82, metalness: 0.02, flatShading: false }), 'building');
+const contextMat = () => themed(new THREE.MeshStandardMaterial({
+  color: THEME.context, roughness: 0.92, metalness: 0.0 }), 'context');
 
 function box(w, h, d, x, z, mat){
   const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat || buildingMat());
@@ -1999,7 +2123,7 @@ const SAMPLES = {
   shading(){
     const g = new THREE.Group();
     g.add(box(26, 18, 12, 0, 0));                      // the block
-    const fin = new THREE.MeshStandardMaterial({ color: 0x8e99a6, roughness: 0.7, metalness: 0.1 });
+    const fin = themed(new THREE.MeshStandardMaterial({ color: THEME.fin, roughness: 0.7, metalness: 0.1 }), 'fin');
     for (let i = 1; i <= 5; i++){                      // horizontal louvres on the south face
       const s = box(26, 0.35, 2.2, 0, 7.1, fin);
       s.position.y = i * 3;
@@ -2104,6 +2228,27 @@ function loadSample(key){
 }
 
 /**
+ * Representative points of everything worth showing: the sun-path horizon ring,
+ * the zenith, and the model's bounding box. Used both to frame the camera and to
+ * crop the exported sheet to its content.
+ */
+function contentPoints(){
+  const R = sunPathRadius * 1.09;
+  const pts = [];
+  for (let a = 0; a < 360; a += 22.5){
+    const v = SolarCore.vector(0, a);
+    pts.push(new THREE.Vector3(v.x * R, 0, v.z * R));
+  }
+  pts.push(new THREE.Vector3(0, R, 0));
+  if (State.model.count){
+    const b = State.model.bbox;
+    for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z])
+      pts.push(new THREE.Vector3(x, y, z));
+  }
+  return pts;
+}
+
+/**
  * Fit the camera so the whole sun-path dome and the model are inside the frame.
  *
  * A bounding-sphere fit wastes a lot of screen on a hemisphere, so this solves
@@ -2128,18 +2273,7 @@ function frameModel(){
   const tanV = Math.tan(camera.fov * D2R / 2);
   const tanH = tanV * clamp(camera.aspect || 1.4, 0.3, 4);
 
-  // representative content: the horizon ring, the zenith, and the model box
-  const pts = [];
-  for (let a = 0; a < 360; a += 22.5){
-    const v = SolarCore.vector(0, a);
-    pts.push(new THREE.Vector3(v.x * R, 0, v.z * R));
-  }
-  pts.push(new THREE.Vector3(0, R, 0));
-  if (State.model.count){
-    const b = State.model.bbox;
-    for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z])
-      pts.push(new THREE.Vector3(x, y, z));
-  }
+  const pts = contentPoints();
 
   let dist = 1;
   const q = new THREE.Vector3();
@@ -2809,7 +2943,7 @@ function updateReadout(sun){
 
 function updateStatusBar(){
   const sun = currentSun(), info = currentDayInfo(), rad = currentIrradiance(sun);
-  const sb = document.getElementById('statusbar');
+  const sb = document.getElementById('status-items');
   const bits = [];
   const st = (k, v, cls) => bits.push('<div class="st ' + (cls||'') + '"><span class="k">' + k +
                                       '</span><span class="v">' + v + '</span></div>');
@@ -2916,13 +3050,257 @@ function exportCSV(){
   toast('Exported ' + fmtNum(r.sensors.count) + ' analysis points to CSV.', 'ok');
 }
 
-function exportPNG(){
-  render();
-  renderer.domElement.toBlob(b => {
-    if (!b) { toast('Could not capture the viewport.', 'err'); return; }
-    download('sun-study-' + fmtDate(State.doy).replace(' ','') + '-' + fmtHM(State.minutes).replace(':','') + '.png', b);
-    toast('Viewport exported as PNG.', 'ok');
-  }, 'image/png');
+/**
+ * Swap the scene chrome between the dark screen theme and the light print theme.
+ * Rebuilds the pieces that bake colour in at construction time: the grid helper
+ * and every sun-path line and text sprite.
+ */
+function applyTheme(name){
+  const t = THEMES[name] || THEMES.dark;
+  if (t === THEME) return;
+  THEME = t;
+
+  groundMat.color.setHex(t.ground);
+  makeGrid(State.disp.grid);
+  skyLight.color.setHex(t.hemiSky);
+  skyLight.groundColor.setHex(t.hemiGround);
+  fillLight.color.setHex(t.fill);
+  fillLight.intensity = t.fillIntensity;
+  sunRay.material.color.setHex(t.ray);
+  sunRay.material.opacity = t.rayOpacity;
+
+  SUN_COLORS.summer.setHex(t.sun.summer);
+  SUN_COLORS.winter.setHex(t.sun.winter);
+  SUN_COLORS.today.setHex(t.sun.today);
+  SUN_COLORS.analemma.setHex(t.sun.analemma);
+
+  // Retint model materials in place, by the role tagged on them at creation
+  const seen = new Set();
+  modelGroup.traverse(o => {
+    if (!o.isMesh) return;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    for (const m of mats){
+      if (!m || seen.has(m) || !m.color) continue;
+      seen.add(m);
+      const hex = t[m.userData.kind || 'building'];
+      if (typeof hex === 'number') m.color.setHex(hex);
+    }
+  });
+
+  todayArc = null;
+  buildSunPath();
+  buildDomeMesh();
+  refresh(true);
+}
+
+/* ----------------------------------------------------------------------------
+ *  Annotated study sheet
+ *
+ *  The viewport on its own says nothing about where or when it is. The export
+ *  composites the render onto a sheet carrying the site, date, time, sun angles
+ *  and — when an analysis has been run — the legend, so the image can go
+ *  straight into a report without a caption.
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Screen-space box containing the 3D content, in pixels of a W x H render.
+ * The viewport is framed to fit the dome on both axes, which usually leaves a
+ * band of empty sky; a sheet destined for a report should not carry it.
+ */
+function contentCropRect(W, H){
+  const full = { x: 0, y: 0, w: W, h: H };
+  const inv = camera.matrixWorldInverse;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity, n = 0;
+  for (const p of contentPoints()){
+    const cam = p.clone().applyMatrix4(inv);
+    if (cam.z > -camera.near) continue;                  // behind the camera
+    const v = p.clone().project(camera);
+    const x = (v.x * 0.5 + 0.5) * W, y = (-v.y * 0.5 + 0.5) * H;
+    if (!isFinite(x) || !isFinite(y)) continue;
+    minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+    minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+    n++;
+  }
+  if (n < 3 || !(maxX > minX) || !(maxY > minY)) return full;
+  const padPx = Math.max(maxX - minX, maxY - minY) * 0.035;
+  const x0 = clamp(minX - padPx, 0, W), x1 = clamp(maxX + padPx, 0, W);
+  const y0 = clamp(minY - padPx, 0, H), y1 = clamp(maxY + padPx, 0, H);
+  if (x1 - x0 < W * 0.2 || y1 - y0 < H * 0.2) return full;
+  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+}
+
+/** Lay the rendered viewport onto a titled sheet, cropped to its content. */
+function composeSheet(source, W, H, s){
+  const pad = Math.round(20 * s);
+  const headerH = Math.round(84 * s);
+  const footerH = Math.round(56 * s);
+  const T = THEME;
+
+  const crop = contentCropRect(W, H);
+  const imageH = Math.max(1, Math.round(crop.h / crop.w * W));
+
+  const cnv = document.createElement('canvas');
+  cnv.width = W;
+  cnv.height = imageH + headerH + footerH;
+  cnv.sheetInfo = { headerH, footerH, imageH, crop };
+  const g = cnv.getContext('2d');
+  const setFont = (px, w = 500) => { g.font = w + ' ' + Math.round(px * s) + 'px Inter, "Segoe UI", system-ui, sans-serif'; };
+
+  g.fillStyle = T.sheetBg;
+  g.fillRect(0, 0, cnv.width, cnv.height);
+  g.fillStyle = T.sheetPanel;
+  g.fillRect(0, 0, W, headerH);
+  g.fillRect(0, headerH + imageH, W, footerH);
+  g.fillStyle = T.sheetLine;
+  g.fillRect(0, headerH - Math.max(1, Math.round(s)), W, Math.max(1, Math.round(s)));
+  g.fillRect(0, headerH + imageH, W, Math.max(1, Math.round(s)));
+
+  g.drawImage(source, crop.x, crop.y, crop.w, crop.h, 0, headerH, W, imageH);
+
+  const sun = currentSun(), info = currentDayInfo(), rad = currentIrradiance(sun);
+  const d = dateOfDoy(State.doy);
+  g.textBaseline = 'alphabetic';
+
+  /* --- header, left --- */
+  if ('letterSpacing' in g) g.letterSpacing = Math.round(1.6 * s) + 'px';
+  setFont(9.5, '650');
+  g.fillStyle = T.sheetFaint;
+  g.textAlign = 'left';
+  g.fillText('SUN PATH & SOLAR RADIATION STUDY', pad, Math.round(26 * s));
+  if ('letterSpacing' in g) g.letterSpacing = '0px';
+
+  setFont(19, '650');
+  g.fillStyle = T.sheetText;
+  g.fillText(State.site.name || 'Custom site', pad, Math.round(51 * s));
+
+  setFont(11, '500');
+  g.fillStyle = T.sheetDim;
+  const climate = State.weather ? State.weather.fileName : 'Clear-sky model (synthetic)';
+  g.fillText(d.day + ' ' + MONTH_NAMES[d.month - 1] + '  ·  ' + fmtHM(State.minutes) +
+             (State.dstHours ? ' DST' : '') + '  ·  ' +
+             State.site.lat.toFixed(2) + '°, ' + State.site.lon.toFixed(2) + '°  ·  ' + climate,
+             pad, Math.round(70 * s));
+
+  /* --- header, right: sun metrics, laid out right to left --- */
+  const chips = [
+    ['ALTITUDE', sun.altitude.toFixed(1) + '°'],
+    ['AZIMUTH',  sun.azimuth.toFixed(1) + '°'],
+    ['SUNRISE',  info.sunrise == null ? '—' : fmtHM(info.sunrise)],
+    ['SUNSET',   info.sunset == null ? '—' : fmtHM(info.sunset)],
+    ['GHI',      Math.round(rad.ghi) + ' W/m²'],
+    ['NORTH',    State.northRot + '°'],
+  ];
+  const gap = Math.round(20 * s);
+  const widths = chips.map(([k, v]) => {
+    setFont(8.5, '650'); const a = g.measureText(k).width;
+    setFont(13.5, '600'); const b = g.measureText(v).width;
+    return Math.max(a, b);
+  });
+  let total = widths.reduce((a, b) => a + b, 0) + gap * (chips.length - 1);
+  // Drop chips from the left until the block clears the title text
+  let first = 0;
+  const leftLimit = pad + Math.round(330 * s);
+  while (first < chips.length - 2 && W - pad - total < leftLimit){
+    total -= widths[first] + gap; first++;
+  }
+  let x = W - pad - total;
+  for (let i = first; i < chips.length; i++){
+    setFont(8.5, '650');
+    g.fillStyle = T.sheetFaint;
+    g.fillText(chips[i][0], x, Math.round(37 * s));
+    setFont(13.5, '600');
+    g.fillStyle = T.sheetText;
+    g.fillText(chips[i][1], x, Math.round(57 * s));
+    x += widths[i] + gap;
+  }
+
+  /* --- footer: credit left, legend right --- */
+  const fy = headerH + imageH;
+  setFont(11, '600');
+  g.fillStyle = T.sheetDim;
+  g.textAlign = 'left';
+  g.fillText('© Karam Al-Obaidi', pad, fy + Math.round(34 * s));
+
+  const r = State.results;
+  if (r){
+    const barW = Math.round(220 * s), barH = Math.round(11 * s);
+    const bx = W - pad - barW, by = fy + Math.round(24 * s);
+    const [mn, mx] = legendRange();
+    const grad = g.createLinearGradient(bx, 0, bx + barW, 0);
+    for (let i = 0; i <= 10; i++){
+      const c = sampleScheme(State.legend.scheme, i / 10);
+      grad.addColorStop(i / 10,
+        'rgb(' + Math.round(c.r*255) + ',' + Math.round(c.g*255) + ',' + Math.round(c.b*255) + ')');
+    }
+    g.fillStyle = grad;
+    g.fillRect(bx, by, barW, barH);
+    g.strokeStyle = T.sheetLine;
+    g.lineWidth = Math.max(1, s * 0.8);
+    g.strokeRect(bx, by, barW, barH);
+
+    setFont(9, '650');
+    g.fillStyle = T.sheetFaint;
+    g.textAlign = 'right';
+    let cap = (r.unitLong + ' — ' + r.unit + '  ·  ' + r.period).toUpperCase();
+    const capMax = W - pad * 2 - Math.round(150 * s);      // clear of the credit
+    while (cap.length > 6 && g.measureText(cap).width > capMax) cap = cap.slice(0, -2) + '…';
+    g.fillText(cap, bx + barW, by - Math.round(6 * s));
+
+    const dp = (mx < 20) ? 1 : 0;
+    setFont(9.5, '600');
+    g.fillStyle = T.sheetDim;
+    g.fillText(fmtNum(mn, dp), bx, by + barH + Math.round(12 * s));
+    g.textAlign = 'center';
+    g.fillText(fmtNum((mn + mx) / 2, dp), bx + barW / 2, by + barH + Math.round(12 * s));
+    g.textAlign = 'right';
+    g.fillText(fmtNum(mx, dp), bx + barW, by + barH + Math.round(12 * s));
+  } else {
+    setFont(10, '500');
+    g.fillStyle = T.sheetFaint;
+    g.textAlign = 'right';
+    g.fillText('Sun path and shadow study — no radiation analysis run',
+               W - pad, fy + Math.round(34 * s));
+  }
+  g.textAlign = 'left';
+  return cnv;
+}
+
+/**
+ * Render the viewport at `scale` in the requested theme and return the finished
+ * sheet. Restores size, pixel ratio and theme even if compositing throws, so a
+ * failed export can never strand the app in print colours.
+ *
+ * @param {{theme?:string, scale?:number, save?:boolean}} opts
+ * @returns {HTMLCanvasElement}
+ */
+function exportSheet({ theme = 'dark', scale = 2, save = true } = {}){
+  const prevTheme = THEME.name;
+  const prevPR = renderer.getPixelRatio();
+  const w = viewportEl.clientWidth || 960, h = viewportEl.clientHeight || 600;
+  const s = clamp(scale, 1, 3);
+  let sheet;
+  try {
+    if (theme !== prevTheme) applyTheme(theme);
+    renderer.setPixelRatio(1);
+    renderer.setSize(Math.round(w * s), Math.round(h * s), false);
+    render();
+    sheet = composeSheet(renderer.domElement, Math.round(w * s), Math.round(h * s), s);
+  } finally {
+    renderer.setPixelRatio(prevPR);
+    if (theme !== prevTheme) applyTheme(prevTheme);
+    onResize();
+    render();
+  }
+  if (save && sheet){
+    const slug = (State.site.name || 'site').replace(/\W+/g, '-').toLowerCase();
+    sheet.toBlob(b => {
+      if (!b) { toast('Could not capture the viewport.', 'err'); return; }
+      download('sun-study-' + slug + '-' + fmtDate(State.doy).replace(' ', '') + '-' +
+               fmtHM(State.minutes).replace(':', '') + (theme === 'light' ? '-print' : '') + '.png', b);
+      toast('Study sheet exported — ' + sheet.width + ' × ' + sheet.height + ' px.', 'ok');
+    }, 'image/png');
+  }
+  return sheet;
 }
 
 /* ============================================================================
@@ -3204,7 +3582,7 @@ on('i-legmode', 'change', (e) => {
 on('i-lgmin', 'change', (e) => { State.legend.min = +e.target.value; renderResults(); });
 on('i-lgmax', 'change', (e) => { State.legend.max = +e.target.value; renderResults(); });
 on('b-csv', 'click', exportCSV);
-on('b-png', 'click', exportPNG);
+on('b-png', 'click', () => exportSheet({ theme: exportOpts.theme, scale: exportOpts.scale }));
 
 /* --- accordion sections -------------------------------------------------- */
 document.querySelectorAll('.sec-head').forEach(h => {
@@ -3258,6 +3636,46 @@ function setPlaying(p){
 }
 ['tb-play','b-play2','b-play3'].forEach(id => on(id, 'click', () => setPlaying(!State.playing)));
 
+/* --- export popover ------------------------------------------------------ */
+const exportOpts = { theme: 'dark', scale: 2 };
+
+function updateExportHint(){
+  const s = exportOpts.scale;
+  const w = Math.round((viewportEl.clientWidth || 960) * s);
+  $('exp-size').textContent = fmtNum(w) + ' px wide, cropped to the sun path and model' +
+    (State.results ? ', legend included.' : '. Run an analysis to include the legend.');
+  $('b-exp-csv').disabled = !State.results;
+}
+
+function openExportPop(open){
+  const pop = $('export-pop');
+  if (!open){ pop.hidden = true; $('tb-export').classList.remove('on'); return; }
+  updateExportHint();
+  pop.hidden = false;
+  $('tb-export').classList.add('on');
+  const r = $('tb-export').getBoundingClientRect();
+  pop.style.top = Math.round(r.bottom + 7) + 'px';
+  pop.style.left = Math.round(clamp(r.left - 100, 8, Math.max(8, innerWidth - pop.offsetWidth - 8))) + 'px';
+}
+on('tb-export', 'click', (e) => { e.stopPropagation(); openExportPop($('export-pop').hidden); });
+$('export-pop').addEventListener('click', (e) => e.stopPropagation());
+addEventListener('click', () => openExportPop(false));
+addEventListener('keydown', (e) => { if (e.key === 'Escape') openExportPop(false); });
+
+$('seg-exp-theme').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  exportOpts.theme = b.dataset.t;
+  [...e.currentTarget.children].forEach(c => c.classList.toggle('on', c === b));
+});
+$('seg-exp-scale').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  exportOpts.scale = +b.dataset.s;
+  [...e.currentTarget.children].forEach(c => c.classList.toggle('on', c === b));
+  updateExportHint();
+});
+on('b-exp-img', 'click', () => { openExportPop(false); exportSheet({ ...exportOpts }); });
+on('b-exp-csv', 'click', () => { openExportPop(false); exportCSV(); });
+
 /* --- fullscreen & help --------------------------------------------------- */
 on('tb-full', 'click', () => {
   if (!document.fullscreenElement) (document.documentElement.requestFullscreen || (()=>{})).call(document.documentElement);
@@ -3276,6 +3694,7 @@ addEventListener('keydown', (e) => {
   else if (k === 'l') setPanel('left', app.classList.contains('no-left'));
   else if (k === 'r') setPanel('right', app.classList.contains('no-right'));
   else if (k === 'f') $('tb-full').click();
+  else if (k === 'e') $('tb-export').click();
   else if (k === 'arrowleft')  setMinutes(State.minutes - (e.shiftKey ? 60 : 10));
   else if (k === 'arrowright') setMinutes(State.minutes + (e.shiftKey ? 60 : 10));
   else if (k === 'arrowup')    setDoy(State.doy + (e.shiftKey ? 30 : 1));
@@ -3361,6 +3780,7 @@ function init(){
     State, SolarCore, EPW, Perez, ClearSky, SkyMatrix,
     buildSkyDome, buildSources, unobstructed, buildSensorGrid,
     runAnalysis, applyEPW, setDoy, setMinutes, loadSample, refresh,
+    exportSheet, applyTheme, THEMES, getTheme: () => THEME.name,
     getDome, resolvePeriod, orientOf,
     setSite(s){ Object.assign(State.site, s);
       $('i-lat').value = State.site.lat; $('i-lon').value = State.site.lon;
