@@ -418,6 +418,44 @@ table.tbl .swatch{display:inline-block;width:8px;height:8px;border-radius:2px;ma
 }
 
 /* ============================================================
+   Guided tour
+   ============================================================ */
+#tour-spot{
+  position:fixed;z-index:200;border-radius:9px;pointer-events:none;
+  box-shadow:0 0 0 2px var(--accent),0 0 0 6px var(--accent-soft),0 0 0 9999px rgba(4,7,11,.66);
+  transition:top .24s cubic-bezier(.4,0,.2,1),left .24s cubic-bezier(.4,0,.2,1),
+             width .24s cubic-bezier(.4,0,.2,1),height .24s cubic-bezier(.4,0,.2,1);
+}
+#tour-spot.dim-only{box-shadow:0 0 0 9999px rgba(4,7,11,.72)}
+#tour-spot[hidden],#tour-card[hidden]{display:none}
+#tour-card{
+  position:fixed;z-index:201;
+  width:min(330px,calc(100vw - 22px));
+  padding:15px 16px 13px;
+  background:var(--panel);border:1px solid var(--line);border-radius:11px;
+  box-shadow:var(--shadow);
+}
+#tour-card .step{
+  font-size:10px;font-weight:650;letter-spacing:.7px;text-transform:uppercase;
+  color:var(--accent);margin-bottom:6px;
+}
+#tour-card h4{margin:0 0 6px;font-size:14.5px;font-weight:650;letter-spacing:.1px}
+#tour-card p{margin:0;font-size:12.5px;line-height:1.52;color:var(--text-dim)}
+#tour-card kbd{
+  display:inline-block;padding:1px 5px;margin:0 1px;
+  background:var(--panel-3);border:1px solid var(--line);border-radius:4px;
+  font-family:inherit;font-size:11px;color:var(--text);
+}
+.tour-nav{display:flex;align-items:center;gap:6px;margin-top:13px}
+.tour-nav .grow{flex:1 1 auto}
+.tour-dots{display:flex;gap:4px;align-items:center}
+.tour-dots i{width:5px;height:5px;border-radius:50%;background:var(--line);display:block;transition:background .18s}
+.tour-dots i.on{background:var(--accent)}
+@media (max-width:700px){
+  #tour-card{width:calc(100vw - 18px)}
+}
+
+/* ============================================================
    Toast
    ============================================================ */
 #toast-wrap{position:fixed;bottom:calc(var(--status-h) + 14px);left:50%;transform:translateX(-50%);z-index:100;display:flex;flex-direction:column;gap:7px;align-items:center;pointer-events:none}
@@ -888,6 +926,19 @@ body.embed{--topbar-h:44px}
   <p class="hint" id="exp-size"></p>
   <button class="btn primary wide" id="b-exp-img" style="margin-top:8px">Export image</button>
   <button class="btn wide" id="b-exp-csv" style="margin-top:6px">Export results CSV</button>
+</div>
+<div id="tour-spot" hidden></div>
+<div id="tour-card" hidden role="dialog" aria-label="Guided tour">
+  <div class="step" id="tour-step"></div>
+  <h4 id="tour-title"></h4>
+  <p id="tour-body"></p>
+  <div class="tour-nav">
+    <button class="btn sm ghost" id="tour-skip">Skip</button>
+    <span class="grow"></span>
+    <div class="tour-dots" id="tour-dots"></div>
+    <button class="btn sm" id="tour-back">Back</button>
+    <button class="btn sm primary" id="tour-next">Next</button>
+  </div>
 </div>
 <div id="toast-wrap"></div>
 
@@ -3676,15 +3727,225 @@ $('seg-exp-scale').addEventListener('click', (e) => {
 on('b-exp-img', 'click', () => { openExportPop(false); exportSheet({ ...exportOpts }); });
 on('b-exp-csv', 'click', () => { openExportPop(false); exportCSV(); });
 
+/* ============================================================================
+ *  Guided tour
+ *
+ *  Coach marks rather than a modal: the spotlight is pointer-events:none, so a
+ *  student can keep dragging the sun or orbiting the model while the tour is up.
+ *  Steps that live inside a panel open it first, which also handles the phone
+ *  layout where panels are bottom sheets.
+ * ========================================================================== */
+const TOUR_KEY = 'sunpath.tour.seen.v1';
+
+const TOUR = [
+  {
+    title: 'Welcome to the Sun Path Studio',
+    body: 'A quick tour of the five things you need — about 30 seconds. ' +
+          'You can keep moving the model while it runs.',
+    centre: true,
+  },
+  {
+    target: '#viewport',
+    title: 'The model space',
+    body: 'Drag to orbit, scroll to zoom. The dome is the sun’s path over the whole year: ' +
+          'each arc is the 21st of a month, and shadows update live as you move the sun.',
+    inset: 90,
+  },
+  {
+    target: '.sec[data-sec="loc"]',
+    open: 'left', sec: 'loc',
+    title: '1 — Where on Earth',
+    body: 'Pick a city or type coordinates. Import an <b>EPW</b> weather file and the app reads ' +
+          'the location and 8,760 hours of real climate data straight out of it.',
+  },
+  {
+    target: '.sec[data-sec="time"]',
+    open: 'left', sec: 'time',
+    title: '2 — When',
+    body: 'Scrub the date and time, or jump to a solstice. Press <kbd>Space</kbd> to animate ' +
+          'a whole day or a whole year.',
+  },
+  {
+    target: '.sec[data-sec="model"]',
+    open: 'right', sec: 'model',
+    title: '3 — Your building',
+    body: 'Start from a sample massing, or import your own <b>OBJ</b> model with unit scaling ' +
+          'and drop-to-ground.',
+  },
+  {
+    target: '#b-run',
+    open: 'right', sec: 'analysis',
+    title: '4 — Run the analysis',
+    body: '<b>Instant W/m²</b> gives irradiance at the moment on screen. <b>Cumulative</b> ' +
+          'totals kWh/m² over a season or a full year, with every surface shading the others.',
+  },
+  {
+    target: '.sec[data-sec="results"]',
+    open: 'right', sec: 'results',
+    title: '5 — Read the results',
+    body: 'Colour is mapped onto every face, with a legend, a mean and max per orientation, ' +
+          'and a CSV export of every analysis point.',
+  },
+  {
+    target: '#tb-export',
+    title: 'Export a study sheet',
+    body: 'One click produces a titled image — site, date, time, sun angles and the legend ' +
+          'burned in — in dark or a light print theme. Press <kbd>E</kbd>.',
+  },
+  {
+    target: '#statusbar',
+    title: 'Always-on readouts',
+    body: 'Sun altitude and azimuth, sunrise, solar noon, sunset, and the hour’s ' +
+          'direct, diffuse and global radiation.',
+  },
+  {
+    title: 'That’s the tour',
+    body: 'Replay it any time from <b>Help</b>. Keys: <kbd>L</kbd>/<kbd>R</kbd> panels, ' +
+          '<kbd>Space</kbd> animate, <kbd>E</kbd> export, <kbd>F</kbd> fullscreen, ' +
+          'arrows to move time and date.',
+    centre: true,
+  },
+];
+
+const Tour = (() => {
+  let idx = -1, active = false;
+
+  const spot = () => $('tour-spot');
+  const card = () => $('tour-card');
+
+  /** Place the spotlight and the card for step i. */
+  function place(){
+    const step = TOUR[idx];
+    const sp = spot(), cd = card();
+    const m = 8, vw = innerWidth, vh = innerHeight;
+
+    let r = null;
+    if (!step.centre && step.target){
+      const el = document.querySelector(step.target);
+      if (el){
+        const b = el.getBoundingClientRect();
+        if (b.width > 0 && b.height > 0){
+          // A big target (the viewport) reads better spotlit slightly inset
+          const i = step.inset || 0;
+          r = { left: b.left + i, top: b.top + i,
+                width: Math.max(24, b.width - i * 2), height: Math.max(24, b.height - i * 2) };
+        }
+      }
+    }
+
+    if (r){
+      sp.classList.remove('dim-only');
+      sp.style.left = Math.round(r.left - m) + 'px';
+      sp.style.top = Math.round(r.top - m) + 'px';
+      sp.style.width = Math.round(r.width + m * 2) + 'px';
+      sp.style.height = Math.round(r.height + m * 2) + 'px';
+    } else {
+      // No target: keep the dimming, drop the ring
+      sp.classList.add('dim-only');
+      sp.style.left = Math.round(vw / 2) + 'px';
+      sp.style.top = Math.round(vh / 2) + 'px';
+      sp.style.width = '0px';
+      sp.style.height = '0px';
+    }
+
+    const cw = cd.offsetWidth || 330, ch = cd.offsetHeight || 170;
+    const g = 14;
+    let left, top;
+    if (!r){
+      left = (vw - cw) / 2;
+      top = (vh - ch) / 2;
+    } else {
+      // Try below, then above, then beside — only overlay the target as a last
+      // resort, which happens when it spans the window in both directions.
+      const midX = () => clamp(r.left + r.width / 2 - cw / 2, 8, Math.max(8, vw - cw - 8));
+      const midY = () => clamp(r.top + r.height / 2 - ch / 2, 8, Math.max(8, vh - ch - 8));
+      if (r.top + r.height + g + ch < vh - 8){
+        top = r.top + r.height + g; left = midX();
+      } else if (r.top - g - ch > 8){
+        top = r.top - g - ch; left = midX();
+      } else if (r.left + r.width + g + cw < vw - 8){
+        left = r.left + r.width + g; top = midY();
+      } else if (r.left - g - cw > 8){
+        left = r.left - g - cw; top = midY();
+      } else {
+        left = midX(); top = clamp(r.top + 12, 8, Math.max(8, vh - ch - 8));
+      }
+    }
+    cd.style.left = Math.round(clamp(left, 8, Math.max(8, vw - cw - 8))) + 'px';
+    cd.style.top = Math.round(clamp(top, 8, Math.max(8, vh - ch - 8))) + 'px';
+  }
+
+  function show(i){
+    idx = clamp(i, 0, TOUR.length - 1);
+    const step = TOUR[idx];
+
+    if (step.open) setPanel(step.open, true);
+    if (step.sec){
+      const sec = document.querySelector('.sec[data-sec="' + step.sec + '"]');
+      if (sec){
+        sec.classList.remove('closed');
+        sec.scrollIntoView({ block: 'nearest' });
+      }
+    }
+
+    $('tour-step').textContent = 'Step ' + (idx + 1) + ' of ' + TOUR.length;
+    $('tour-title').textContent = step.title;
+    $('tour-body').innerHTML = step.body;
+    $('tour-dots').innerHTML = TOUR.map((_, k) => '<i class="' + (k === idx ? 'on' : '') + '"></i>').join('');
+    $('tour-back').disabled = idx === 0;
+    $('tour-next').textContent = idx === TOUR.length - 1 ? 'Finish' : 'Next';
+
+    spot().hidden = false;
+    card().hidden = false;
+    // Let the panel finish its transition before measuring
+    requestAnimationFrame(() => { place(); setTimeout(place, 240); });
+  }
+
+  function start(from = 0){
+    active = true;
+    show(from);
+  }
+
+  function end(remember = true){
+    active = false;
+    spot().hidden = true;
+    card().hidden = true;
+    if (remember){ try { localStorage.setItem(TOUR_KEY, '1'); } catch (e) { /* private mode */ } }
+  }
+
+  function next(){ if (idx >= TOUR.length - 1) end(); else show(idx + 1); }
+  function back(){ show(idx - 1); }
+
+  /** Auto-start on a first visit, unless suppressed by ?tour=0. */
+  function maybeAutoStart(){
+    const p = new URLSearchParams(location.search);
+    if (p.get('tour') === '0') return;
+    let seen = false;
+    try { seen = localStorage.getItem(TOUR_KEY) === '1'; } catch (e) { seen = false; }
+    if (seen && p.get('tour') !== '1') return;
+    setTimeout(() => { if (!active) start(0); }, 650);
+  }
+
+  addEventListener('resize', () => { if (active) place(); });
+  return { start, end, next, back, maybeAutoStart, isActive: () => active, steps: TOUR.length };
+})();
+
+on('tour-next', 'click', Tour.next);
+on('tour-back', 'click', Tour.back);
+on('tour-skip', 'click', () => Tour.end());
+addEventListener('keydown', (e) => {
+  if (!Tour.isActive()) return;
+  if (e.key === 'Escape'){ Tour.end(); }
+  else if (e.key === 'ArrowRight' || e.key === 'Enter'){ e.preventDefault(); Tour.next(); }
+  else if (e.key === 'ArrowLeft'){ e.preventDefault(); Tour.back(); }
+});
+
 /* --- fullscreen & help --------------------------------------------------- */
 on('tb-full', 'click', () => {
   if (!document.fullscreenElement) (document.documentElement.requestFullscreen || (()=>{})).call(document.documentElement);
   else document.exitFullscreen();
 });
-on('tb-help', 'click', () => {
-  toast('Sun path + shadows update live. Import an EPW for real climate data and an OBJ for your own massing, ' +
-        'then Run analysis for irradiance on every surface. Keys: L/R panels, Space play, F fullscreen.', 'info', 9000);
-});
+on('tb-help', 'click', () => Tour.start(0));
 
 /* --- keyboard ------------------------------------------------------------ */
 addEventListener('keydown', (e) => {
@@ -3774,6 +4035,7 @@ function init(){
   rebuildAll({ frame: true });
   updateRunHint();
   requestAnimationFrame(loop);
+  Tour.maybeAutoStart();
 
   // Public surface for the automated test suite
   window.__SUNAPP = {
@@ -3781,6 +4043,7 @@ function init(){
     buildSkyDome, buildSources, unobstructed, buildSensorGrid,
     runAnalysis, applyEPW, setDoy, setMinutes, loadSample, refresh,
     exportSheet, applyTheme, THEMES, getTheme: () => THEME.name,
+    Tour, TOUR_KEY,
     getDome, resolvePeriod, orientOf,
     setSite(s){ Object.assign(State.site, s);
       $('i-lat').value = State.site.lat; $('i-lon').value = State.site.lon;

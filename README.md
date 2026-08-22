@@ -24,6 +24,7 @@ Below: the first-load state (London, clear-sky model) and the phone layout.
 
 | | |
 |---|---|
+| **Guided first-run tour** | A ten-step walkthrough starts automatically the first time a student opens the page, spotlighting each control in turn. It is non-blocking — the model stays draggable while it runs — and replays any time from **Help**. |
 | **3D sun path for a full year** | Hourly analemmas, monthly sun-path arcs, solstice and equinox highlights, compass rose with bearings, altitude rings, animated sun. |
 | **Real-time shadows** | A shadow-casting sun light driven by the true solar position, with day and year animation. |
 | **Solar radiation on all surfaces** | Instantaneous irradiance in W/m², or cumulative radiation in kWh/m² over any period, mapped face-by-face onto the model. |
@@ -83,6 +84,12 @@ examples/jsm/loaders/OBJLoader.js
 
 ## Using it
 
+**First run** — a guided tour walks through the interface one control at a time. Skip it
+with `Esc`, replay it from **Help**, or suppress it entirely by adding `?tour=0` to the
+URL (useful when projecting the app in a lecture). Add `?tour=1` to force it.
+
+![Guided tour](docs/screenshot-tour.png)
+
 **Toolbar** — `Sun & Site` and `Model & Analysis` open the two panels; `Animate` plays
 the sun; the view cube jumps to plan or elevation views.
 
@@ -115,7 +122,8 @@ app computes on a flat unobstructed surface next to the value in the weather fil
 Those two agreeing is the quickest way to confirm the model is behaving.
 
 **Keyboard** — `L`/`R` panels, `Space` play/pause, `E` export, `F` fullscreen, `←`/`→` time
-(`Shift` = 1 hour), `↑`/`↓` date (`Shift` = 30 days).
+(`Shift` = 1 hour), `↑`/`↓` date (`Shift` = 30 days). During the tour the arrows step
+through it and `Esc` dismisses it.
 
 ---
 
@@ -172,7 +180,7 @@ It is clearly labelled as synthetic; it is not real climate.
 
 ## Validation
 
-`npm test` runs 46 headless checks. Every number below is produced by that suite, not
+`npm test` runs 56 headless checks. Every number below is produced by that suite, not
 asserted by hand.
 
 | Check | Result |
@@ -194,7 +202,9 @@ asserted by hand.
 The suite also covers the interface: the results table's numeric cells and headers both
 compute to `right`, the page declares a dark `color-scheme` so native dropdowns cannot
 flash light, focusing a `<select>` does not wipe its chevron, and an image export restores
-the live theme and canvas size afterwards.
+the live theme and canvas size afterwards. The guided tour is checked end to end: it
+auto-starts once, every card stays on screen and clear of the element it points at, the
+spotlight passes clicks through, and it does not reappear on the next visit.
 
 ### On the dropdown flash
 
@@ -253,7 +263,7 @@ rebuilds live on every change, with no "apply" step.
 ```bash
 npm install          # playwright, for the test suite only
 npm run vendor       # fetch three.js and the validation EPW
-npm test             # 46 headless checks, screenshots and sample export sheets
+npm test             # 56 headless checks, screenshots and sample export sheets
 npm run serve        # serve the folder at http://localhost:8080
 ```
 

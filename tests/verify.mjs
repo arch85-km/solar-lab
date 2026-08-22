@@ -75,7 +75,7 @@ page.on('console', m => { if (m.type() === 'error') consoleErrors.push(m.text())
 page.on('pageerror', e => consoleErrors.push('pageerror: ' + e.message));
 
 console.log('\n=== boot ===');
-await page.goto('http://127.0.0.1:' + port + '/index.html', { waitUntil: 'load' });
+await page.goto('http://127.0.0.1:' + port + '/index.html?tour=0', { waitUntil: 'load' });
 await page.waitForFunction(() => window.__SUNAPP && window.__SUNAPP.ready, null, { timeout: 30000 });
 check('app boots and exposes its API', true);
 check('importmap resolves against the real published package',
@@ -448,6 +448,118 @@ const expNoResults = await page.evaluate(() => {
 check('a sun-path study can be exported with no analysis run',
       !expNoResults.hasResults && expNoResults.w > 0 && expNoResults.h > expNoResults.w * 0,
       expNoResults.w + ' × ' + expNoResults.h + ' px, results = ' + expNoResults.hasResults);
+
+/* -------------------------------------------------------------- tour --- */
+console.log('\n=== guided tour ===');
+
+// A fresh context has no localStorage flag, so the tour must auto-start there
+{
+  const tourCtx = await browser.newContext({ viewport: { width: 1280, height: 820 } });
+  await tourCtx.route('**://cdn.jsdelivr.net/**', async (route) => {
+    const m = new URL(route.request().url()).pathname.match(/^\/npm\/three@[^/]+\/(.+)$/);
+    const f = m && join(vendorRoot, m[1]);
+    if (!f || !existsSync(f)) return route.fulfill({ status: 404, body: 'missing' });
+    await route.fulfill({ status: 200, contentType: 'text/javascript',
+                          headers: { 'access-control-allow-origin': '*' }, body: await readFile(f, 'utf8') });
+  });
+  const tp = await tourCtx.newPage();
+  const tourErrors = [];
+  tp.on('pageerror', e => tourErrors.push(e.message));
+  await tp.goto('http://127.0.0.1:' + port + '/index.html', { waitUntil: 'load' });
+  await tp.waitForFunction(() => window.__SUNAPP && window.__SUNAPP.ready, null, { timeout: 30000 });
+
+  await tp.waitForSelector('#tour-card:not([hidden])', { timeout: 5000 });
+  const first = await tp.evaluate(() => ({
+    step: document.getElementById('tour-step').textContent,
+    title: document.getElementById('tour-title').textContent,
+    total: window.__SUNAPP.Tour.steps,
+    backDisabled: document.getElementById('tour-back').disabled,
+  }));
+  check('tour auto-starts on a first visit', /Step 1 of/.test(first.step) && !!first.title,
+        first.step + ' — "' + first.title + '"');
+  check('Back is disabled on the first step', first.backDisabled === true);
+
+  // Walk the whole tour through the Next button
+  const seen = [];
+  for (let i = 0; i < first.total; i++){
+    seen.push(await tp.evaluate(() => {
+      const spot = document.getElementById('tour-spot');
+      const card = document.getElementById('tour-card');
+      const sr = spot.getBoundingClientRect(), cr = card.getBoundingClientRect();
+      // A step can only be judged on covering its target when there is somewhere
+      // else for the card to go: a centred step has a zero-size spotlight, and a
+      // target spanning the window in both axes leaves no clear side.
+      const spotArea = sr.width * sr.height;
+      const fits = (room) => room >= cr.height + 16;
+      const fitsX = (room) => room >= cr.width + 16;
+      const avoidable = fits(innerHeight - sr.bottom) || fits(sr.top) ||
+                        fitsX(innerWidth - sr.right) || fitsX(sr.left);
+      const pointed = spotArea > 400 && avoidable;
+      return {
+        title: document.getElementById('tour-title').textContent,
+        onScreen: cr.left >= 0 && cr.top >= 0 &&
+                  cr.right <= innerWidth + 1 && cr.bottom <= innerHeight + 1,
+        pointed,
+        overlaps: pointed &&
+          !(cr.right < sr.left || cr.left > sr.right || cr.bottom < sr.top || cr.top > sr.bottom),
+        spotVisible: !spot.hidden,
+        pointerThrough: getComputedStyle(spot).pointerEvents === 'none',
+      };
+    }));
+    await tp.click('#tour-next');
+    await tp.waitForTimeout(320);
+  }
+  const offScreen = seen.filter(x => !x.onScreen).map(x => x.title);
+  check('every tour card stays inside the viewport', offScreen.length === 0,
+        offScreen.length ? offScreen.join(', ') : seen.length + ' steps checked at 1280×820');
+  const pointed = seen.filter(x => x.pointed);
+  check('the tour never covers the element it is pointing at',
+        pointed.length >= 5 && pointed.every(x => !x.overlaps),
+        pointed.filter(x => x.overlaps).map(x => x.title).join(', ') ||
+        pointed.length + ' element-targeted steps clear of their target');
+  check('the spotlight lets clicks through to the app',
+        seen.every(x => x.pointerThrough));
+
+  await tp.evaluate(() => window.__SUNAPP.Tour.start(2));   // a panel step, worth a look
+  await tp.waitForTimeout(500);
+  await tp.screenshot({ path: join(SHOTS, 'tour.png') });
+  await tp.evaluate(() => { const T = window.__SUNAPP.Tour; T.start(9); });
+  await tp.waitForTimeout(400);
+  await tp.click('#tour-next');
+  await tp.waitForTimeout(200);
+
+  const done = await tp.evaluate(() => ({
+    hidden: document.getElementById('tour-card').hidden,
+    stored: localStorage.getItem(window.__SUNAPP.TOUR_KEY),
+  }));
+  check('finishing the tour closes it and records that it was seen',
+        done.hidden === true && done.stored === '1', 'stored = ' + done.stored);
+
+  await tp.reload({ waitUntil: 'load' });
+  await tp.waitForFunction(() => window.__SUNAPP && window.__SUNAPP.ready, null, { timeout: 30000 });
+  await tp.waitForTimeout(1100);
+  const second = await tp.evaluate(() => document.getElementById('tour-card').hidden);
+  check('the tour does not reappear on the next visit', second === true);
+
+  // Help replays it on demand
+  await tp.click('#tb-help');
+  await tp.waitForTimeout(250);
+  const replay = await tp.evaluate(() => ({
+    hidden: document.getElementById('tour-card').hidden,
+    step: document.getElementById('tour-step').textContent,
+  }));
+  check('Help replays the tour from the beginning',
+        replay.hidden === false && /Step 1 of/.test(replay.step), replay.step);
+
+  // Escape closes it
+  await tp.keyboard.press('Escape');
+  await tp.waitForTimeout(150);
+  check('Escape dismisses the tour',
+        await tp.evaluate(() => document.getElementById('tour-card').hidden) === true);
+  check('no page errors during the tour', tourErrors.length === 0, tourErrors.slice(0, 2).join(' | '));
+
+  await tourCtx.close();
+}
 
 /* -------------------------------------------------------------- console --- */
 console.log('\n=== runtime health ===');
