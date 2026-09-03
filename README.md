@@ -1,6 +1,6 @@
-# Sun Path & Solar Radiation Studio
+# Sun Studio
 
-An interactive 3D sun-path and solar-radiation analysis tool for teaching environmental
+**Sun Studio** is an interactive 3D sun-path and solar-radiation analysis tool for teaching environmental
 design to architecture students. It runs entirely in the browser from a **single
 responsive HTML file** that drops straight into a WordPress page.
 
@@ -52,7 +52,7 @@ internet access — which any live WordPress site has.
             aspect-ratio:16/10;min-height:520px;border-radius:10px;overflow:hidden;
             box-shadow:0 6px 28px rgba(0,0,0,.28)">
   <iframe src="/wp-content/uploads/sunpath/index.html?embed=1"
-          title="Sun Path and Solar Radiation Studio"
+          title="Sun Studio — sun path and solar radiation analysis"
           style="position:absolute;inset:0;width:100%;height:100%;border:0"
           allowfullscreen loading="lazy"></iframe>
 </div>
@@ -89,6 +89,9 @@ with `Esc`, replay it from **Help**, or suppress it entirely by adding `?tour=0`
 URL (useful when projecting the app in a lecture). Add `?tour=1` to force it.
 
 ![Guided tour](docs/screenshot-tour.png)
+
+All panel sections start collapsed, so the first thing a student sees is the model
+space. Open the ones you need.
 
 **Toolbar** — `Sun & Site` and `Model & Analysis` open the two panels; `Animate` plays
 the sun; the view cube jumps to plan or elevation views.
@@ -180,7 +183,7 @@ It is clearly labelled as synthetic; it is not real climate.
 
 ## Validation
 
-`npm test` runs 56 headless checks. Every number below is produced by that suite, not
+`npm test` runs 58 headless checks. Every number below is produced by that suite, not
 asserted by hand.
 
 | Check | Result |
@@ -263,7 +266,7 @@ rebuilds live on every change, with no "apply" step.
 ```bash
 npm install          # playwright, for the test suite only
 npm run vendor       # fetch three.js and the validation EPW
-npm test             # 56 headless checks, screenshots and sample export sheets
+npm test             # 58 headless checks, screenshots and sample export sheets
 npm run serve        # serve the folder at http://localhost:8080
 ```
 

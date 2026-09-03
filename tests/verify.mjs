@@ -78,6 +78,21 @@ console.log('\n=== boot ===');
 await page.goto('http://127.0.0.1:' + port + '/index.html?tour=0', { waitUntil: 'load' });
 await page.waitForFunction(() => window.__SUNAPP && window.__SUNAPP.ready, null, { timeout: 30000 });
 check('app boots and exposes its API', true);
+const boot = await page.evaluate(() => {
+  const secs = [...document.querySelectorAll('.sec')];
+  return {
+    total: secs.length,
+    open: secs.filter(x => !x.classList.contains('closed')).map(x => x.dataset.sec),
+    title: document.title,
+    brand: document.querySelector('.brand-text b').textContent,
+  };
+});
+check('every panel section starts collapsed',
+      boot.total > 0 && boot.open.length === 0,
+      boot.total + ' sections, open: ' + (boot.open.join(', ') || 'none'));
+check('app is titled Sun Studio',
+      boot.title === 'Sun Studio' && boot.brand === 'Sun Studio',
+      'title "' + boot.title + '", brand "' + boot.brand + '"');
 check('importmap resolves against the real published package',
       cdnHits.has('build/three.module.js') &&
       cdnHits.has('examples/jsm/controls/OrbitControls.js') &&

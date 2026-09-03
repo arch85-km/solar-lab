@@ -5,11 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="author" content="Karam Al-Obaidi">
 <meta name="description" content="Interactive 3D sun path and solar radiation analysis for architectural design teaching. EPW climate import, OBJ model import, Perez sky model, W/m2 irradiance on all surfaces.">
-<title>Sun Path &amp; Solar Radiation Studio</title>
+<title>Sun Studio</title>
 <style>
 /* ============================================================
-   Sun Path & Solar Radiation Studio
-   Design tokens
+   Sun Studio — design tokens
    ============================================================ */
 :root{
   --bg:#0d1117;
@@ -552,7 +551,7 @@ body.embed{--topbar-h:44px}
     <div class="brand">
       <div class="brand-mark"></div>
       <div class="brand-text">
-        <b>Sun Path &amp; Solar Radiation Studio</b>
+        <b>Sun Studio</b>
         <span>Environmental design analysis</span>
       </div>
     </div>
@@ -607,7 +606,7 @@ body.embed{--topbar-h:44px}
       <div class="panel-scroll">
 
         <!-- LOCATION -->
-        <section class="sec" data-sec="loc">
+        <section class="sec closed" data-sec="loc">
           <button class="sec-head">
             <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 21.5s7-6.2 7-11.3A7 7 0 0 0 5 10.2c0 5.1 7 11.3 7 11.3z"/><circle cx="12" cy="10" r="2.6"/></svg>
             <span class="sec-title">Location</span><span class="chev"></span>
@@ -646,7 +645,7 @@ body.embed{--topbar-h:44px}
         </section>
 
         <!-- DATE & TIME -->
-        <section class="sec" data-sec="time">
+        <section class="sec closed" data-sec="time">
           <button class="sec-head">
             <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9.2"/><path d="M12 6.6V12l3.6 2.2"/></svg>
             <span class="sec-title">Date &amp; Time</span><span class="chev"></span>
@@ -731,7 +730,7 @@ body.embed{--topbar-h:44px}
       <div class="panel-scroll">
 
         <!-- MODEL -->
-        <section class="sec" data-sec="model">
+        <section class="sec closed" data-sec="model">
           <button class="sec-head">
             <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 2.6 21 7.5v9L12 21.4 3 16.5v-9z"/><path d="M3 7.5l9 4.9 9-4.9M12 12.4v9"/></svg>
             <span class="sec-title">Model</span><span class="chev"></span>
@@ -778,7 +777,7 @@ body.embed{--topbar-h:44px}
         </section>
 
         <!-- ANALYSIS -->
-        <section class="sec" data-sec="analysis">
+        <section class="sec closed" data-sec="analysis">
           <button class="sec-head">
             <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 19.5h16M6.5 19.5V11M11 19.5V5.4M15.5 19.5v-5.6M20 19.5V8.2"/></svg>
             <span class="sec-title">Solar Radiation Analysis</span><span class="chev"></span>
@@ -850,7 +849,7 @@ body.embed{--topbar-h:44px}
         </section>
 
         <!-- RESULTS -->
-        <section class="sec" data-sec="results">
+        <section class="sec closed" data-sec="results">
           <button class="sec-head">
             <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M3.5 3.5v17h17"/><path d="M7 15.5l3.6-4.6 3.2 2.6L20 6.6"/></svg>
             <span class="sec-title">Results</span><span class="chev"></span>
@@ -957,7 +956,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 
 /* ============================================================================
- *  Sun Path & Solar Radiation Studio
+ *  Sun Studio — 3D sun path and solar radiation analysis
  *
  *  Methodology follows the Radiance / Ladybug Tools chain:
  *    - solar position .............. NOAA solar position algorithm
@@ -3078,7 +3077,7 @@ function exportCSV(){
   const r = State.results;
   if (!r) { toast('Run an analysis first.', 'err'); return; }
   const lines = [
-    '# Sun Path & Solar Radiation Studio — analysis export',
+    '# Sun Studio — solar radiation analysis export',
     '# Site,' + (State.site.name || 'custom') + ',lat,' + State.site.lat + ',lon,' + State.site.lon + ',tz,' + State.site.tz,
     '# Climate,' + (State.weather ? State.weather.fileName : 'synthetic clear sky (ASHRAE/Hottel)'),
     '# Analysis,' + r.unitLong + ',' + r.period + ',unit,' + r.unit,
@@ -3217,7 +3216,7 @@ function composeSheet(source, W, H, s){
   setFont(9.5, '650');
   g.fillStyle = T.sheetFaint;
   g.textAlign = 'left';
-  g.fillText('SUN PATH & SOLAR RADIATION STUDY', pad, Math.round(26 * s));
+  g.fillText('SUN STUDIO · SOLAR RADIATION STUDY', pad, Math.round(26 * s));
   if ('letterSpacing' in g) g.letterSpacing = '0px';
 
   setFont(19, '650');
@@ -3739,7 +3738,7 @@ const TOUR_KEY = 'sunpath.tour.seen.v1';
 
 const TOUR = [
   {
-    title: 'Welcome to the Sun Path Studio',
+    title: 'Welcome to Sun Studio',
     body: 'A quick tour of the five things you need — about 30 seconds. ' +
           'You can keep moving the model while it runs.',
     centre: true,
