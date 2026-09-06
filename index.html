@@ -496,7 +496,8 @@ table.tbl .swatch{display:inline-block;width:8px;height:8px;border-radius:2px;ma
              width .24s cubic-bezier(.4,0,.2,1),height .24s cubic-bezier(.4,0,.2,1);
 }
 #tour-spot.dim-only{box-shadow:0 0 0 9999px var(--tour-dim-2)}
-#tour-spot[hidden],#tour-card[hidden]{display:none}
+#tour-spot[hidden],#tour-card[hidden],#tour-optout[hidden]{display:none}
+#tour-optout{margin-top:11px;padding-top:10px;border-top:1px solid var(--line-soft)}
 #tour-card{
   position:fixed;z-index:201;
   width:min(330px,calc(100vw - 22px));
@@ -1005,6 +1006,10 @@ body.embed{--topbar-h:44px}
   <div class="step" id="tour-step"></div>
   <h4 id="tour-title"></h4>
   <p id="tour-body"></p>
+  <label class="sw" id="tour-optout" hidden>
+    <input type="checkbox" id="tour-dont"><span class="track"></span>
+    <span class="t">Don&rsquo;t show this on launch</span>
+  </label>
   <div class="tour-nav">
     <button class="btn sm ghost" id="tour-skip">Skip</button>
     <span class="grow"></span>
@@ -3991,6 +3996,11 @@ const Tour = (() => {
       }
     }
 
+    // The opt-out belongs where a reader decides: at the start, or at the end
+    const optout = $('tour-optout');
+    optout.hidden = !(idx === 0 || idx === TOUR.length - 1);
+    $('tour-dont').checked = isSuppressed();
+
     $('tour-step').textContent = 'Step ' + (idx + 1) + ' of ' + TOUR.length;
     $('tour-title').textContent = step.title;
     $('tour-body').innerHTML = step.body;
@@ -4009,33 +4019,52 @@ const Tour = (() => {
     show(from);
   }
 
-  function end(remember = true){
+  /** Whether the visitor has asked not to see the intro on launch. */
+  function isSuppressed(){
+    try { return localStorage.getItem(TOUR_KEY) === '1'; } catch (e) { return false; }
+  }
+
+  /**
+   * Record the opt-out. Finishing or skipping does NOT set it: the intro shows
+   * on every launch until someone explicitly asks it not to, so a lecturer
+   * demonstrating the app keeps getting it while a student can turn it off.
+   */
+  function suppress(on){
+    try {
+      if (on) localStorage.setItem(TOUR_KEY, '1');
+      else localStorage.removeItem(TOUR_KEY);
+    } catch (e) { /* private mode: the preference simply will not stick */ }
+  }
+
+  function end(){
     active = false;
     spot().hidden = true;
     card().hidden = true;
-    if (remember){ try { localStorage.setItem(TOUR_KEY, '1'); } catch (e) { /* private mode */ } }
   }
 
   function next(){ if (idx >= TOUR.length - 1) end(); else show(idx + 1); }
   function back(){ show(idx - 1); }
 
-  /** Auto-start on a first visit, unless suppressed by ?tour=0. */
+  /**
+   * Start on every launch unless the visitor opted out, or ?tour=0 says not to.
+   * ?tour=1 forces it even for someone who has opted out.
+   */
   function maybeAutoStart(){
     const p = new URLSearchParams(location.search);
     if (p.get('tour') === '0') return;
-    let seen = false;
-    try { seen = localStorage.getItem(TOUR_KEY) === '1'; } catch (e) { seen = false; }
-    if (seen && p.get('tour') !== '1') return;
+    if (isSuppressed() && p.get('tour') !== '1') return;
     setTimeout(() => { if (!active) start(0); }, 650);
   }
 
   addEventListener('resize', () => { if (active) place(); });
-  return { start, end, next, back, maybeAutoStart, isActive: () => active, steps: TOUR.length };
+  return { start, end, next, back, maybeAutoStart, suppress, isSuppressed,
+           isActive: () => active, steps: TOUR.length };
 })();
 
 on('tour-next', 'click', Tour.next);
 on('tour-back', 'click', Tour.back);
 on('tour-skip', 'click', () => Tour.end());
+on('tour-dont', 'change', (e) => Tour.suppress(e.target.checked));
 addEventListener('keydown', (e) => {
   if (!Tour.isActive()) return;
   if (e.key === 'Escape'){ Tour.end(); }

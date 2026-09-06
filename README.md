@@ -25,7 +25,7 @@ Below: the first-load state (London, clear-sky model) and the phone layout.
 | | |
 |---|---|
 | **Dark and light presentation** | The whole interface and the 3D scene switch together, live — dark for the studio and the lecture theatre, light for print, handouts and projectors that wash out. The choice is remembered, and exports default to whichever is on screen. |
-| **Guided first-run tour** | A ten-step walkthrough starts automatically the first time a student opens the page, spotlighting each control in turn. It is non-blocking — the model stays draggable while it runs — and replays any time from **Help**. |
+| **Guided intro** | A ten-step walkthrough opens on launch, spotlighting each control in turn, with a **Don't show this on launch** toggle on the first and last cards. It is non-blocking — the model stays draggable while it runs — and replays any time from **Help**. |
 | **3D sun path for a full year** | Hourly analemmas, monthly sun-path arcs, solstice and equinox highlights, compass rose with bearings, altitude rings, animated sun. |
 | **Real-time shadows** | A shadow-casting sun light driven by the true solar position, with day and year animation. |
 | **Solar radiation on all surfaces** | Instantaneous irradiance in W/m², or cumulative radiation in kWh/m² over any period, mapped face-by-face onto the model. |
@@ -85,11 +85,20 @@ examples/jsm/loaders/OBJLoader.js
 
 ## Using it
 
-**First run** — a guided tour walks through the interface one control at a time. Skip it
-with `Esc`, replay it from **Help**, or suppress it entirely by adding `?tour=0` to the
-URL (useful when projecting the app in a lecture). Add `?tour=1` to force it.
+**The intro** — a guided walkthrough opens on launch and covers the interface one control
+at a time. Skip it with `Esc` or replay it from **Help** at any point.
 
-![Guided tour](docs/screenshot-tour.png)
+It shows on *every* launch until someone ticks **Don't show this on launch**, on the first
+or last card — so a student turns it off once and never sees it again, while you keep
+getting it each time you open the app to teach from. Finishing or skipping does not
+silently opt anyone out. `?tour=0` on the URL suppresses it for a single session (handy
+when projecting), and `?tour=1` forces it even for a visitor who has opted out.
+
+![The intro on launch](docs/screenshot-intro.png)
+
+<sub>The intro as it opens, with the opt-out. Later steps spotlight each panel in turn:</sub>
+
+![A tour step](docs/screenshot-tour.png)
 
 All panel sections start collapsed, so the first thing a student sees is the model
 space. Open the ones you need.
@@ -191,7 +200,7 @@ It is clearly labelled as synthetic; it is not real climate.
 
 ## Validation
 
-`npm test` runs 72 headless checks. Every number below is produced by that suite, not
+`npm test` runs 77 headless checks. Every number below is produced by that suite, not
 asserted by hand.
 
 | Check | Result |
@@ -214,8 +223,9 @@ The suite also covers the interface: the results table's numeric cells and heade
 compute to `right`, the page declares a dark `color-scheme` so native dropdowns cannot
 flash light, focusing a `<select>` does not wipe its chevron, and an image export restores
 the live theme and canvas size afterwards. The guided tour is checked end to end: it
-auto-starts once, every card stays on screen and clear of the element it points at, the
-spotlight passes clicks through, and it does not reappear on the next visit.
+opens on launch, every card stays on screen and clear of the element it points at, the
+spotlight passes clicks through, finishing does not silently opt the visitor out, the
+opt-out toggle both suppresses and restores it, and `?tour=1` overrides it.
 
 Both presentation modes are checked the same way rather than by eye: the toggle moves the
 interface and the 3D scene together, the viewport itself re-renders light, the choice
@@ -279,7 +289,7 @@ rebuilds live on every change, with no "apply" step.
 ```bash
 npm install          # playwright, for the test suite only
 npm run vendor       # fetch three.js and the validation EPW
-npm test             # 72 headless checks, screenshots and sample export sheets
+npm test             # 77 headless checks, screenshots and sample export sheets
 npm run serve        # serve the folder at http://localhost:8080
 ```
 

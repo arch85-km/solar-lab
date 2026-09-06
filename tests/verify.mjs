@@ -652,16 +652,57 @@ console.log('\n=== guided tour ===');
     hidden: document.getElementById('tour-card').hidden,
     stored: localStorage.getItem(window.__SUNAPP.TOUR_KEY),
   }));
-  check('finishing the tour closes it and records that it was seen',
-        done.hidden === true && done.stored === '1', 'stored = ' + done.stored);
+  check('finishing the tour closes it without silently opting the visitor out',
+        done.hidden === true && done.stored === null, 'stored = ' + done.stored);
 
+  // Default: it comes back on the next launch
+  await tp.reload({ waitUntil: 'load' });
+  await tp.waitForFunction(() => window.__SUNAPP && window.__SUNAPP.ready, null, { timeout: 30000 });
+  await tp.waitForSelector('#tour-card:not([hidden])', { timeout: 5000 });
+  check('the intro returns on the next launch by default', true, 'shown again after reload');
+
+  // The opt-out is offered on the first and last cards only
+  const optoutFirst = await tp.evaluate(() => !document.getElementById('tour-optout').hidden);
+  await tp.evaluate(() => window.__SUNAPP.Tour.start(4));
+  await tp.waitForTimeout(200);
+  const optoutMiddle = await tp.evaluate(() => !document.getElementById('tour-optout').hidden);
+  await tp.evaluate((n) => window.__SUNAPP.Tour.start(n - 1), 10);
+  await tp.waitForTimeout(200);
+  const optoutLast = await tp.evaluate(() => !document.getElementById('tour-optout').hidden);
+  check('the opt-out appears on the first and last cards, not in the middle',
+        optoutFirst && optoutLast && !optoutMiddle,
+        'first ' + optoutFirst + ', middle ' + optoutMiddle + ', last ' + optoutLast);
+
+  // Ticking it stops the intro on later launches
+  await tp.click('#tour-optout');
+  await tp.waitForTimeout(150);
+  const stored = await tp.evaluate(() => localStorage.getItem(window.__SUNAPP.TOUR_KEY));
+  check('ticking the opt-out records the preference', stored === '1', 'stored = ' + stored);
+
+  await tp.click('#tour-next');
   await tp.reload({ waitUntil: 'load' });
   await tp.waitForFunction(() => window.__SUNAPP && window.__SUNAPP.ready, null, { timeout: 30000 });
   await tp.waitForTimeout(1100);
   const second = await tp.evaluate(() => document.getElementById('tour-card').hidden);
-  check('the tour does not reappear on the next visit', second === true);
+  check('after opting out the intro no longer shows on launch', second === true);
+
+  // ?tour=1 overrides the opt-out, which is how the author demos it
+  await tp.goto('http://127.0.0.1:' + port + '/index.html?tour=1', { waitUntil: 'load' });
+  await tp.waitForFunction(() => window.__SUNAPP && window.__SUNAPP.ready, null, { timeout: 30000 });
+  await tp.waitForSelector('#tour-card:not([hidden])', { timeout: 5000 });
+  check('?tour=1 forces the intro even after opting out', true, 'shown with ?tour=1');
+
+  // Un-ticking restores it
+  await tp.evaluate(() => window.__SUNAPP.Tour.start(0));
+  await tp.waitForTimeout(200);
+  await tp.click('#tour-optout');
+  await tp.waitForTimeout(150);
+  const cleared = await tp.evaluate(() => localStorage.getItem(window.__SUNAPP.TOUR_KEY));
+  check('un-ticking the opt-out brings the intro back', cleared === null, 'stored = ' + cleared);
+  await tp.evaluate(() => window.__SUNAPP.Tour.end());
 
   // Help replays it on demand
+  await tp.waitForTimeout(150);
   await tp.click('#tb-help');
   await tp.waitForTimeout(250);
   const replay = await tp.evaluate(() => ({
