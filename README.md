@@ -24,6 +24,7 @@ Below: the first-load state (London, clear-sky model) and the phone layout.
 
 | | |
 |---|---|
+| **Dark and light presentation** | The whole interface and the 3D scene switch together, live — dark for the studio and the lecture theatre, light for print, handouts and projectors that wash out. The choice is remembered, and exports default to whichever is on screen. |
 | **Guided first-run tour** | A ten-step walkthrough starts automatically the first time a student opens the page, spotlighting each control in turn. It is non-blocking — the model stays draggable while it runs — and replays any time from **Help**. |
 | **3D sun path for a full year** | Hourly analemmas, monthly sun-path arcs, solstice and equinox highlights, compass rose with bearings, altitude rings, animated sun. |
 | **Real-time shadows** | A shadow-casting sun light driven by the true solar position, with day and year animation. |
@@ -93,6 +94,13 @@ URL (useful when projecting the app in a lecture). Add `?tour=1` to force it.
 All panel sections start collapsed, so the first thing a student sees is the model
 space. Open the ones you need.
 
+**Presentation mode** — the toolbar toggle (or `T`) switches the whole app between dark
+and light, interface and 3D scene together. Dark is the default; the choice is remembered
+per browser. Light mode is the one to use on a washed-out projector or when the screen is
+going into a printed handout.
+
+![Light presentation mode](docs/screenshot-light.png)
+
 **Toolbar** — `Sun & Site` and `Model & Analysis` open the two panels; `Animate` plays
 the sun; the view cube jumps to plan or elevation views.
 
@@ -124,7 +132,7 @@ the hour's DNI/DHI/GHI. It also shows a live **horizontal check**: the irradianc
 app computes on a flat unobstructed surface next to the value in the weather file.
 Those two agreeing is the quickest way to confirm the model is behaving.
 
-**Keyboard** — `L`/`R` panels, `Space` play/pause, `E` export, `F` fullscreen, `←`/`→` time
+**Keyboard** — `L`/`R` panels, `Space` play/pause, `T` theme, `E` export, `F` fullscreen, `←`/`→` time
 (`Shift` = 1 hour), `↑`/`↓` date (`Shift` = 30 days). During the tour the arrows step
 through it and `Esc` dismisses it.
 
@@ -183,7 +191,7 @@ It is clearly labelled as synthetic; it is not real climate.
 
 ## Validation
 
-`npm test` runs 58 headless checks. Every number below is produced by that suite, not
+`npm test` runs 72 headless checks. Every number below is produced by that suite, not
 asserted by hand.
 
 | Check | Result |
@@ -208,6 +216,11 @@ flash light, focusing a `<select>` does not wipe its chevron, and an image expor
 the live theme and canvas size afterwards. The guided tour is checked end to end: it
 auto-starts once, every card stays on screen and clear of the element it points at, the
 spotlight passes clicks through, and it does not reappear on the next visit.
+
+Both presentation modes are checked the same way rather than by eye: the toggle moves the
+interface and the 3D scene together, the viewport itself re-renders light, the choice
+survives a reload, and **measured contrast ratios** clear 4.5:1 for body text and button
+labels in each mode — the check that catches a hand-duplicated palette drifting.
 
 ### On the dropdown flash
 
@@ -266,7 +279,7 @@ rebuilds live on every change, with no "apply" step.
 ```bash
 npm install          # playwright, for the test suite only
 npm run vendor       # fetch three.js and the validation EPW
-npm test             # 58 headless checks, screenshots and sample export sheets
+npm test             # 72 headless checks, screenshots and sample export sheets
 npm run serve        # serve the folder at http://localhost:8080
 ```
 

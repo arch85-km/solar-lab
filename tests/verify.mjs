@@ -464,6 +464,111 @@ check('a sun-path study can be exported with no analysis run',
       !expNoResults.hasResults && expNoResults.w > 0 && expNoResults.h > expNoResults.w * 0,
       expNoResults.w + ' × ' + expNoResults.h + ' px, results = ' + expNoResults.hasResults);
 
+/* ------------------------------------------------------ presentation modes --- */
+console.log('\n=== dark and light presentation ===');
+
+// Contrast is the thing that actually breaks when a palette is duplicated by
+// hand, so measure it rather than eyeballing the screenshots.
+const CONTRAST_FN = `(() => {
+  const lum = (c) => {
+    const [r,g,b] = c.match(/[\\d.]+/g).slice(0,3).map(Number).map(v => {
+      v /= 255; return v <= 0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055, 2.4);
+    });
+    return 0.2126*r + 0.7152*g + 0.0722*b;
+  };
+  window.__contrast = (fg, bg) => {
+    const a = lum(fg), b = lum(bg);
+    return (Math.max(a,b) + 0.05) / (Math.min(a,b) + 0.05);
+  };
+  window.__lum = lum;
+})()`;
+
+async function probeTheme(){
+  return page.evaluate((fnSrc) => {
+    eval(fnSrc);
+    const cs = getComputedStyle(document.body);
+    const panel = getComputedStyle(document.querySelector('#panel-left'));
+    const title = getComputedStyle(document.querySelector('.sec-title'));
+    const value = getComputedStyle(document.querySelector('#statusbar .credit'));
+    const status = getComputedStyle(document.getElementById('statusbar'));
+    const btn = document.querySelector('.btn.primary');
+    const btnCs = btn ? getComputedStyle(btn) : null;
+    const A = window.__SUNAPP;
+    return {
+      attr: document.documentElement.dataset.theme || '(none)',
+      scene: A.getTheme(),
+      colorScheme: getComputedStyle(document.documentElement).colorScheme,
+      bodyLum: window.__lum(cs.backgroundColor),
+      panelLum: window.__lum(panel.backgroundColor),
+      titleContrast: window.__contrast(title.color, panel.backgroundColor),
+      creditContrast: window.__contrast(value.color, status.backgroundColor),
+      btnContrast: btnCs ? window.__contrast(btnCs.color, btnCs.backgroundColor) : null,
+      chevron: getComputedStyle(document.getElementById('i-city')).backgroundImage,
+    };
+  }, CONTRAST_FN);
+}
+
+const darkT = await probeTheme();
+check('the app opens in dark presentation by default',
+      darkT.attr === 'dark' && darkT.scene === 'dark' && darkT.bodyLum < 0.06,
+      'attr ' + darkT.attr + ', scene ' + darkT.scene + ', body luminance ' + darkT.bodyLum.toFixed(3));
+
+await page.click('#tb-theme');
+await page.waitForTimeout(400);
+const lightT = await probeTheme();
+check('the toggle switches interface and 3D scene together',
+      lightT.attr === 'light' && lightT.scene === 'light' && lightT.bodyLum > 0.7,
+      'attr ' + lightT.attr + ', scene ' + lightT.scene + ', body luminance ' + lightT.bodyLum.toFixed(3));
+check('light mode tells the browser to draw native controls light',
+      /light/.test(lightT.colorScheme), lightT.colorScheme);
+check('the select chevron is redrawn for light mode',
+      lightT.chevron !== darkT.chevron && lightT.chevron !== 'none');
+
+for (const [name, t] of [['dark', darkT], ['light', lightT]]){
+  check('body text meets 4.5:1 against its panel in ' + name + ' mode',
+        t.titleContrast >= 4.5, t.titleContrast.toFixed(2) + ':1');
+  check('the status-bar credit stays legible in ' + name + ' mode',
+        t.creditContrast >= 4.0, t.creditContrast.toFixed(2) + ':1');
+  check('primary button text meets 4.5:1 on its fill in ' + name + ' mode',
+        t.btnContrast >= 4.5, t.btnContrast.toFixed(2) + ':1');
+}
+
+// The viewport itself must follow, not just the chrome
+const vpLight = await page.evaluate(() => {
+  const c = document.querySelector('#viewport canvas');
+  const g = document.createElement('canvas');
+  g.width = g.height = 1;
+  g.getContext('2d').drawImage(c, 2, 2, 1, 1, 0, 0, 1, 1);
+  const p = g.getContext('2d').getImageData(0, 0, 1, 1).data;
+  return (p[0] + p[1] + p[2]) / 3;
+});
+check('the 3D viewport renders light too, not just the panels',
+      vpLight > 170, 'corner luminance ' + Math.round(vpLight));
+
+await page.screenshot({ path: join(SHOTS, 'light-mode.png') });
+
+// It has to survive a reload
+await page.reload({ waitUntil: 'load' });
+await page.waitForFunction(() => window.__SUNAPP && window.__SUNAPP.ready, null, { timeout: 30000 });
+await page.waitForTimeout(400);
+const afterReload = await page.evaluate(() => ({
+  attr: document.documentElement.dataset.theme,
+  scene: window.__SUNAPP.getTheme(),
+}));
+check('the chosen presentation persists across a reload',
+      afterReload.attr === 'light' && afterReload.scene === 'light',
+      afterReload.attr + ' / ' + afterReload.scene);
+
+const lightOverflow = await page.evaluate(() =>
+  document.documentElement.scrollWidth - document.documentElement.clientWidth);
+check('no horizontal overflow in light mode', lightOverflow <= 1, 'overflow ' + lightOverflow + 'px');
+
+// Back to dark for the remaining checks and the reference screenshots
+await page.evaluate(() => window.__SUNAPP.setUiTheme('dark'));
+await page.waitForTimeout(300);
+check('switching back restores the dark presentation',
+      (await page.evaluate(() => document.documentElement.dataset.theme)) === 'dark');
+
 /* -------------------------------------------------------------- tour --- */
 console.log('\n=== guided tour ===');
 

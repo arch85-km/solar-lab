@@ -28,6 +28,26 @@
   --green:#3fbf7f;
   --red:#ff6b5e;
   --shadow:0 10px 34px rgba(0,0,0,.5);
+  --warn:#e0a13a;
+  --on-accent:#241a08;
+  --accent-hover:#ffc061;
+  --scroll-thumb:#33404f;
+  --scroll-thumb-hover:#42525f;
+  --topbar-bg:linear-gradient(180deg,#1a2129,#141a21);
+  --status-bg:linear-gradient(180deg,#141a21,#111720);
+  --btn-hover:#2b3644;
+  --btn-hover-line:#3a4756;
+  --icon-hover:#2f3b4a;
+  --thumb-ring:#16202b;
+  --overlay-bg:rgba(13,17,23,.76);
+  --overlay-bg-2:rgba(13,17,23,.82);
+  --overlay-line:rgba(80,96,114,.4);
+  --busy-bg:rgba(10,14,20,.55);
+  --scrim:rgba(5,8,12,.5);
+  --tour-dim:rgba(4,7,11,.66);
+  --tour-dim-2:rgba(4,7,11,.72);
+  --toast-bg:#222c38;
+  --sw-knob-on:#fff2dc;
   --r:7px;
   --lw:304px;
   --rw:326px;
@@ -40,6 +60,53 @@
      light substrate over a dark page, which reads as a black flash. */
   color-scheme:dark;
 }
+
+/* ------------------------------------------------------------------
+   Light mode. Only the palette changes — every rule below reads tokens,
+   so the two modes never drift apart. color-scheme follows so native
+   popups, pickers and scrollbars switch with the page.
+   ------------------------------------------------------------------ */
+:root[data-theme="light"]{
+  --bg:#f4f6f9;
+  --bg-viewport:#eef1f5;
+  --panel:#ffffff;
+  --panel-2:#f1f4f8;
+  --panel-3:#e5eaf0;
+  --line:#d4dae2;
+  --line-soft:#e4e9ef;
+  --text:#111a24;
+  --text-dim:#4a5765;
+  --text-faint:#78838f;
+  --accent:#b45309;
+  --accent-dim:#92400e;
+  --accent-soft:rgba(180,83,9,.11);
+  --accent-hover:#9a4708;
+  --on-accent:#fff7ed;
+  --blue:#1d6fbf;
+  --green:#15794a;
+  --red:#c02718;
+  --warn:#a15c07;
+  --shadow:0 10px 30px rgba(17,26,36,.16);
+  --scroll-thumb:#c4ccd6;
+  --scroll-thumb-hover:#a9b4c0;
+  --topbar-bg:linear-gradient(180deg,#ffffff,#f1f4f9);
+  --status-bg:linear-gradient(180deg,#f5f7fa,#eaeef4);
+  --btn-hover:#e9edf3;
+  --btn-hover-line:#c2cad4;
+  --icon-hover:#e2e7ee;
+  --thumb-ring:#ffffff;
+  --overlay-bg:rgba(255,255,255,.84);
+  --overlay-bg-2:rgba(255,255,255,.9);
+  --overlay-line:rgba(120,135,150,.36);
+  --busy-bg:rgba(244,246,249,.62);
+  --scrim:rgba(28,38,50,.26);
+  --tour-dim:rgba(20,28,38,.42);
+  --tour-dim-2:rgba(20,28,38,.48);
+  --toast-bg:#ffffff;
+  --sw-knob-on:#fff7ed;
+  color-scheme:light;
+}
+
 *,*::before,*::after{box-sizing:border-box}
 html,body{margin:0;padding:0;height:100%;overflow:hidden;overscroll-behavior:none}
 body{
@@ -54,8 +121,8 @@ body{
 button,input,select,textarea{font:inherit;color:inherit}
 ::-webkit-scrollbar{width:9px;height:9px}
 ::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:#33404f;border-radius:6px;border:2px solid transparent;background-clip:content-box}
-::-webkit-scrollbar-thumb:hover{background:#42525f;background-clip:content-box}
+::-webkit-scrollbar-thumb{background:var(--scroll-thumb);border-radius:6px;border:2px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:var(--scroll-thumb-hover);background-clip:content-box}
 .num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
 
 /* ============================================================
@@ -85,7 +152,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 #topbar{
   display:flex;align-items:center;gap:10px;
   padding:0 12px;
-  background:linear-gradient(180deg,#1a2129,#141a21);
+  background:var(--topbar-bg);
   border-bottom:1px solid var(--line);
   z-index:40;
 }
@@ -120,7 +187,7 @@ button,input,select,textarea{font:inherit;color:inherit}
   color:var(--text-dim);font-size:11px;font-weight:600;letter-spacing:.3px;cursor:pointer;
 }
 .view-cube button:hover{background:var(--panel-3);color:var(--text)}
-.view-cube button.on{background:var(--accent);color:#241a08}
+.view-cube button.on{background:var(--accent);color:var(--on-accent)}
 
 /* ============================================================
    Panels
@@ -173,7 +240,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:7px}
 .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
 .hint{font-size:10.5px;color:var(--text-faint);line-height:1.42;margin:5px 0 0}
-.hint.warn{color:#e0a13a}
+.hint.warn{color:var(--warn)}
 
 input[type=text],input[type=number],input[type=date],input[type=time],select,textarea{
   width:100%;height:28px;padding:0 8px;
@@ -195,6 +262,9 @@ select option,select optgroup{background:var(--panel-2);color:var(--text)}
 input[type=number]{-moz-appearance:textfield}
 input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 input[type=date],input[type=time]{cursor:pointer}
+:root[data-theme="light"] select{
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' fill='none' stroke='%234a5765' stroke-width='1.4'/></svg>");
+}
 
 /* --- range sliders --- */
 input[type=range]{
@@ -205,11 +275,11 @@ input[type=range]::-webkit-slider-runnable-track{height:4px;background:var(--pan
 input[type=range]::-moz-range-track{height:4px;background:var(--panel-3);border-radius:3px}
 input[type=range]::-webkit-slider-thumb{
   -webkit-appearance:none;width:14px;height:14px;margin-top:-5px;border-radius:50%;
-  background:var(--accent);border:2px solid #16202b;box-shadow:0 1px 4px rgba(0,0,0,.55);
+  background:var(--accent);border:2px solid var(--thumb-ring);box-shadow:0 1px 4px rgba(0,0,0,.35);
 }
 input[type=range]::-moz-range-thumb{
   width:12px;height:12px;border-radius:50%;
-  background:var(--accent);border:2px solid #16202b;box-shadow:0 1px 4px rgba(0,0,0,.55);
+  background:var(--accent);border:2px solid var(--thumb-ring);box-shadow:0 1px 4px rgba(0,0,0,.35);
 }
 input[type=range]:focus{outline:none}
 input[type=range]:focus::-webkit-slider-thumb{box-shadow:0 0 0 3px var(--accent-soft)}
@@ -222,12 +292,12 @@ input[type=range]:focus::-webkit-slider-thumb{box-shadow:0 0 0 3px var(--accent-
   color:var(--text);font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;
   transition:background .13s,border-color .13s,opacity .13s;
 }
-.btn:hover{background:#2b3644;border-color:#3a4756}
+.btn:hover{background:var(--btn-hover);border-color:var(--btn-hover-line)}
 .btn:active{transform:translateY(.5px)}
 .btn:disabled{opacity:.42;cursor:not-allowed}
 .btn.wide{width:100%}
-.btn.primary{background:var(--accent);border-color:var(--accent);color:#241a08;font-weight:650}
-.btn.primary:hover{background:#ffc061;border-color:#ffc061}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:650}
+.btn.primary:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
 .btn.ghost{background:transparent}
 .btn.ghost:hover{background:var(--panel-2)}
 .btn svg{width:14px;height:14px;flex:0 0 auto}
@@ -242,7 +312,7 @@ input[type=range]:focus::-webkit-slider-thumb{box-shadow:0 0 0 3px var(--accent-
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
 .seg button:hover{color:var(--text)}
-.seg button.on{background:var(--accent);color:#241a08}
+.seg button.on{background:var(--accent);color:var(--on-accent)}
 .seg.sm button{height:21px;font-size:10.5px}
 
 /* --- switches --- */
@@ -259,7 +329,7 @@ input[type=range]:focus::-webkit-slider-thumb{box-shadow:0 0 0 3px var(--accent-
   transition:transform .16s,background .16s;
 }
 .sw input:checked + .track{background:var(--accent-dim);border-color:var(--accent)}
-.sw input:checked + .track::after{transform:translateX(13px);background:#fff2dc}
+.sw input:checked + .track::after{transform:translateX(13px);background:var(--sw-knob-on)}
 .sw input:focus-visible + .track{box-shadow:0 0 0 3px var(--accent-soft)}
 .sw span.t{font-size:12px;color:var(--text-dim)}
 .sw:hover span.t{color:var(--text)}
@@ -319,8 +389,8 @@ table.tbl .swatch{display:inline-block;width:8px;height:8px;border-radius:2px;ma
 #vp-readout{
   top:11px;left:12px;
   padding:8px 11px;border-radius:7px;
-  background:rgba(13,17,23,.76);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);
-  border:1px solid rgba(80,96,114,.4);
+  background:var(--overlay-bg);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);
+  border:1px solid var(--overlay-line);
   font-size:11px;line-height:1.6;font-variant-numeric:tabular-nums;
   max-width:min(46vw,260px);
 }
@@ -335,12 +405,12 @@ table.tbl .swatch{display:inline-block;width:8px;height:8px;border-radius:2px;ma
 }
 #vp-busy{
   inset:0;display:none;align-items:center;justify-content:center;
-  background:rgba(10,14,20,.55);backdrop-filter:blur(2px);z-index:15;
+  background:var(--busy-bg);backdrop-filter:blur(2px);z-index:15;
 }
 #vp-busy.on{display:flex}
 .spinner{
   width:26px;height:26px;border-radius:50%;
-  border:2.5px solid rgba(255,179,64,.22);border-top-color:var(--accent);
+  border:2.5px solid var(--accent-soft);border-top-color:var(--accent);
   animation:spin .8s linear infinite;
 }
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -351,8 +421,8 @@ table.tbl .swatch{display:inline-block;width:8px;height:8px;border-radius:2px;ma
   left:50%;bottom:12px;transform:translateX(-50%);
   display:none;align-items:center;gap:9px;pointer-events:auto;
   padding:7px 11px;border-radius:9px;
-  background:rgba(13,17,23,.82);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);
-  border:1px solid rgba(80,96,114,.42);
+  background:var(--overlay-bg-2);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);
+  border:1px solid var(--overlay-line);
   width:min(430px,calc(100% - 24px));
 }
 #vp-scrub.on{display:flex}
@@ -364,9 +434,9 @@ table.tbl .swatch{display:inline-block;width:8px;height:8px;border-radius:2px;ma
   background:var(--panel-3);border:1px solid var(--line);border-radius:6px;
   color:var(--text);cursor:pointer;padding:0;
 }
-.icon-btn:hover{background:#2f3b4a}
+.icon-btn:hover{background:var(--icon-hover)}
 .icon-btn svg{width:13px;height:13px}
-.icon-btn.on{background:var(--accent);border-color:var(--accent);color:#241a08}
+.icon-btn.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
 
 /* ============================================================
    Status bar
@@ -374,7 +444,7 @@ table.tbl .swatch{display:inline-block;width:8px;height:8px;border-radius:2px;ma
 #statusbar{
   display:flex;align-items:center;gap:0;
   min-height:var(--status-h);padding:0 12px;
-  background:linear-gradient(180deg,#141a21,#111720);
+  background:var(--status-bg);
   border-top:1px solid var(--line);
   font-size:11px;font-variant-numeric:tabular-nums;
   overflow:hidden;white-space:nowrap;
@@ -421,11 +491,11 @@ table.tbl .swatch{display:inline-block;width:8px;height:8px;border-radius:2px;ma
    ============================================================ */
 #tour-spot{
   position:fixed;z-index:200;border-radius:9px;pointer-events:none;
-  box-shadow:0 0 0 2px var(--accent),0 0 0 6px var(--accent-soft),0 0 0 9999px rgba(4,7,11,.66);
+  box-shadow:0 0 0 2px var(--accent),0 0 0 6px var(--accent-soft),0 0 0 9999px var(--tour-dim);
   transition:top .24s cubic-bezier(.4,0,.2,1),left .24s cubic-bezier(.4,0,.2,1),
              width .24s cubic-bezier(.4,0,.2,1),height .24s cubic-bezier(.4,0,.2,1);
 }
-#tour-spot.dim-only{box-shadow:0 0 0 9999px rgba(4,7,11,.72)}
+#tour-spot.dim-only{box-shadow:0 0 0 9999px var(--tour-dim-2)}
 #tour-spot[hidden],#tour-card[hidden]{display:none}
 #tour-card{
   position:fixed;z-index:201;
@@ -460,7 +530,7 @@ table.tbl .swatch{display:inline-block;width:8px;height:8px;border-radius:2px;ma
 #toast-wrap{position:fixed;bottom:calc(var(--status-h) + 14px);left:50%;transform:translateX(-50%);z-index:100;display:flex;flex-direction:column;gap:7px;align-items:center;pointer-events:none}
 .toast{
   padding:8px 14px;border-radius:7px;
-  background:#222c38;border:1px solid var(--line);box-shadow:var(--shadow);
+  background:var(--toast-bg);border:1px solid var(--line);box-shadow:var(--shadow);
   font-size:12px;max-width:min(90vw,420px);
   animation:tin .22s ease-out;
 }
@@ -472,7 +542,7 @@ table.tbl .swatch{display:inline-block;width:8px;height:8px;border-radius:2px;ma
 /* scrim for overlay panels */
 #scrim{
   position:absolute;inset:0;z-index:22;display:none;
-  background:rgba(5,8,12,.5);backdrop-filter:blur(1px);
+  background:var(--scrim);backdrop-filter:blur(1px);
 }
 #scrim.on{display:block}
 
@@ -583,6 +653,10 @@ body.embed{--topbar-h:44px}
       <button data-view="W" title="Looking from west">W</button>
     </div>
     <span class="tb-sep"></span>
+    <button class="tb-btn" id="tb-theme" title="Switch between dark and light presentation (T)">
+      <svg id="ic-theme" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"></svg>
+      <span class="tb-label" id="tb-theme-label">Light</span>
+    </button>
     <button class="tb-btn" id="tb-export" title="Export a study sheet or results (E)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 3.6v12M8.4 12l3.6 3.6L15.6 12"/><path d="M4 15.5v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
       <span class="tb-label">Export</span>
@@ -3686,6 +3760,36 @@ function setPlaying(p){
 }
 ['tb-play','b-play2','b-play3'].forEach(id => on(id, 'click', () => setPlaying(!State.playing)));
 
+/* --- presentation theme -------------------------------------------------- */
+const UI_THEME_KEY = 'sunpath.theme.v1';
+const ICON_SUN  = '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2' +
+                  'M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/>';
+const ICON_MOON = '<path d="M20.5 14.2A8.6 8.6 0 0 1 9.8 3.5a8.6 8.6 0 1 0 10.7 10.7z"/>';
+
+/**
+ * Switch the whole presentation — interface palette and 3D scene together.
+ * The CSS carries both palettes as tokens on :root, so this only has to flip an
+ * attribute; applyTheme() handles the scene chrome that bakes colour in.
+ */
+function setUiTheme(name, { persist = true } = {}){
+  const t = (name === 'light') ? 'light' : 'dark';
+  document.documentElement.dataset.theme = t;
+  applyTheme(t);
+
+  $('ic-theme').innerHTML = t === 'dark' ? ICON_SUN : ICON_MOON;
+  $('tb-theme-label').textContent = t === 'dark' ? 'Light' : 'Dark';
+  $('tb-theme').title = 'Switch to the ' + (t === 'dark' ? 'light' : 'dark') + ' presentation (T)';
+
+  // An export should default to what is on screen, without locking the choice
+  exportOpts.theme = t;
+  const seg = $('seg-exp-theme');
+  if (seg) [...seg.children].forEach(c => c.classList.toggle('on', c.dataset.t === t));
+
+  if (persist){ try { localStorage.setItem(UI_THEME_KEY, t); } catch (e) { /* private mode */ } }
+}
+const currentUiTheme = () => document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
+on('tb-theme', 'click', () => setUiTheme(currentUiTheme() === 'dark' ? 'light' : 'dark'));
+
 /* --- export popover ------------------------------------------------------ */
 const exportOpts = { theme: 'dark', scale: 2 };
 
@@ -3955,6 +4059,7 @@ addEventListener('keydown', (e) => {
   else if (k === 'r') setPanel('right', app.classList.contains('no-right'));
   else if (k === 'f') $('tb-full').click();
   else if (k === 'e') $('tb-export').click();
+  else if (k === 't') $('tb-theme').click();
   else if (k === 'arrowleft')  setMinutes(State.minutes - (e.shiftKey ? 60 : 10));
   else if (k === 'arrowright') setMinutes(State.minutes + (e.shiftKey ? 60 : 10));
   else if (k === 'arrowup')    setDoy(State.doy + (e.shiftKey ? 30 : 1));
@@ -4027,6 +4132,10 @@ function init(){
   $('v-speed').textContent = State.speed.toFixed(1) + '×';
   $('i-speed').value = State.speed;
 
+  let stored = null;
+  try { stored = localStorage.getItem(UI_THEME_KEY); } catch (e) { /* private mode */ }
+  setUiTheme(stored === 'light' ? 'light' : 'dark', { persist: false });
+
   loadSample('demo');
   setPanel('left', innerWidth > 1100);
   setPanel('right', innerWidth > 1100);
@@ -4042,7 +4151,7 @@ function init(){
     buildSkyDome, buildSources, unobstructed, buildSensorGrid,
     runAnalysis, applyEPW, setDoy, setMinutes, loadSample, refresh,
     exportSheet, applyTheme, THEMES, getTheme: () => THEME.name,
-    Tour, TOUR_KEY,
+    Tour, TOUR_KEY, setUiTheme, currentUiTheme, UI_THEME_KEY,
     getDome, resolvePeriod, orientOf,
     setSite(s){ Object.assign(State.site, s);
       $('i-lat').value = State.site.lat; $('i-lon').value = State.site.lon;
