@@ -344,4 +344,30 @@ tests/assets/         downloaded on demand (Chicago O'Hare TMY3, for validation)
 
 ---
 
+## Licence
+
+**Sun Studio is MIT licensed** — © 2026 Karam Al-Obaidi. Use it, adapt it, host it on your
+own site, hand it to students, free of charge and for any purpose, commercial or not. The
+only condition is that the copyright notice travels with copies you distribute.
+
+It builds on two pieces of licensed work, both permissive and both compatible with the
+above:
+
+- **three.js** (MIT) — the only runtime dependency, loaded from a CDN. If you switch to
+  self-hosting it, ship its licence file alongside.
+- **Radiance** (Radiance Software License v2.0, Lawrence Berkeley National Laboratory) —
+  the Perez sky coefficients and the Tregenza/Reinhart patch construction are
+  reimplemented from it in JavaScript.
+
+Everything else — NOAA solar position, the Perez, Hottel, Liu–Jordan and Tregenza methods,
+the EPW field layout — is published science and data, credited rather than licensed. No
+web fonts and no weather data are redistributed.
+
+Full texts and the complete credit list: [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md).
+
+*Not legal advice. If your institution has an IP policy covering teaching materials, that
+policy governs and this licence choice should be checked against it.*
+
+---
+
 © Karam Al-Obaidi

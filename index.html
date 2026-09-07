@@ -1,4 +1,14 @@
 <!DOCTYPE html>
+<!--
+  Sun Studio — 3D sun path and solar radiation analysis
+  Copyright (c) 2026 Karam Al-Obaidi — MIT License (see LICENSE)
+
+  Loads three.js (MIT, (c) 2010-2026 three.js authors) from jsDelivr at runtime.
+  The Perez sky coefficients and the Tregenza/Reinhart patch construction are
+  reimplemented from Radiance (Radiance Software License v2.0, (c) 1990-2025 The
+  Regents of the University of California, through Lawrence Berkeley National
+  Laboratory). Full notices: THIRD-PARTY-NOTICES.md
+-->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -3157,6 +3167,8 @@ function exportCSV(){
   if (!r) { toast('Run an analysis first.', 'err'); return; }
   const lines = [
     '# Sun Studio — solar radiation analysis export',
+    '# © Karam Al-Obaidi, MIT licensed. Method: NOAA solar position; Perez et al. 1993',
+    '# all-weather sky on Tregenza/Reinhart patches; ray-cast shading. No interreflection.',
     '# Site,' + (State.site.name || 'custom') + ',lat,' + State.site.lat + ',lon,' + State.site.lon + ',tz,' + State.site.tz,
     '# Climate,' + (State.weather ? State.weather.fileName : 'synthetic clear sky (ASHRAE/Hottel)'),
     '# Analysis,' + r.unitLong + ',' + r.period + ',unit,' + r.unit,
@@ -3909,8 +3921,11 @@ const TOUR = [
   {
     title: 'That’s the tour',
     body: 'Replay it any time from <b>Help</b>. Keys: <kbd>L</kbd>/<kbd>R</kbd> panels, ' +
-          '<kbd>Space</kbd> animate, <kbd>E</kbd> export, <kbd>F</kbd> fullscreen, ' +
-          'arrows to move time and date.',
+          '<kbd>T</kbd> theme, <kbd>Space</kbd> animate, <kbd>E</kbd> export, ' +
+          '<kbd>F</kbd> fullscreen, arrows to move time and date.' +
+          '<br><br><span style="color:var(--text-faint);font-size:11px">' +
+          'Sun Studio © Karam Al-Obaidi · MIT licensed. Built on three.js, and on the ' +
+          'Perez sky model and Tregenza sky subdivision as implemented in Radiance.</span>',
     centre: true,
   },
 ];

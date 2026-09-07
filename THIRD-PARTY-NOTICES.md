@@ -1,0 +1,144 @@
+# Third-party notices
+
+Sun Studio is licensed under the MIT License (see `LICENSE`). It builds on the work
+below. Copies of the required notices are reproduced in full.
+
+---
+
+## three.js
+
+The only runtime dependency. Loaded from jsDelivr at
+`https://cdn.jsdelivr.net/npm/three@0.185.1/` — the app itself contains no three.js code.
+**If you self-host three.js instead** (the offline option in the README), you are
+redistributing copies and this notice must ship alongside them.
+
+Project: https://github.com/mrdoob/three.js
+
+```
+The MIT License
+
+Copyright © 2010-2026 three.js authors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+```
+
+---
+
+## Radiance
+
+Sun Studio contains no Radiance code, but two things were derived from it and
+reimplemented in JavaScript:
+
+- the Tregenza / Reinhart sky-patch construction, following `rh_init()` in `gendaymtx.c`;
+- the Perez all-weather sky coefficient table and its parameter equations
+  (`PerezCoeff`, `CalcPerezParam`, `CalcRelLuminance` in `gendaymtx.c`).
+
+The coefficients themselves are published data from Perez, Seals & Michalsky (1993),
+*Solar Energy* 50(3):235–245, Table 1. The notice below is reproduced as the Radiance
+Software License asks.
+
+Project: https://github.com/LBNL-ETA/Radiance
+
+```
+The Radiance Software License, Version 2.0
+
+Radiance v6.1 Copyright (c) 1990 to 2025, The Regents of the University of
+California, through Lawrence Berkeley National Laboratory (subject to receipt
+of any required approvals from the U.S. Dept. of Energy).  All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+(1) Redistributions of source code must retain the above copyright notice,
+this list of conditions and the following disclaimer.
+
+(2) Redistributions in binary form must reproduce the above copyright
+notice, this list of conditions and the following disclaimer in the
+documentation and/or other materials provided with the distribution.
+
+(3) Neither the name of the University of California, Lawrence Berkeley
+National Laboratory, U.S. Dept. of Energy nor the names of its contributors
+may be used to endorse or promote products derived from this software
+without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+
+You are under no obligation whatsoever to provide any bug fixes, patches,
+or upgrades to the features, functionality or performance of the source
+code ("Enhancements") to anyone; however, if you choose to make your
+Enhancements available either publicly, or directly to Lawrence Berkeley
+National Laboratory, without imposing a separate written license agreement
+for such Enhancements, then you hereby grant the following license: a
+non-exclusive, royalty-free perpetual license to install, use, modify,
+prepare derivative works, incorporate into other computer software,
+distribute, and sublicense such enhancements or derivative works thereof,
+in binary and source code form.
+```
+
+---
+
+## Methods and published data — credited, not licensed
+
+These are scientific methods, correlations and datasets rather than licensed software.
+They are implemented from their published descriptions and cited here as good practice.
+
+| Used for | Source |
+|---|---|
+| Solar position, equation of time, refraction | NOAA Global Monitoring Laboratory solar calculator; Meeus, *Astronomical Algorithms*, 2nd ed. A US federal work, public domain in the United States. |
+| Sky radiance distribution | Perez, R., Seals, R., Michalsky, J. (1993). *All-Weather Model for Sky Luminance Distribution.* Solar Energy 50(3):235–245. |
+| Sky clearness and brightness | Perez, R., Ineichen, P., Seals, R., Michalsky, J., Stewart, R. (1990). *Modeling Daylight Availability and Irradiance Components from Direct and Global Irradiance.* Solar Energy 44(5):271–289. |
+| Sky hemisphere subdivision | Tregenza, P. R. (1987); Reinhart, C. F. subdivision factors. |
+| Clear-sky fallback | Hottel, H. C. (1976) beam transmittance; Liu, B. Y. H. & Jordan, R. C. (1960) diffuse correlation. |
+| EPW field layout | EnergyPlus Weather File (EPW) Data Dictionary, US Department of Energy. |
+
+The "Ladybug spectrum" colour scheme is named after the palette used by
+[Ladybug Tools](https://www.ladybug.tools/), so that students recognise it from
+Grasshopper. No Ladybug Tools code is included in this app.
+
+---
+
+## Weather data
+
+**Sun Studio redistributes no weather data.** EPW files are supplied by the person using
+the app, and are read in the browser — nothing is uploaded anywhere.
+
+The test suite downloads one EPW at run time (Chicago O'Hare TMY3, from the Ladybug Tools
+test assets) purely to validate the physics; it is not committed to this repository and is
+not part of any deployment.
+
+If you bundle an EPW file with your own deployment, check the terms of the collection it
+came from. Most are free to use and redistribute, but some sources restrict redistribution
+even where the download itself is free.
+
+---
+
+## Fonts
+
+No web fonts are loaded. The interface uses a system font stack, so no font licence
+applies to a deployment of this app.
