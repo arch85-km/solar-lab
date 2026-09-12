@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <!--
   Sun Studio — 3D sun path and solar radiation analysis
+  Version 2.7
   Copyright (c) 2026 Karam Al-Obaidi — MIT License (see LICENSE)
 
   Loads three.js (MIT, (c) 2010-2026 three.js authors) from jsDelivr at runtime.
@@ -14,6 +15,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="author" content="Karam Al-Obaidi">
+<meta name="application-version" id="meta-version" content="2.7">
 <meta name="description" content="Interactive 3D sun path and solar radiation analysis for architectural design teaching. EPW climate import, OBJ model import, Perez sky model, W/m2 irradiance on all surfaces.">
 <title>Sun Studio</title>
 <style>
@@ -481,7 +483,10 @@ table.tbl .swatch{display:inline-block;width:8px;height:8px;border-radius:2px;ma
 #vp-readout .r span{color:var(--text-dim)}
 #vp-compass{top:11px;right:12px;width:52px;height:52px;opacity:.9;pointer-events:auto;cursor:pointer}
 #vp-compass:hover{opacity:1}
-#vp-compass.turned{filter:drop-shadow(0 0 5px rgba(111,178,255,.55))}
+/* No focus box on a mouse click — the rose is a graphic, not a form control.
+   Keyboard users still get a ring, which is what :focus-visible is for. */
+#vp-compass:focus{outline:none}
+#vp-compass:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:50%}
 #vp-attrib{
   bottom:8px;right:11px;
   padding:3px 7px;border-radius:4px;
@@ -1231,7 +1236,7 @@ body.embed{--topbar-h:44px}
 
   <!-- ================= STATUS BAR ================= -->
   <footer id="statusbar">
-    <div class="credit">&copy; Karam Al-Obaidi &middot; <span id="build-tag"></span></div>
+    <div class="credit" id="credit">&copy; Karam Al-Obaidi</div>
     <div id="status-items"></div>
   </footer>
 </div>
@@ -2400,7 +2405,7 @@ const Mercator = (() => {
  * running build can be identified at a glance — a stale download that looks
  * almost right is otherwise very hard to tell apart from the current one.
  */
-const BUILD = '2.6';
+const BUILD = '2.7';
 
 /**
  * Aerial imagery through a tile proxy on your own server.
@@ -4751,7 +4756,7 @@ function composeSheet(source, W, H, s){
   setFont(11, '600');
   g.fillStyle = T.sheetDim;
   g.textAlign = 'left';
-  const credit = '© Karam Al-Obaidi · v' + BUILD;
+  const credit = '© Karam Al-Obaidi';
   g.fillText(credit, pad, fy + Math.round(34 * s));
   const bmAttrib = Basemap.info.attribution;
   if (bmAttrib){
@@ -6235,7 +6240,12 @@ function init(){
   State.site = { lat: c.lat, lon: c.lon, tz: c.tz, el: c.el, name: c.n };
   $('i-lat').value = c.lat; $('i-lon').value = c.lon; $('i-tz').value = c.tz; $('i-elev').value = c.el;
 
-  $('build-tag').textContent = 'v' + BUILD;
+  // The version lives in the file, not on screen: an HTML comment and a meta
+  // tag at the top, plus the credit's tooltip, so a build can still be told
+  // apart without a stamp in the corner of every screenshot.
+  document.getElementById('meta-version').setAttribute('content', BUILD);
+  const credit = document.getElementById('credit');
+  if (credit) credit.title = 'Sun Studio v' + BUILD;
 
   // The proxy option only makes sense once a deployed copy points at one
   if (PROXY_URL){
@@ -6273,7 +6283,7 @@ function init(){
   requestAnimationFrame(loop);
   // Say which build this is, out loud. Three rounds of debugging went into
   // symptoms that a stale file had already fixed.
-  toast('Sun Studio v' + BUILD + ' loaded.', 'info', 4000);
+
   Tour.maybeAutoStart();
 
   // Public surface for the automated test suite

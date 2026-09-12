@@ -55,6 +55,14 @@ const php  = readFileSync(join(ROOT, 'server', 'tile-proxy.php'), 'utf8');
 const build = (html.match(/const BUILD = '([^']+)';/) || [])[1];
 if (!build) fail('Could not find the BUILD constant in index.html.');
 
+// The version is not on screen any more, so the file's own markers are how a
+// build is identified: they must agree with the constant.
+for (const [re, what] of [[/^  Version ([\d.]+)$/m, 'the header comment'],
+                          [/<meta name="application-version"[^>]*content="([^"]+)"/, 'the meta tag']]){
+  const found = (html.match(re) || [])[1];
+  if (found !== build) fail('BUILD is ' + build + ' but ' + what + ' says ' + found + '.');
+}
+
 /* ── rewrite ───────────────────────────────────────────────────────────── */
 
 const variant = key ? 'proxy' : 'plain';

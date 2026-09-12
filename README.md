@@ -345,7 +345,7 @@ It is clearly labelled as synthetic; it is not real climate.
 
 ## Validation
 
-`npm test` runs 203 headless checks. Every number below is produced by that suite, not
+`npm test` runs 204 headless checks. Every number below is produced by that suite, not
 asserted by hand.
 
 | Check | Result |
@@ -434,12 +434,20 @@ rebuilds live on every change, with no "apply" step.
 
 ---
 
+### Which build am I running?
+
+The version is deliberately **not** on screen — it would sit in the corner of
+every screenshot and every projected lecture. It is in the file instead: the
+header comment on line 3, a `<meta name="application-version">` tag, and the
+tooltip on the credit in the status bar. `tools/make-deploy.mjs` refuses to build
+if those disagree with the `BUILD` constant, so they cannot drift apart.
+
 ## Development
 
 ```bash
 npm install          # playwright, for the test suite only
 npm run vendor       # fetch three.js and the validation EPW
-npm test             # 203 headless checks, screenshots and sample export sheets
+npm test             # 204 headless checks, screenshots and sample export sheets
 npm run serve        # serve the folder at http://localhost:8080
 ```
 

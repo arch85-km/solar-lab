@@ -167,15 +167,25 @@ const boot = await page.evaluate(() => {
 check('every panel section starts collapsed',
       boot.total > 0 && boot.open.length === 0,
       boot.total + ' sections, open: ' + (boot.open.join(', ') || 'none'));
+// The version identifies a build without appearing in the corner of every
+// screenshot: it lives in the file — header comment and meta tag — and in the
+// credit's tooltip, which costs nothing on screen.
 const stamp = await page.evaluate(() => ({
   build: window.__SUNAPP.BUILD,
-  shown: (document.getElementById('build-tag') || {}).textContent,
+  meta: (document.querySelector('meta[name="application-version"]') || {}).content,
   credit: document.querySelector('#statusbar .credit').textContent,
+  tip: document.querySelector('#statusbar .credit').title,
+  onScreen: /\bv\d+\.\d+/.test(document.body.innerText),
 }));
-check('the build version is visible in the status bar',
-      !!stamp.build && stamp.shown === 'v' + stamp.build &&
-      stamp.credit.includes('Karam Al-Obaidi') && stamp.credit.includes('v' + stamp.build),
-      '"' + stamp.credit.trim() + '"');
+{
+  const src = await readFile(join(ROOT, 'index.html'), 'utf8');
+  const inComment = (src.match(/^  Version ([\d.]+)$/m) || [])[1];
+  check('the version is recorded in the file, not shown on screen',
+        !!stamp.build && stamp.meta === stamp.build && inComment === stamp.build &&
+        !stamp.onScreen && stamp.credit.trim() === '© Karam Al-Obaidi' &&
+        stamp.tip === 'Sun Studio v' + stamp.build,
+        'v' + stamp.build + ' in the header comment, the meta tag and the credit tooltip');
+}
 check('the old key Show button is gone',
       await page.evaluate(() => !document.getElementById('b-bm-key-show')));
 
@@ -1456,6 +1466,16 @@ check('it keeps the camera where it was, only turning it',
       'distance ' + roseAfter.dist.toFixed(0) + ' m, unchanged');
 check('facing the view north leaves project north alone — they are separate controls',
       roseAfter.north === 25, 'building still at ' + roseAfter.north + '°');
+const roseFocus = await page.evaluate(() => {
+  const rose = document.getElementById('vp-compass');
+  const st = getComputedStyle(rose);
+  return { outline: st.outlineStyle, width: st.outlineWidth,
+           focused: document.activeElement === rose };
+});
+check('clicking the compass leaves no focus box drawn round it',
+      roseFocus.outline === 'none' || roseFocus.width === '0px',
+      'outline ' + roseFocus.outline + ' ' + roseFocus.width);
+
 check('the compass says what clicking it does',
       /look north|Looking north/i.test(roseAfter.tip || ''), roseAfter.tip);
 
