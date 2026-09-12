@@ -113,7 +113,9 @@ once you type its real-world width in metres — nothing is uploaded anywhere, a
 with no internet at all. Either way the map sits at true metre scale under the model, takes
 the building shadows, and is excluded from the radiation analysis.
 
-**Find a place** — type an address, postcode or building name and press Search. One
+**Find a place** — there is a search box in the toolbar (or press `/`); the Location panel
+has the same one next to the coordinates. Type an address, postcode or building name and
+press Enter. One
 caution the app will remind you of: **the time zone is not guessed** from coordinates, so
 check it after moving somewhere new. A wrong time zone silently shifts every sun position.
 
@@ -264,7 +266,7 @@ It is clearly labelled as synthetic; it is not real climate.
 
 ## Validation
 
-`npm test` runs 124 headless checks. Every number below is produced by that suite, not
+`npm test` runs 128 headless checks. Every number below is produced by that suite, not
 asserted by hand.
 
 | Check | Result |
@@ -358,7 +360,7 @@ rebuilds live on every change, with no "apply" step.
 ```bash
 npm install          # playwright, for the test suite only
 npm run vendor       # fetch three.js and the validation EPW
-npm test             # 124 headless checks, screenshots and sample export sheets
+npm test             # 128 headless checks, screenshots and sample export sheets
 npm run serve        # serve the folder at http://localhost:8080
 ```
 

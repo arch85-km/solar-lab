@@ -645,9 +645,23 @@ check('tile requests stay within the 6x6 policy cap',
       tileRequests.length + ' tiles requested');
 check('every tile came from one zoom level, none pre-fetched beyond the extent',
       new Set(tileRequests.map(t => t.z)).size === 1, 'zoom ' + tileRequests[0].z);
-check('the basemap lies flat on the ground and is excluded from analysis',
-      Math.abs(bm.rotX + Math.PI / 2) < 1e-3 && bm.y > 0 && bm.y < 0.05 && bm.excluded,
-      'rotX ' + bm.rotX + ', y ' + bm.y);
+check('the basemap lies flat and is excluded from analysis',
+      Math.abs(bm.rotX + Math.PI / 2) < 1e-3 && bm.excluded,
+      'rotX ' + bm.rotX);
+
+// A 2 mm gap between these planes striped the map at site distances, so the
+// ordering and the separation are both pinned down here.
+const layers = await page.evaluate(() => window.__SUNAPP.groundLayers());
+const gaps = [layers.basemap - layers.ground, layers.grid - layers.basemap];
+check('ground, basemap and grid are stacked in order, all at or below the model base',
+      layers.ground < layers.basemap && layers.basemap < layers.grid && layers.grid <= 0,
+      'ground ' + layers.ground + ' < basemap ' + layers.basemap + ' < grid ' + layers.grid);
+check('their separation is far outside depth-buffer precision',
+      gaps.every(g => g >= 0.05), 'gaps ' + gaps.map(g => g.toFixed(2)).join(' / ') + ' m');
+check('the grid is hidden while a basemap is shown',
+      layers.gridVisible === false);
+check('the shadow map is refreshed on change, not rebuilt every frame',
+      layers.shadowAuto === false);
 check('OpenStreetMap attribution is shown on screen',
       /OpenStreetMap contributors/.test(bm.attribution) && /OpenStreetMap contributors/.test(bm.onScreen),
       bm.onScreen);

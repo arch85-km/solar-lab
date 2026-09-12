@@ -189,6 +189,21 @@ button,input,select,textarea{font:inherit;color:inherit}
 .tb-btn.on{background:var(--accent-soft);color:var(--accent);border-color:rgba(255,179,64,.32)}
 .tb-btn svg{width:15px;height:15px;flex:0 0 auto}
 .tb-sep{width:1px;height:22px;background:var(--line);margin:0 5px;flex:0 0 auto}
+.tb-search{
+  display:flex;align-items:center;gap:6px;
+  height:31px;padding:0 9px;margin-right:4px;
+  background:var(--panel-2);border:1px solid var(--line);border-radius:var(--r);
+  min-width:0;
+}
+.tb-search svg{width:14px;height:14px;flex:0 0 auto;color:var(--text-faint)}
+.tb-search input{
+  width:170px;min-width:0;height:100%;
+  background:transparent;border:0;outline:none;font-size:12px;
+}
+.tb-search:focus-within{border-color:var(--accent)}
+#tb-results{width:300px;padding:8px}
+@media (max-width:1180px){ .tb-search input{width:120px} }
+@media (max-width:900px){ .tb-search{display:none} }
 .tb-label{display:inline}
 .view-cube{display:flex;gap:2px;background:var(--panel-2);border:1px solid var(--line);border-radius:var(--r);padding:2px}
 .view-cube button{
@@ -474,7 +489,14 @@ table.tbl .swatch{display:inline-block;width:8px;height:8px;border-radius:2px;ma
   color:var(--text);font-size:11.5px;cursor:pointer;line-height:1.35;
 }
 #search-results button:hover{background:var(--btn-hover);border-color:var(--btn-hover-line)}
-#search-results button small{display:block;color:var(--text-faint);font-size:10px}
+#search-results button small,#tb-results-list button small{display:block;color:var(--text-faint);font-size:10px}
+#tb-results-list{display:flex;flex-direction:column;gap:3px}
+#tb-results-list button{
+  text-align:left;padding:6px 8px;
+  background:var(--panel-2);border:1px solid var(--line);border-radius:5px;
+  color:var(--text);font-size:11.5px;cursor:pointer;line-height:1.35;
+}
+#tb-results-list button:hover{background:var(--btn-hover);border-color:var(--btn-hover-line)}
 #place-list{display:flex;flex-direction:column;gap:3px;margin-top:6px}
 #place-list:empty{display:none}
 .place-row{
@@ -741,6 +763,10 @@ body.embed{--topbar-h:44px}
       <button data-view="W" title="Looking from west">W</button>
     </div>
     <span class="tb-sep"></span>
+    <div class="tb-search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.4 15.4 21 21"/></svg>
+      <input type="text" id="tb-q" placeholder="Search a city or address" autocomplete="off" aria-label="Search for a city or address">
+    </div>
     <button class="tb-btn" id="tb-theme" title="Switch between dark and light presentation (T)">
       <svg id="ic-theme" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"></svg>
       <span class="tb-label" id="tb-theme-label">Light</span>
@@ -1181,6 +1207,7 @@ body.embed{--topbar-h:44px}
     <div id="status-items"></div>
   </footer>
 </div>
+<div id="tb-results" class="pop" hidden><div id="tb-results-list"></div></div>
 <div id="export-pop" class="pop" hidden>
   <div class="pop-t">Export study sheet</div>
   <div class="row col">
@@ -2134,6 +2161,10 @@ sunLight.castShadow = true;
 sunLight.shadow.mapSize.set(2048, 2048);
 sunLight.shadow.bias = -0.0006;
 sunLight.shadow.normalBias = 0.035;
+// The shadow map only changes when the sun, the model or the theme does, so it
+// is refreshed explicitly rather than rebuilt 60 times a second.
+sunLight.shadow.autoUpdate = false;
+sunLight.shadow.needsUpdate = true;
 scene.add(sunLight, sunLight.target);
 
 const skyLight = new THREE.HemisphereLight(THEME.hemiSky, THEME.hemiGround, 1.05);
@@ -2147,7 +2178,10 @@ const GROUND_SIZE = 900;
 const groundMat = new THREE.MeshStandardMaterial({ color: THEME.ground, roughness: 0.98, metalness: 0 });
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(GROUND_SIZE, GROUND_SIZE), groundMat);
 ground.rotation.x = -Math.PI / 2;
-ground.position.y = -0.015;
+// The ground, basemap and grid are near-coplanar, so their separation has to
+// survive the depth buffer's precision at site distances. 2 mm did not: it
+// striped the map. Centimetres, all below y=0 so buildings still meet the map.
+ground.position.y = -0.30;
 ground.receiveShadow = true;
 scene.add(ground);
 
@@ -2158,7 +2192,7 @@ function makeGrid(visible = true){
   gridHelper = new THREE.GridHelper(200, 40, THEME.gridMajor, THEME.gridMinor);
   gridHelper.material.opacity = THEME.gridOpacity;
   gridHelper.material.transparent = true;
-  gridHelper.position.y = 0.006;
+  gridHelper.position.y = -0.04;
   gridHelper.visible = visible;
   scene.add(gridHelper);
 }
@@ -2323,6 +2357,8 @@ const Basemap = (() => {
     if (mesh){ basemapGroup.remove(mesh); mesh.geometry.dispose(); mesh.material.dispose(); mesh = null; }
     if (texture){ texture.dispose(); texture = null; }
     state = { kind: 'none', attribution: '', extent: 0, tainted: false, note: '' };
+    if (gridHelper) gridHelper.visible = State.disp.grid;
+    requestRender();
     updateAttribution();
   }
 
@@ -2346,13 +2382,18 @@ const Basemap = (() => {
         fog: false,
       }));
     mesh.rotation.x = -Math.PI / 2;
-    mesh.position.set(offsetX, 0.004, offsetZ);
+    mesh.position.set(offsetX, -0.12, offsetZ);
     mesh.receiveShadow = true;
     mesh.userData.noAnalysis = true;
     basemapGroup.add(mesh);
 
     state.kind = kind;
     state.extent = Math.max(width, height);
+    // A survey grid over a real map is clutter, and it is the surface most
+    // likely to fight the basemap for depth
+    if (gridHelper) gridHelper.visible = false;
+    sunLight.shadow.needsUpdate = true;
+    requestRender();
     updateAttribution();
     return mesh;
   }
@@ -2686,6 +2727,9 @@ function updateSunVisuals(sun){
   sunLight.intensity = up ? lerp(0.55, 2.55, clamp(Math.sin(sun.altitude * D2R), 0, 1) ** 0.55) : 0;
   sunLight.color.setHSL(0.108, clamp(0.55 - sun.altitude / 120, 0.06, 0.55), 0.62);
 
+  sunLight.shadow.needsUpdate = true;
+  requestRender();
+
   const cam = sunLight.shadow.camera;
   const ext = Math.max(State.modelRadius * 1.55, 26);
   cam.left = -ext; cam.right = ext; cam.top = ext; cam.bottom = -ext;
@@ -2915,12 +2959,15 @@ function frameModel(){
   dist *= 1.03;                                          // a hair of breathing room
 
   camera.position.copy(controls.target).addScaledVector(dir, dist);
-  camera.near = Math.max(dist / 1200, 0.2);
+  // A 19200:1 far/near ratio leaves too few depth bits for near-coplanar ground
+  // planes; 3200:1 is ample for a site and still clears the sun-path dome.
+  camera.near = Math.max(dist / 200, 0.4);
   camera.far = dist * 16;
   camera.updateProjectionMatrix();
   scene.fog.near = dist * 0.95;
   scene.fog.far = dist * 4.5;
   controls.update();
+  requestRender();
 }
 
 
@@ -3411,6 +3458,7 @@ function renderResults(){
   mesh.userData.noAnalysis = true;
   resultGroup.add(mesh);
 
+  requestRender();
   document.getElementById('no-results').style.display = 'none';
   document.getElementById('have-results').style.display = '';
   updateLegend(mn, mx);
@@ -3572,6 +3620,7 @@ function updateReadout(sun){
     '<div class="r"><span>Azimuth</span><b>' + sun.azimuth.toFixed(1) + '°</b></div>';
 }
 
+let horizCheck = { key: '', val: 0 };
 function updateStatusBar(){
   const sun = currentSun(), info = currentDayInfo(), rad = currentIrradiance(sun);
   const sb = document.getElementById('status-items');
@@ -3599,12 +3648,25 @@ function updateStatusBar(){
 
   // Live cross-check: the model's own horizontal irradiance vs. the source GHI.
   // With an EPW loaded these must agree, because the Perez sky is normalised to DHI.
+  // It only changes per hour, so the result is cached — otherwise dragging the
+  // time slider rebuilt a 145-patch Perez sky several times a second.
   try {
-    const saveMode = State.analysis.mode;
-    State.analysis.mode = 'inst';
-    const src = buildSources();
-    State.analysis.mode = saveMode;
-    const horiz = unobstructed(0, 1, 0, src);
+    const a = State.analysis;
+    const ck = [State.site.lat, State.site.lon, State.site.tz, State.dstHours, State.doy,
+                clamp(Math.floor(State.minutes / 60), 0, 23),
+                State.weather ? State.weather.fileName : 'clear',
+                a.density, a.groundRefl, a.useGround].join('|');
+    let horiz;
+    if (horizCheck.key === ck){
+      horiz = horizCheck.val;
+    } else {
+      const saveMode = a.mode;
+      a.mode = 'inst';
+      const src = buildSources();
+      a.mode = saveMode;
+      horiz = unobstructed(0, 1, 0, src);
+      horizCheck = { key: ck, val: horiz };
+    }
     const ghi = rad.ghi;
     const ok = ghi < 5 || Math.abs(horiz - ghi) / Math.max(ghi, 1) < 0.05;
     st('Horizontal check', Math.round(horiz) + ' vs ' + Math.round(ghi) + ' W/m²', ok ? 'ok sec-only' : 'bad sec-only');
@@ -3694,7 +3756,7 @@ function applyTheme(name){
   THEME = t;
 
   groundMat.color.setHex(t.ground);
-  makeGrid(State.disp.grid);
+  makeGrid(State.disp.grid && !Basemap.mesh);
   skyLight.color.setHex(t.hemiSky);
   skyLight.groundColor.setHex(t.hemiGround);
   fillLight.color.setHex(t.fill);
@@ -4446,17 +4508,20 @@ on('f-bm-img', 'change', (e) => {
 
 /* --- place search (Nominatim) -------------------------------------------- */
 let lastSearchAt = 0;
-async function runSearch(){
-  const q = $('i-search').value.trim();
-  const out = $('search-results');
+/**
+ * @param {HTMLInputElement} input  which box the query came from
+ * @param {HTMLElement} out         where to render the results
+ */
+async function runSearch(input = $('i-search'), out = $('search-results')){
+  const q = input.value.trim();
   if (q.length < 3){ out.innerHTML = ''; toast('Type at least three characters.', 'info', 2500); return; }
+  if (out === $('tb-results-list')) $('tb-results').hidden = false;
 
   // Nominatim asks for no more than one request a second
   const wait = 1100 - (performance.now() - lastSearchAt);
   if (wait > 0) await new Promise(r => setTimeout(r, wait));
   lastSearchAt = performance.now();
 
-  $('b-search').disabled = true;
   out.innerHTML = '<button disabled>Searching…</button>';
   try {
     const url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&addressdetails=0&q=' +
@@ -4476,13 +4541,12 @@ async function runSearch(){
       b.querySelector('small').textContent =
         (+r.lat).toFixed(4) + '°, ' + (+r.lon).toFixed(4) + '°  ·  ' + name.split(',').slice(2).join(',').trim();
       b.onclick = () => pickPlace(+r.lat, +r.lon, short);
+      b.className = 'place-result';
       out.appendChild(b);
     }
   } catch (err){
     out.innerHTML = '';
     toast('Place search failed: ' + err.message, 'err', 6000);
-  } finally {
-    $('b-search').disabled = false;
   }
 }
 
@@ -4497,12 +4561,34 @@ function pickPlace(lat, lon, name){
   $('i-lon').value = lon.toFixed(4);
   $('i-city').value = '';
   $('search-results').innerHTML = '';
+  $('tb-results-list').innerHTML = '';
+  $('tb-results').hidden = true;
+  $('tb-q').value = '';
   rebuildAll();
   if (State.basemap.source === 'osm') loadBasemapTiles();
   toast('Moved to ' + name + ' — check the time zone is right for this location.', 'info', 6500);
 }
-on('b-search', 'click', runSearch);
-on('i-search', 'keydown', (e) => { if (e.key === 'Enter'){ e.preventDefault(); runSearch(); } });
+on('b-search', 'click', () => runSearch($('i-search'), $('search-results')));
+on('i-search', 'keydown', (e) => {
+  if (e.key === 'Enter'){ e.preventDefault(); runSearch($('i-search'), $('search-results')); }
+});
+
+// The same search, reachable from the toolbar — the Location panel starts
+// collapsed, which made the one inside it easy to miss entirely.
+on('tb-q', 'keydown', (e) => {
+  if (e.key === 'Enter'){
+    e.preventDefault();
+    const r = $('tb-q').getBoundingClientRect();
+    const pop = $('tb-results');
+    pop.style.top = Math.round(r.bottom + 7) + 'px';
+    pop.style.left = Math.round(clamp(r.left - 40, 8, Math.max(8, innerWidth - 310))) + 'px';
+    runSearch($('tb-q'), $('tb-results-list'));
+  } else if (e.key === 'Escape'){ $('tb-results').hidden = true; $('tb-q').blur(); }
+});
+$('tb-results').addEventListener('click', (e) => e.stopPropagation());
+addEventListener('click', (e) => {
+  if (e.target !== $('tb-q')) $('tb-results').hidden = true;
+});
 
 /* --- date & time --------------------------------------------------------- */
 function setDoy(doy, fromInput){
@@ -5060,6 +5146,7 @@ addEventListener('keydown', (e) => {
   else if (k === 'f') $('tb-full').click();
   else if (k === 'e') $('tb-export').click();
   else if (k === 't') $('tb-theme').click();
+  else if (k === '/'){ e.preventDefault(); $('tb-q').focus(); }
   else if (k === 'arrowleft')  setMinutes(State.minutes - (e.shiftKey ? 60 : 10));
   else if (k === 'arrowright') setMinutes(State.minutes + (e.shiftKey ? 60 : 10));
   else if (k === 'arrowup')    setDoy(State.doy + (e.shiftKey ? 30 : 1));
@@ -5071,6 +5158,7 @@ addEventListener('keydown', (e) => {
  * ========================================================================== */
 let wasNarrow = null;
 function onResize(){
+  requestRender();
   const w = viewportEl.clientWidth || 1, h = viewportEl.clientHeight || 1;
   renderer.setSize(w, h, false);
   camera.aspect = w / h;
@@ -5094,6 +5182,17 @@ if (window.ResizeObserver) new ResizeObserver(onResize).observe(viewportEl);
 
 function render(){ renderer.render(scene, camera); }
 
+/**
+ * Keep drawing for a short window after anything changes, rather than running a
+ * full render — and a 2048² shadow pass — every frame while the scene sits
+ * still. The tail covers OrbitControls' damping settling after a drag.
+ */
+let renderUntil = 0;
+function requestRender(ms = 280){
+  renderUntil = Math.max(renderUntil, performance.now() + ms);
+}
+controls.addEventListener('change', () => requestRender());
+
 let lastT = performance.now(), compassT = 0;
 function loop(now){
   requestAnimationFrame(loop);
@@ -5104,9 +5203,12 @@ function loop(now){
     if (State.animMode === 'day') setMinutes((State.minutes + dt * 60 * State.speed * 3) % 1440);
     else setDoy((State.doy + dt * State.speed * 6 - 1) % 365 + 1);
   }
-  controls.update();
-  if (now - compassT > 120){ compassT = now; updateCompassOverlay(); }
-  render();
+  const active = State.playing || now < renderUntil;
+  if (active){
+    controls.update();
+    if (now - compassT > 120){ compassT = now; updateCompassOverlay(); }
+    render();
+  }
 }
 
 /* ============================================================================
@@ -5159,6 +5261,16 @@ function init(){
     Basemap, Mercator, TILE_SOURCES, loadBasemapTiles, pickPlace, runSearch, Selects,
     resolveMapKey, MAPTILER_KEY_STORE, sourceAttribution,
     loadPlaces, savePlace, removePlace, renderPlaces, PLACES_KEY,
+    requestRender,
+    // Heights of the near-coplanar ground surfaces, so their separation can be
+    // asserted rather than left to drift back into z-fighting range.
+    groundLayers: () => ({
+      ground: ground.position.y,
+      grid: gridHelper ? gridHelper.position.y : null,
+      gridVisible: gridHelper ? gridHelper.visible : null,
+      basemap: Basemap.mesh ? Basemap.mesh.position.y : null,
+      shadowAuto: sunLight.shadow.autoUpdate,
+    }),
     getDome, resolvePeriod, orientOf, setProjection, domePoint,
     setSite(s){ Object.assign(State.site, s);
       $('i-lat').value = State.site.lat; $('i-lon').value = State.site.lon;
