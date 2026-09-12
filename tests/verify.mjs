@@ -1421,6 +1421,31 @@ check('the context the tracer sees turns with the context on screen',
 check('reset brings the map and the context back, not just the model',
       site.back.model === 0 && site.back.map === 0 && site.back.ctx === 0);
 
+// The same reset, reachable without opening a panel
+const roseBefore = await page.evaluate(() => {
+  const A = window.__SUNAPP;
+  const sl = document.getElementById('i-north');
+  sl.value = '25'; sl.dispatchEvent(new Event('input', { bubbles: true }));
+  const rose = document.getElementById('vp-compass');
+  return { rot: A.State.northRot, marked: rose.classList.contains('turned'),
+           clickable: getComputedStyle(rose).pointerEvents };
+});
+// A real click on the overlay, because an SVG element has no .click() method —
+// which is also why this has to be driven through the mouse to mean anything.
+await page.click('#vp-compass');
+await page.waitForTimeout(200);
+let roseReset = await page.evaluate(() => {
+  const rose = document.getElementById('vp-compass');
+  return { before: null, after: window.__SUNAPP.State.northRot,
+           marked: rose.classList.contains('turned'), tip: rose.getAttribute('title') };
+});
+roseReset.before = roseBefore;   // stitched together for one readable check
+check('clicking the compass on the map resets project north too',
+      roseReset.before.rot === 25 && roseReset.before.marked &&
+      roseReset.before.clickable !== 'none' && roseReset.after === 0 && !roseReset.marked,
+      '25° → ' + roseReset.after + '° from the viewport');
+check('the compass says what clicking it does', /reset/i.test(roseReset.tip || ''), roseReset.tip);
+
 check('the viewport compass shows project north while it is turned',
       /P 30°/.test(rose.turned) && !/P /.test(rose.back),
       'rose marks project north at 30°, clean again at 0°');

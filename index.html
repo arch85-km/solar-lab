@@ -479,7 +479,9 @@ table.tbl .swatch{display:inline-block;width:8px;height:8px;border-radius:2px;ma
 #vp-readout .r{display:flex;justify-content:space-between;gap:14px}
 #vp-readout .r b{font-weight:600;color:var(--text)}
 #vp-readout .r span{color:var(--text-dim)}
-#vp-compass{top:11px;right:12px;width:52px;height:52px;opacity:.9}
+#vp-compass{top:11px;right:12px;width:52px;height:52px;opacity:.9;pointer-events:auto;cursor:pointer}
+#vp-compass:hover{opacity:1}
+#vp-compass.turned{filter:drop-shadow(0 0 5px rgba(111,178,255,.55))}
 #vp-attrib{
   bottom:8px;right:11px;
   padding:3px 7px;border-radius:4px;
@@ -1017,7 +1019,8 @@ body.embed{--topbar-h:44px}
     <!-- ---------- VIEWPORT ---------- -->
     <div id="viewport">
       <div class="vp-overlay" id="vp-readout"></div>
-      <svg class="vp-overlay" id="vp-compass" viewBox="0 0 100 100"></svg>
+      <svg class="vp-overlay" id="vp-compass" viewBox="0 0 100 100" role="button" tabindex="0"
+           title="Project north — click to reset to true north"></svg>
       <div class="vp-overlay" id="vp-scrub">
         <button class="icon-btn" id="b-play3" title="Play / pause"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg></button>
         <span class="tval num" id="scrub-t">12:00</span>
@@ -2395,7 +2398,7 @@ const Mercator = (() => {
  * running build can be identified at a glance — a stale download that looks
  * almost right is otherwise very hard to tell apart from the current one.
  */
-const BUILD = '2.4';
+const BUILD = '2.5';
 
 /**
  * Aerial imagery through a tile proxy on your own server.
@@ -4501,6 +4504,10 @@ function updateCompassOverlay(){
     '</g>' +
     '<text x="50" y="96" text-anchor="middle" font-size="9" font-weight="700" fill="#6fb2ff" font-family="Inter,sans-serif">' +
       'P ' + pn + '°</text>' : '';
+  svg.classList.toggle('turned', !!pn);
+  svg.setAttribute('title', pn
+    ? 'Project north turned ' + pn + '° — click to reset the site to true north'
+    : 'Project north — click to reset to true north');
   svg.innerHTML =
     '<circle cx="50" cy="50" r="34" fill="rgba(13,17,23,.6)" stroke="rgba(120,140,160,.45)" stroke-width="1.5"/>' +
     '<g transform="rotate(' + rot.toFixed(2) + ' 50 50)">' +
@@ -4916,9 +4923,18 @@ on('i-city', 'change', (e) => {
   if (State.basemap.source !== 'none' && State.basemap.source !== 'image') loadBasemapTiles();
 });
 
-on('b-north-reset', 'click', () => {
+function resetNorth(){
+  if (!State.northRot) return;
   $('i-north').value = 0;
   $('i-north').dispatchEvent(new Event('input', { bubbles: true }));
+  toast('Project north reset — the site is back on true north.', 'ok', 3500);
+}
+on('b-north-reset', 'click', resetNorth);
+// The same reset from the map itself: the compass is where you are looking when
+// you notice the site is turned, and opening a panel to undo it is a detour.
+on('vp-compass', 'click', resetNorth);
+on('vp-compass', 'keydown', (e) => {
+  if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); resetNorth(); }
 });
 
 on('i-north', 'input', (e) => {
