@@ -675,6 +675,30 @@ check('the grid is hidden while a basemap is shown',
 check('the shadow map is refreshed on change, not rebuilt every frame',
       layers.shadowAuto === false);
 
+// The reported striping was the shadow camera's frustum edge: the basemap was a
+// shadow receiver up to a kilometre across, so most of it sampled outside the
+// depth texture. Shadows now land on a small dedicated catcher instead, which
+// keeps the frustum tight no matter how large the map is.
+const shad = await page.evaluate(async () => {
+  const A = window.__SUNAPP;
+  const out = [];
+  for (const ex of [400, 2000]){
+    A.State.basemap.extent = ex;
+    await A.Basemap.loadTiles('osm');
+    A.refresh(true);
+    out.push(A.shadowProbe());
+  }
+  return out;
+});
+check('neither the basemap nor the ground receives shadows',
+      shad.every(p => p.basemapReceives === false && p.groundReceives === false));
+check('the shadow frustum stays tight however large the basemap is',
+      shad.every(p => p.ext < 200) && shad[0].ext === shad[1].ext,
+      'basemap ' + shad.map(p => p.basemapExtent.toFixed(0) + ' m').join(' and ') +
+      ' → frustum ±' + shad[0].ext.toFixed(0) + ' m both times');
+check('the shadow catcher covers the model neighbourhood',
+      shad.every(p => p.catcherHalf >= 60), '±' + shad[0].catcherHalf.toFixed(0) + ' m');
+
 // Z-fighting is view-dependent: it appears at some camera angles and not others,
 // which is why it read as "happens when I orbit". Sweep low elevations, where
 // depth precision is worst, and look for the artefact's signature — near-black

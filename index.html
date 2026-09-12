@@ -2209,8 +2209,37 @@ ground.rotation.x = -Math.PI / 2;
 // survive the depth buffer's precision at site distances. 2 mm did not: it
 // striped the map. Centimetres, all below y=0 so buildings still meet the map.
 ground.position.y = -0.30;
-ground.receiveShadow = true;
+ground.receiveShadow = false;   // the shadow catcher handles this now
 scene.add(ground);
+
+/**
+ * Shadows are caught by a small dedicated plane rather than by the ground or the
+ * basemap.
+ *
+ * A basemap can be a kilometre across. Making it a shadow receiver forces the
+ * shadow camera to cover all of it, which either leaves most of it outside the
+ * frustum — hard-edged banded darkness along the boundary, which is what was
+ * reported — or spreads 2048 texels over 1000 m, which is acne. Shadows only
+ * matter next to the building, so this plane covers just that, uses
+ * ShadowMaterial so it draws the shadow and nothing else, and lets the map show
+ * through untouched everywhere else.
+ */
+const shadowCatcher = new THREE.Mesh(
+  new THREE.PlaneGeometry(1, 1),
+  new THREE.ShadowMaterial({ opacity: 0.42, depthWrite: false, fog: false }));
+shadowCatcher.rotation.x = -Math.PI / 2;
+shadowCatcher.position.y = -0.06;          // above the ground, basemap and grid
+shadowCatcher.receiveShadow = true;
+shadowCatcher.renderOrder = 1;
+shadowCatcher.userData.noAnalysis = true;
+scene.add(shadowCatcher);
+
+/** Size the catcher to the model's neighbourhood; returns its half-extent. */
+function fitShadowCatcher(){
+  const half = Math.max(State.modelRadius * 3.2, 60);
+  shadowCatcher.scale.set(half * 2, half * 2, 1);
+  return half;
+}
 
 // GridHelper bakes its colours into vertex data, so a theme change rebuilds it.
 let gridHelper = null;
@@ -2325,7 +2354,7 @@ const Mercator = (() => {
  * running build can be identified at a glance — a stale download that looks
  * almost right is otherwise very hard to tell apart from the current one.
  */
-const BUILD = '1.7';
+const BUILD = '1.8';
 
 const MAPTILER_KEY = '';
 
@@ -2419,6 +2448,8 @@ const Basemap = (() => {
     if (texture){ texture.dispose(); texture = null; }
     state = { kind: 'none', attribution: '', extent: 0, tainted: false, note: '' };
     if (gridHelper) gridHelper.visible = State.disp.grid;
+    ground.visible = true;
+    sunLight.shadow.needsUpdate = true;
     requestRender();
     updateAttribution();
   }
@@ -2444,7 +2475,7 @@ const Basemap = (() => {
       }));
     mesh.rotation.x = -Math.PI / 2;
     mesh.position.set(offsetX, -0.12, offsetZ);
-    mesh.receiveShadow = true;
+    mesh.receiveShadow = false;     // shadows land on the catcher above it
     mesh.userData.noAnalysis = true;
     basemapGroup.add(mesh);
 
@@ -2453,6 +2484,9 @@ const Basemap = (() => {
     // A survey grid over a real map is clutter, and it is the surface most
     // likely to fight the basemap for depth
     if (gridHelper) gridHelper.visible = false;
+    // The map replaces the ground it covers; leaving both means two coplanar
+    // surfaces competing for depth on whatever GPU happens to be in use.
+    ground.visible = false;
     sunLight.shadow.needsUpdate = true;
     requestRender();
     updateAttribution();
@@ -2780,7 +2814,10 @@ function updateSunVisuals(sun){
   sunRay.geometry.computeBoundingSphere();
 
   // Directional light: far enough away that the ortho shadow camera covers the site
-  const d = Math.max(R * 2.4, 90);
+  // The frustum only has to cover the catcher, so it stays tight and sharp
+  // however large the basemap is.
+  const shadowExt = fitShadowCatcher() * 1.02;
+  const d = Math.max(R * 2.4, shadowExt * 2.4, 90);
   sunLight.position.set(v.x * d, Math.max(v.y, 0.02) * d, v.z * d);
   sunLight.target.position.set(0, 0, 0);
   sunLight.target.updateMatrixWorld();
@@ -2792,10 +2829,13 @@ function updateSunVisuals(sun){
   requestRender();
 
   const cam = sunLight.shadow.camera;
-  const ext = Math.max(State.modelRadius * 1.55, 26);
-  cam.left = -ext; cam.right = ext; cam.top = ext; cam.bottom = -ext;
-  cam.near = 1; cam.far = d * 2.4;
+  cam.left = -shadowExt; cam.right = shadowExt;
+  cam.top = shadowExt;   cam.bottom = -shadowExt;
+  cam.near = 1; cam.far = d * 2.6;
   cam.updateProjectionMatrix();
+  // A wider frustum spreads the same 2048 texels over more ground, so the bias
+  // has to grow with it or the shadows acne instead.
+  sunLight.shadow.normalBias = clamp(shadowExt * 0.0016, 0.03, 0.12);
 
   // Ambient sky tint follows the sun height so dusk reads as dusk
   const dayness = clamp(Math.sin(Math.max(sun.altitude, -6) * D2R) * 1.6 + 0.16, 0.05, 1);
@@ -5341,6 +5381,9 @@ function init(){
   rebuildAll({ frame: true });
   updateRunHint();
   requestAnimationFrame(loop);
+  // Say which build this is, out loud. Three rounds of debugging went into
+  // symptoms that a stale file had already fixed.
+  toast('Sun Studio v' + BUILD + ' loaded.', 'info', 4000);
   Tour.maybeAutoStart();
 
   // Public surface for the automated test suite
@@ -5354,6 +5397,18 @@ function init(){
     resolveMapKey, MAPTILER_KEY_STORE, sourceAttribution, PROXY_URL, PROXY_ATTRIBUTION,
     loadPlaces, savePlace, removePlace, renderPlaces, PLACES_KEY,
     requestRender, BUILD,
+    /** Shadow frustum vs what actually receives shadows. */
+    shadowProbe: () => ({
+      ext: sunLight.shadow.camera.right,
+      far: sunLight.shadow.camera.far,
+      lightDist: sunLight.position.length(),
+      normalBias: sunLight.shadow.normalBias,
+      basemapExtent: Basemap.info.extent,
+      groundVisible: ground.visible,
+      catcherHalf: shadowCatcher.scale.x / 2,
+      basemapReceives: Basemap.mesh ? Basemap.mesh.receiveShadow : null,
+      groundReceives: ground.receiveShadow,
+    }),
     /** Place the camera at an azimuth/elevation for orbit-sweep diagnostics. */
     orbitTo(azDeg, elevDeg){
       const d = camera.position.distanceTo(controls.target);

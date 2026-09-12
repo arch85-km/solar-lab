@@ -282,7 +282,7 @@ It is clearly labelled as synthetic; it is not real climate.
 
 ## Validation
 
-`npm test` runs 138 headless checks. Every number below is produced by that suite, not
+`npm test` runs 141 headless checks. Every number below is produced by that suite, not
 asserted by hand.
 
 | Check | Result |
@@ -376,7 +376,7 @@ rebuilds live on every change, with no "apply" step.
 ```bash
 npm install          # playwright, for the test suite only
 npm run vendor       # fetch three.js and the validation EPW
-npm test             # 138 headless checks, screenshots and sample export sheets
+npm test             # 141 headless checks, screenshots and sample export sheets
 npm run serve        # serve the folder at http://localhost:8080
 ```
 
