@@ -239,15 +239,23 @@ going into a printed handout.
 the sun; the view cube jumps to plan or elevation views.
 
 **Sun & Site** — pick a preset city or type coordinates, set the time zone, elevation and
-project-north rotation (*Reset* beside it returns to true north, and the viewport compass
-carries a blue **P** mark while it is turned), import an EPW, then scrub the date and time. The quick buttons
+project-north rotation, import an EPW, then scrub the date and time. **Project north turns
+the whole site** — the model, the basemap under it and the 3D context together — while the
+sun path stays geographic, because the sky does not rotate. *Reset* beside the slider puts
+all of it back, and the viewport compass carries a blue **P** mark while north is turned. The quick buttons
 jump to the June solstice, an equinox and the December solstice.
 
-**Imported models** — after an OBJ is in, *Model units*, *OBJ up axis*, *Drop to ground*,
-*Centre on site origin* and a *Model scale* slider (0.1×–5×, with a Reset) all re-place the
-model that is already loaded, rather than being read once at import. Swapping the model
-also rebuilds the shadow map, so the previous massing's shadows do not linger on the
-ground.
+**Imported models** — import as many OBJ files as you like; they load as one assembly and
+each gets a chip in the panel. Click a chip to select that model, × to remove it. *Model
+scale* and *Place model…* act on the selected one; *Model units*, *OBJ up axis*, *Drop to
+ground* and *Centre under the sun path* act on the assembly, and all of them re-place what
+is already loaded rather than being read once at import.
+
+Imports arrive **under the sun path**, wherever you have placed it, and *Place model…* then
+drops the selected one anywhere on the site (*Centre* returns it). Relative positions
+between files are preserved: the assembly's datum is measured from the files as exported,
+before any manual offsets. Swapping the model also rebuilds the shadow map, so the previous
+massing's shadows do not linger on the ground.
 
 **Model & Analysis** — choose a sample massing or import an OBJ, set the analysis grid,
 sky density and ground reflectance, then **Run analysis**.
@@ -332,7 +340,7 @@ It is clearly labelled as synthetic; it is not real climate.
 
 ## Validation
 
-`npm test` runs 184 headless checks. Every number below is produced by that suite, not
+`npm test` runs 196 headless checks. Every number below is produced by that suite, not
 asserted by hand.
 
 | Check | Result |
@@ -426,7 +434,7 @@ rebuilds live on every change, with no "apply" step.
 ```bash
 npm install          # playwright, for the test suite only
 npm run vendor       # fetch three.js and the validation EPW
-npm test             # 184 headless checks, screenshots and sample export sheets
+npm test             # 196 headless checks, screenshots and sample export sheets
 npm run serve        # serve the folder at http://localhost:8080
 ```
 

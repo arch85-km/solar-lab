@@ -1382,6 +1382,45 @@ const rose = await page.evaluate(() => {
   document.getElementById('b-north-reset').click();
   return { turned, back: read() };
 });
+const site = await page.evaluate(async () => {
+  const A = window.__SUNAPP;
+  A.loadSample('demo');
+  A.State.basemap.extent = 400;
+  A.State.basemap.source = 'osm3d';
+  await A.Basemap.loadTiles('osm3d');
+  await A.OsmBuildings.load();
+  const sl = document.getElementById('i-north');
+  sl.value = '40'; sl.dispatchEvent(new Event('input', { bubbles: true }));
+  const rad = (g) => +g.rotation.y.toFixed(4);
+  const ctx = A.OsmBuildings.info.tris;
+  const occ = A.occluderTriangles();
+  const base = A.State.model.tris.length;
+  // the first context vertex, before and after the site turned
+  const raw = [ctx[0], ctx[2]], used = [occ[base], occ[base + 2]];
+  const turned = {
+    model: rad(A.modelGroup), map: rad(A.basemapGroup), ctx: rad(A.contextGroup),
+    chart: rad(A.sunPathGroup), compass: rad(A.compassGroup),
+  };
+  document.getElementById('b-north-reset').click();
+  const back = { model: rad(A.modelGroup), map: rad(A.basemapGroup), ctx: rad(A.contextGroup) };
+  A.OsmBuildings.clear(); A.Basemap.clear();
+  A.State.basemap.source = 'none';
+  return { turned, back, raw, used };
+});
+const rot40 = -40 * Math.PI / 180;
+check('project north turns the whole site — model, map and 3D context together',
+      near(site.turned.model, rot40, 0.1) && near(site.turned.map, rot40, 0.1) &&
+      near(site.turned.ctx, rot40, 0.1),
+      'all three at ' + (site.turned.map * 180 / Math.PI).toFixed(0) + '°');
+check('the sun path stays geographic while the site turns under it',
+      site.turned.chart === 0 && site.turned.compass === 0);
+check('the context the tracer sees turns with the context on screen',
+      Math.abs(site.used[0] - (site.raw[0] * Math.cos(rot40) + site.raw[1] * Math.sin(rot40))) < 0.01 &&
+      Math.abs(site.used[0] - site.raw[0]) > 1,
+      'first context vertex ' + site.raw[0].toFixed(1) + ' → ' + site.used[0].toFixed(1) + ' m');
+check('reset brings the map and the context back, not just the model',
+      site.back.model === 0 && site.back.map === 0 && site.back.ctx === 0);
+
 check('the viewport compass shows project north while it is turned',
       /P 30°/.test(rose.turned) && !/P /.test(rose.back),
       'rose marks project north at 30°, clean again at 0°');
@@ -1438,7 +1477,7 @@ const labels = await page.evaluate(async () => {
 });
 check('chart labels are sized in screen pixels, not in metres',
       labels.near.px.length > 20 &&
-      Math.min(...labels.near.px) >= 12 && Math.max(...labels.near.px) <= 24,
+      Math.min(...labels.near.px) >= 16 && Math.max(...labels.near.px) <= 30,
       labels.near.px.length + ' labels between ' +
       Math.min(...labels.near.px) + ' and ' + Math.max(...labels.near.px) + ' px');
 
@@ -1464,11 +1503,11 @@ const pulled = await page.evaluate(async () => {
   return { steps, tiny };
 });
 check('they hold that size as the camera pulls back, which is the whole point',
-      pulled.steps.every(s => s.med >= 12 && s.max <= 24) &&
+      pulled.steps.every(s => s.med >= 16 && s.max <= 30) &&
       pulled.steps.every((s, i) => i === 0 || s.n <= pulled.steps[i - 1].n),
       pulled.steps.map(s => s.dist + ' m: ' + s.n + ' labels at ' + s.med + ' px').join(', '));
 check('when the chart is smaller than its own numbers, only the cardinals stay',
-      pulled.tiny.n === 4 && pulled.tiny.med >= 18,
+      pulled.tiny.n === 4 && pulled.tiny.med >= 22,
       pulled.tiny.n + ' labels left at ' + pulled.tiny.dist + ' m, ' + pulled.tiny.med + ' px');
 
 const zoomed = await page.evaluate(async () => {
@@ -1592,6 +1631,74 @@ check('changing the units re-places the model instead of doing nothing',
       '9 m as feet → ' + resize.feet.toFixed(2) + ' m');
 check('the scale control is offered only while an imported model is loaded',
       resize.rowHidden);
+
+// An imported model has to arrive where the chart is, and be movable afterwards
+const objPlace = await page.evaluate((t) => {
+  const A = window.__SUNAPP;
+  A.setChartAt(55, -40);
+  A.importOBJ(t, 'block.obj');
+  const centre = () => {
+    const b = A.State.model.bbox;
+    return [+((b.min.x + b.max.x) / 2).toFixed(1), +((b.min.z + b.max.z) / 2).toFixed(1)];
+  };
+  const arrived = centre();
+  A.placeModelAt(10, 12);
+  const moved = centre();
+  const note = document.getElementById('obj-at-note').textContent;
+  document.getElementById('b-obj-centre').click();
+  const back = centre();
+  const rowShown = document.getElementById('row-objplace').style.display !== 'none';
+  A.setChartAt(0, 0);
+  A.loadSample('demo');
+  return { arrived, moved, back, note, rowShown,
+           rowHidden: document.getElementById('row-objplace').style.display === 'none' };
+}, boxObj(10, 12));
+check('an imported model arrives under the sun path, wherever that has been put',
+      objPlace.arrived[0] === 55 && objPlace.arrived[1] === -40,
+      'chart at 55, −40 → model centre at ' + objPlace.arrived.join(', '));
+check('it can be placed anywhere on the site afterwards',
+      objPlace.moved[0] === 10 && objPlace.moved[1] === 12 && objPlace.rowShown,
+      'moved to ' + objPlace.moved.join(', ') + ' m');
+check('the offset is spelled out, and Centre returns it to the chart',
+      /45 m W/.test(objPlace.note) && /52 m S/.test(objPlace.note) &&
+      objPlace.back[0] === 55 && objPlace.back[1] === -40,
+      objPlace.note.slice(0, 72));
+check('the placement control goes away with the imported model', objPlace.rowHidden);
+
+// A site usually arrives as several files, which have to land as one assembly
+const many = await page.evaluate((boxes) => {
+  const A = window.__SUNAPP;
+  A.setChartAt(0, 0);
+  A.importOBJ(boxes[0], 'block-a.obj');
+  A.importOBJ(boxes[1], 'tower-b.obj');
+  const items = A.objItems();
+  const chips = [...document.querySelectorAll('#obj-chip .chip')];
+  const tris = A.State.model.count;
+  // the second file is the one the controls act on, and it can be moved alone
+  A.placeModelAt(30, 0);
+  const moved = A.objItems().map(i => [i.at.x, i.at.z]);
+  const spanAfter = A.State.model.bbox.max.x - A.State.model.bbox.min.x;
+  // selecting the first chip points the controls back at it
+  chips[0].querySelector('.cname').click();
+  const active = A.objItems().map(i => i.active);
+  const scaleShown = +document.getElementById('i-objscale').value;
+  // removing one leaves the other in place
+  chips[1].querySelector('.cx').click();
+  const left = A.objItems();
+  A.loadSample('demo');
+  return { names: items.map(i => i.name), tris, moved, spanAfter, active, scaleShown,
+           chips: chips.length, left: left.map(i => i.name) };
+}, [boxObj(8, 9), boxObj(6, 20)]);
+check('several OBJ files load together as one assembly',
+      many.names.join(',') === 'block-a.obj,tower-b.obj' && many.chips === 2 && many.tris === 24,
+      many.chips + ' models, ' + many.tris + ' triangles in total');
+check('each one can be moved on its own without disturbing the others',
+      many.moved[0][0] === 0 && many.moved[1][0] !== 0 && many.spanAfter > 30,
+      'assembly spans ' + many.spanAfter.toFixed(0) + ' m after moving the second');
+check('clicking a chip points the scale and placement controls at that model',
+      many.active[0] === true && many.active[1] === false && many.scaleShown === 1);
+check('removing one leaves the rest loaded',
+      many.left.length === 1 && many.left[0] === 'block-a.obj', many.left.join(', '));
 
 /* ------------------------------------------------------- placing the chart --- */
 // The chart can be dropped over a particular courtyard or roof. It is a drawing

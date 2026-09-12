@@ -416,13 +416,16 @@ input[type=range]:focus::-webkit-slider-thumb{box-shadow:0 0 0 3px var(--accent-
 /* ============================================================
    Chips, badges, tables, legend
    ============================================================ */
+.chip.on{border-color:var(--accent)}
 .chip{
   display:flex;align-items:center;gap:7px;
   padding:7px 9px;margin-top:7px;
   background:var(--panel-2);border:1px solid var(--line);border-left:2px solid var(--accent);
   border-radius:5px;font-size:11px;
 }
-.chip .cname{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:550}
+.chip .cname{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:550;cursor:pointer}
+.chip.on{background:var(--panel-3,var(--panel-2));border-left-width:3px;box-shadow:inset 0 0 0 1px var(--accent-dim,transparent)}
+.chip.on .cname{color:var(--accent)}
 .chip .cx{background:transparent;border:0;color:var(--text-faint);cursor:pointer;font-size:15px;line-height:1;padding:0 3px}
 .chip .cx:hover{color:var(--red)}
 .chip.info{border-left-color:var(--blue)}
@@ -1053,7 +1056,7 @@ body.embed{--topbar-h:44px}
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 15.5V3.5M8.4 7.1 12 3.5l3.6 3.6"/><path d="M4 14.5v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>
               Import OBJ model
             </button>
-            <input type="file" id="f-obj" accept=".obj,.txt" hidden>
+            <input type="file" id="f-obj" accept=".obj,.txt" multiple hidden>
             <div id="obj-chip"></div>
             <div class="grid2" style="margin-top:9px">
               <div class="row col">
@@ -1073,13 +1076,20 @@ body.embed{--topbar-h:44px}
             </div>
             <div class="row col" id="row-objscale" style="display:none">
               <div class="lbl-row">
-                <label for="i-objscale">Model scale &mdash; <span id="v-objscale" class="num">1.00&times;</span></label>
+                <label for="i-objscale">Model scale <span id="obj-which" class="num"></span> &mdash; <span id="v-objscale" class="num">1.00&times;</span></label>
                 <button type="button" class="btn xs ghost" id="b-objscale-reset" title="Back to 1:1">Reset</button>
               </div>
               <input type="range" id="i-objscale" min="0.1" max="5" step="0.05" value="1">
             </div>
             <label class="sw"><input type="checkbox" id="i-drop" checked><span class="track"></span><span class="t">Drop model to ground</span></label>
-            <label class="sw"><input type="checkbox" id="i-center" checked><span class="track"></span><span class="t">Centre on site origin</span></label>
+            <label class="sw"><input type="checkbox" id="i-center" checked><span class="track"></span><span class="t">Centre under the sun path</span></label>
+            <div class="row col" id="row-objplace" style="display:none">
+              <div class="row" style="margin:0">
+                <button type="button" class="btn sm grow" id="b-obj-place">Place model&hellip;</button>
+                <button type="button" class="btn sm ghost" id="b-obj-centre">Centre</button>
+              </div>
+              <p class="hint" id="obj-at-note">Sitting under the sun path. Press <b>Place model</b> and click where it belongs on the site.</p>
+            </div>
             <dl class="kv" id="model-kv"></dl>
             <p class="hint warn" id="model-warn" style="display:none"></p>
           </div>
@@ -2243,12 +2253,17 @@ function fitShadowCatcher(){
 // GridHelper bakes its colours into vertex data, so a theme change rebuilds it.
 let gridHelper = null;
 function makeGrid(visible = true){
+  // Keep whatever site rotation the old grid carried. Reading State here would
+  // be a temporal-dead-zone error: this runs while the module is still being
+  // evaluated, long before State exists.
+  const rot = gridHelper ? gridHelper.rotation.y : 0;
   if (gridHelper){ scene.remove(gridHelper); gridHelper.geometry.dispose(); gridHelper.material.dispose(); }
   gridHelper = new THREE.GridHelper(200, 40, THEME.gridMajor, THEME.gridMinor);
   gridHelper.material.opacity = THEME.gridOpacity;
   gridHelper.material.transparent = true;
   gridHelper.position.y = -0.04;
   gridHelper.visible = visible;
+  gridHelper.rotation.y = rot;                     // survives a theme rebuild
   scene.add(gridHelper);
 }
 makeGrid();
@@ -2269,7 +2284,7 @@ function makeLabel(text, { size = 46, color = '#cfd9e4', weight = 600, scale = 1
   // Drawn at 2x and mipmapped. A label sprite is almost always minified on
   // screen, and an unmipmapped texture samples one texel per pixel there, which
   // is what left the numbers with dirty edges.
-  const SS = 2;
+  const SS = 3;
   const pad = Math.round(size * 0.28), cnv = document.createElement('canvas'), ctx = cnv.getContext('2d');
   const font = (px) => weight + ' ' + px + 'px Inter, system-ui, sans-serif';
   ctx.font = font(size);
@@ -2280,7 +2295,7 @@ function makeLabel(text, { size = 46, color = '#cfd9e4', weight = 600, scale = 1
   ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
   if (halo){
     ctx.strokeStyle = halo;
-    ctx.lineWidth = Math.max(2.5, size * 0.16);
+    ctx.lineWidth = Math.max(3, size * 0.19);
     ctx.lineJoin = 'round';
     ctx.miterLimit = 2;
     ctx.strokeText(text, w / 2, h / 2);
@@ -2380,7 +2395,7 @@ const Mercator = (() => {
  * running build can be identified at a glance — a stale download that looks
  * almost right is otherwise very hard to tell apart from the current one.
  */
-const BUILD = '2.3';
+const BUILD = '2.4';
 
 /**
  * Aerial imagery through a tile proxy on your own server.
@@ -3088,7 +3103,7 @@ function chartLabelInk(){
 }
 
 /** A label placed on the chart, haloed so it survives a busy basemap. */
-function addChartLabel(group, text, pos, { size = 34, color, weight = 600, scale, px = 15, always = false }){
+function addChartLabel(group, text, pos, { size = 34, color, weight = 600, scale, px = 19, always = false }){
   const li = isStereo() ? chartLabelInk() : null;
   const lab = makeLabel(text, {
     size, weight, scale, px, always,
@@ -3139,7 +3154,7 @@ function buildSunPath(){
           .multiplyScalar(flat ? 1.06 : 1.045);
         if (flat) at.y = STEREO_Y;
         addChartLabel(sunPathGroup, m === 6 ? '21 Jun' : '21 Dec', at,
-                      { size: 38, color: '#' + col.getHexString(), weight: 700, px: 16,
+                      { size: 38, color: '#' + col.getHexString(), weight: 700, px: 20,
                         scale: R * (flat ? 0.031 : 0.027) });
       }
     }
@@ -3179,7 +3194,7 @@ function buildSunPath(){
           if (flat) at.y = STEREO_Y;
           if (flat && !roomForLabel(at)) continue;
           addChartLabel(sunPathGroup, String(h).padStart(2, '0') + (flat ? 'h' : ''), at,
-                        { size: 34, color: flat ? null : THEME.hourLabel, px: 15,
+                        { size: 34, color: flat ? null : THEME.hourLabel, px: 19,
                           weight: flat ? 700 : 600, scale: R * (flat ? 0.026 : 0.021) });
         }
       }
@@ -3210,7 +3225,7 @@ function buildSunPath(){
       const at = domePoint(alt, flat ? 0 : 90, R);
       if (flat) at.x += R * 0.038; else at.multiplyScalar(1.02);
       addChartLabel(sunPathGroup, alt + '°', at,
-                    { size: 30, color: flat ? null : THEME.ringLabel, px: 15,
+                    { size: 30, color: flat ? null : THEME.ringLabel, px: 19,
                       weight: flat ? 700 : 600, scale: R * (flat ? 0.024 : 0.019) });
     }
   }
@@ -3247,7 +3262,7 @@ function buildCompass(R){
       const at = domePoint(0, a, R * 1.075);
       at.y = STEREO_Y;
       addChartLabel(compassGroup, String(a).padStart(3, '0') + '°', at,
-                    { size: 28, weight: 700, px: 14, scale: R * 0.022 });
+                    { size: 28, weight: 700, px: 18, scale: R * 0.022 });
     }
   }
 
@@ -3261,7 +3276,7 @@ function buildCompass(R){
   for (const [t, a, c] of cardinals){
     const at = domePoint(0, a, R * (flat ? 1.13 : 1.075));
     at.y = flat ? STEREO_Y : R * 0.028;
-    addChartLabel(compassGroup, t, at, { size: 52, color: c, weight: 700, px: 22, always: true,
+    addChartLabel(compassGroup, t, at, { size: 52, color: c, weight: 700, px: 27, always: true,
                                         scale: R * (flat ? 0.046 : 0.038) });
   }
 }
@@ -3470,8 +3485,37 @@ function occluderTriangles(){
   if (!State.analysis.osmShade || !ctx || !ctx.length) return State.model.tris;
   const out = new Float32Array(State.model.tris.length + ctx.length);
   out.set(State.model.tris, 0);
-  out.set(ctx, State.model.tris.length);
+  // The context is stored in the world space it was built in; project north
+  // turns the group that draws it, so the copy the tracer sees must turn too or
+  // the shadows on screen and the shading in the numbers stop agreeing.
+  const a = -State.northRot * D2R, c = Math.cos(a), sn = Math.sin(a);
+  const base = State.model.tris.length;
+  for (let i = 0; i < ctx.length; i += 3){
+    const x = ctx[i], z = ctx[i + 2];
+    out[base + i]     = x * c + z * sn;
+    out[base + i + 1] = ctx[i + 1];
+    out[base + i + 2] = -x * sn + z * c;
+  }
   return out;
+}
+
+/**
+ * Project north turns the whole site, not only the model.
+ *
+ * The sun path stays geographic — it is the sky, and the sky does not rotate —
+ * while the model, the map under it, the OpenStreetMap context and the survey
+ * grid turn together as one site. Turning only the model left the building
+ * crossways to its own basemap, and made the rotation (and its reset) invisible
+ * whenever the massing was small or hidden under the chart.
+ */
+function applyNorthRotation(){
+  const a = -State.northRot * D2R;
+  modelGroup.rotation.y = a;
+  basemapGroup.rotation.y = a;
+  contextGroup.rotation.y = a;
+  if (gridHelper) gridHelper.rotation.y = a;
+  State.bvhDirty = true;          // the context occluders moved with it
+  sunLight.shadow.needsUpdate = true;
 }
 
 /** Recompute cached model metrics, frame the sun-path dome around the model. */
@@ -3511,12 +3555,12 @@ function refreshModelMetrics(){
 /** Replace the model with one of the built-in samples. */
 function loadSample(key){
   disposeGroup(modelGroup);
+  objAssembly.clear();
+  objItems = [];
+  objActive = -1;
   modelGroup.add(SAMPLES[key] ? SAMPLES[key]() : SAMPLES.demo());
   State.objName = null;
-  objRoot = null;
-  document.getElementById('obj-chip').innerHTML = '';
-  const row = document.getElementById('row-objscale');
-  if (row) row.style.display = 'none';
+  renderObjChips();
   clearResults();
   refreshModelMetrics();
   buildSunPath();
@@ -3602,6 +3646,19 @@ function frameModel(){
 
 
 /* --- OBJ import ---------------------------------------------------------- */
+/* ----------------------------------------------------------------------------
+ *  Imported models
+ *
+ *  Several OBJ files can be loaded at once — a site usually arrives in pieces —
+ *  so they live in an assembly group inside modelGroup. Each keeps its own
+ *  scale and its own position on the site; centring and drop-to-ground act on
+ *  the assembly as a whole, which is what preserves the relative positions of
+ *  files exported from the same model.
+ * -------------------------------------------------------------------------- */
+const objAssembly = new THREE.Group();
+let objItems = [];            // [{ name, root, scale, at:{x,z} }]
+let objActive = -1;           // the one the scale and place controls act on
+
 function importOBJ(text, name){
   const loader = new OBJLoader();
   let root;
@@ -3623,51 +3680,149 @@ function importOBJ(text, name){
     g.add(mesh);
   }
 
-  disposeGroup(modelGroup);
-  modelGroup.add(g);
-  objRoot = g;
-  State.objName = name;
-  document.getElementById('obj-chip').innerHTML =
-    '<div class="chip"><span class="cname" title="' + name.replace(/"/g,'&quot;') + '">' + name +
-    '</span><button class="cx" id="obj-x" title="Remove">&times;</button></div>';
-  document.getElementById('obj-x').onclick = () => loadSample(document.getElementById('i-sample').value);
-  document.getElementById('row-objscale').style.display = '';
+  // The first import replaces the sample massing; later ones join it
+  if (!objItems.length){
+    disposeGroup(modelGroup);
+    objAssembly.clear();
+    modelGroup.add(objAssembly);
+  }
+  objAssembly.add(g);
+  objItems.push({ name, root: g, scale: 1, at: { x: 0, z: 0 } });
+  objActive = objItems.length - 1;
+  State.objName = objItems.map(i => i.name).join(', ');
+
+  renderObjChips();
   const size = placeObj();
   frameModel();
-  toast('Imported ' + name + ' — ' + fmtNum(State.model.count) + ' triangles, ' +
+  toast('Imported ' + name + ' — ' + fmtNum(State.model.count) + ' triangles in ' +
+        objItems.length + ' model' + (objItems.length > 1 ? 's' : '') + ', ' +
         fmtNum(size.x, 1) + ' × ' + fmtNum(size.z, 1) + ' × ' + fmtNum(size.y, 1) + ' m', 'ok');
 }
 
+/** One chip per imported file: click to select, × to remove. */
+function renderObjChips(){
+  const box = document.getElementById('obj-chip');
+  box.innerHTML = '';
+  objItems.forEach((it, i) => {
+    const chip = document.createElement('div');
+    chip.className = 'chip' + (i === objActive ? ' on' : '');
+    chip.innerHTML = '<span class="cname"></span><button class="cx" title="Remove">&times;</button>';
+    const nm = chip.querySelector('.cname');
+    nm.textContent = it.name;
+    nm.title = it.name + (objItems.length > 1 ? ' — click to select' : '');
+    nm.onclick = () => { objActive = i; renderObjChips(); syncObjControls(); };
+    chip.querySelector('.cx').onclick = () => removeObj(i);
+    box.appendChild(chip);
+  });
+  const many = objItems.length > 0;
+  for (const id of ['row-objscale', 'row-objplace']){
+    const row = document.getElementById(id);
+    if (row) row.style.display = many ? '' : 'none';
+  }
+  syncObjControls();
+}
+
+/** Point the scale slider and the placement readout at the selected model. */
+function syncObjControls(){
+  const it = objItems[objActive];
+  if (!it) return;
+  const sl = document.getElementById('i-objscale');
+  if (sl){
+    sl.value = String(it.scale);
+    document.getElementById('v-objscale').textContent = it.scale.toFixed(2) + '×';
+  }
+  const which = document.getElementById('obj-which');
+  if (which) which.textContent = objItems.length > 1 ? it.name : '';
+  updateObjAtNote();
+}
+
+function removeObj(i){
+  const it = objItems[i];
+  if (!it) return;
+  objAssembly.remove(it.root);
+  disposeGroup(it.root);
+  objItems.splice(i, 1);
+  objActive = Math.min(objActive, objItems.length - 1);
+  if (!objItems.length){
+    State.objName = null;
+    loadSample(document.getElementById('i-sample').value);
+    return;
+  }
+  State.objName = objItems.map(x => x.name).join(', ');
+  renderObjChips();
+  placeObj();
+  refresh(true);
+}
+
 /**
- * The imported geometry, kept so units, up axis, scale and placement can be
- * changed after the fact. Re-parsing the file for every tweak would be wasteful
- * and — worse — those controls used to do nothing at all once a model was in.
+ * Lay the imported models out: each at its own scale and site position, then
+ * the assembly centred under the sun path and dropped to the ground.
  */
-let objRoot = null;
-
-/** Apply units × scale, up axis, drop and centring; returns the placed size. */
 function placeObj(){
-  const g = objRoot;
-  if (!g) return new THREE.Vector3();
+  if (!objItems.length) return new THREE.Vector3();
   const unit = parseFloat(document.getElementById('i-units').value) || 1;
-  g.rotation.set(0, 0, 0);
-  g.position.set(0, 0, 0);
-  if (document.getElementById('i-objup').value === 'z') g.rotation.x = -Math.PI / 2;
-  g.scale.setScalar(unit * State.objScale);
-  g.updateMatrixWorld(true);
+  const zUp = document.getElementById('i-objup').value === 'z';
 
-  const bb = new THREE.Box3().setFromObject(g);
+  // Two passes. The datum comes from the files as they were exported, with no
+  // manual offsets applied; the offsets are then laid on top. Measuring the
+  // datum after the offsets would let the assembly chase them, and placing a
+  // single model by hand would move nothing at all.
+  for (const it of objItems){
+    const g = it.root;
+    g.rotation.set(0, 0, 0);
+    g.position.set(0, 0, 0);
+    if (zUp) g.rotation.x = -Math.PI / 2;
+    g.scale.setScalar(unit * it.scale);
+    g.updateMatrixWorld(true);
+  }
+
+  objAssembly.position.set(0, 0, 0);
+  objAssembly.updateMatrixWorld(true);
+  const bb = new THREE.Box3().setFromObject(objAssembly);
   const ctr = bb.getCenter(new THREE.Vector3());
   const off = new THREE.Vector3();
-  if (document.getElementById('i-center').checked){ off.x = -ctr.x; off.z = -ctr.z; }
-  if (document.getElementById('i-drop').checked)  off.y = -bb.min.y;
-  g.position.add(off);
-  g.updateMatrixWorld(true);
+  // Centring means "under the sun path", which is the site origin until the
+  // chart has been placed somewhere else — an imported model that ignores where
+  // the chart is put is no use for reading a shadow off it.
+  const at = State.disp.chartAt;
+  if (document.getElementById('i-center').checked){
+    off.x = at.x - ctr.x; off.z = at.z - ctr.z;
+  }
+  if (document.getElementById('i-drop').checked) off.y = -bb.min.y;
+  objAssembly.position.copy(off);
+  for (const it of objItems) it.root.position.set(it.at.x, 0, it.at.z);
+  objAssembly.updateMatrixWorld(true);
 
   clearResults();
   refreshModelMetrics();
   buildSunPath();
-  return bb.getSize(new THREE.Vector3());
+  updateObjAtNote();
+  return new THREE.Box3().setFromObject(objAssembly).getSize(new THREE.Vector3());
+}
+
+/** Put the selected model's centre at a point on the site. */
+function placeModelAt(x, z){
+  const it = objItems[objActive];
+  if (!it) return;
+  const bb = new THREE.Box3().setFromObject(it.root);
+  const c = bb.getCenter(new THREE.Vector3());
+  it.at = { x: it.at.x + (x - c.x), z: it.at.z + (z - c.z) };
+  placeObj();
+  refresh(true);
+  requestRender();
+}
+
+/** Say where the selected model sits relative to the chart, in plain words. */
+function updateObjAtNote(){
+  const el = document.getElementById('obj-at-note');
+  const it = objItems[objActive];
+  if (!el || !it) return;
+  const { x, z } = it.at;
+  const who = objItems.length > 1 ? it.name + ': ' : '';
+  el.innerHTML = Math.hypot(x, z) < 0.5
+    ? who + 'sitting with the assembly under the sun path. Press <b>Place model</b> and click where it belongs.'
+    : who + 'offset ' + Math.abs(z).toFixed(0) + ' m ' + (z < 0 ? 'N' : 'S') + ', ' +
+      Math.abs(x).toFixed(0) + ' m ' + (x < 0 ? 'W' : 'E') + ' within the site.';
 }
 
 /* ============================================================================
@@ -3684,6 +3839,7 @@ const State = {
           shadow:true, grid:true, dome:false, radius:1, chart:1, chartAt:{ x:0, z:0 },
           projection:'3d', autoStereo:true },
   objScale: 1,              // extra scaling on an imported OBJ, on top of its units
+  objAt: { x: 0, z: 0 },    // where that model sits, relative to the sun path
   analysis: { mode:'inst', period:'year', unit:'kwh', gridSize:1.5, offset:0.02,
               density:1, groundRefl:0.2, useGround:true, shade:true,
               hourFrom:0, hourTo:24, from:null, to:null, osmShade:true },
@@ -4768,7 +4924,7 @@ on('b-north-reset', 'click', () => {
 on('i-north', 'input', (e) => {
   State.northRot = +e.target.value;
   $('v-north').textContent = State.northRot + '°';
-  modelGroup.rotation.y = -State.northRot * D2R;
+  applyNorthRotation();
   refreshModelMetrics();
   clearResults();
   refresh(true);
@@ -5349,19 +5505,26 @@ on('d-radius', 'input', (e) => {
    A one-shot pick: arm it, click the ground, done. The plane is y = 0, so the
    hit is where the cursor meets the site rather than wherever the model
    happens to be tall. */
-let placingChart = false;
+let placingTarget = null;                       // 'chart' | 'model' | null
 const chartPickRay = new THREE.Raycaster();
 const chartPickPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 
-function armChartPlacement(on){
-  placingChart = on;
-  $('b-chart-place').classList.toggle('on', on);
-  renderer.domElement.style.cursor = on ? 'crosshair' : '';
-  if (on) toast('Click the spot on the site where the chart should sit. Escape to cancel.', 'info', 6000);
+/** Arm a one-shot click on the ground: the chart, or the imported model. */
+function armPlacement(target){
+  placingTarget = target;
+  $('b-chart-place').classList.toggle('on', target === 'chart');
+  const objBtn = $('b-obj-place');
+  if (objBtn) objBtn.classList.toggle('on', target === 'model');
+  renderer.domElement.style.cursor = target ? 'crosshair' : '';
+  if (target) toast('Click the spot on the site where the ' +
+                    (target === 'chart' ? 'chart' : 'model') +
+                    ' should sit. Escape to cancel.', 'info', 6000);
 }
+/** Kept for the chart's own control and for the test surface. */
+const armChartPlacement = (on) => armPlacement(on ? 'chart' : null);
 
 renderer.domElement.addEventListener('pointerdown', (e) => {
-  if (!placingChart || e.button !== 0) return;
+  if (!placingTarget || e.button !== 0) return;
   e.preventDefault();
   e.stopPropagation();
   const r = renderer.domElement.getBoundingClientRect();
@@ -5369,13 +5532,25 @@ renderer.domElement.addEventListener('pointerdown', (e) => {
     ((e.clientX - r.left) / r.width) * 2 - 1,
     -((e.clientY - r.top) / r.height) * 2 + 1), camera);
   const hit = new THREE.Vector3();
-  if (chartPickRay.ray.intersectPlane(chartPickPlane, hit)) setChartAt(hit.x, hit.z);
-  armChartPlacement(false);
+  if (chartPickRay.ray.intersectPlane(chartPickPlane, hit)){
+    if (placingTarget === 'chart') setChartAt(hit.x, hit.z);
+    else placeModelAt(hit.x, hit.z);
+  }
+  armPlacement(null);
 }, true);
 
-on('b-chart-place', 'click', () => armChartPlacement(!placingChart));
-on('b-chart-centre', 'click', () => { armChartPlacement(false); setChartAt(0, 0); });
-addEventListener('keydown', (e) => { if (e.key === 'Escape' && placingChart) armChartPlacement(false); });
+on('b-chart-place', 'click', () => armPlacement(placingTarget === 'chart' ? null : 'chart'));
+on('b-chart-centre', 'click', () => { armPlacement(null); setChartAt(0, 0); });
+on('b-obj-place', 'click', () => armPlacement(placingTarget === 'model' ? null : 'model'));
+on('b-obj-centre', 'click', () => {
+  armPlacement(null);
+  const it = objItems[objActive];
+  if (!it) return;
+  it.at = { x: 0, z: 0 };
+  placeObj();
+  refresh(true);
+});
+addEventListener('keydown', (e) => { if (e.key === 'Escape' && placingTarget) armPlacement(null); });
 
 on('i-ctx-osm', 'change', (e) => {
   State.analysis.osmShade = e.target.checked;
@@ -5395,26 +5570,33 @@ on('i-sample', 'change', (e) => loadSample(e.target.value));
 // Units, up axis, scale and placement re-place the model that is already in,
 // rather than being read once at import and then ignored.
 on('i-objscale', 'input', (e) => {
-  State.objScale = +e.target.value;
-  $('v-objscale').textContent = State.objScale.toFixed(2) + '×';
+  const it = objItems[objActive];
+  if (!it) return;
+  it.scale = +e.target.value;
+  State.objScale = it.scale;                 // the last value touched, for state
+  $('v-objscale').textContent = it.scale.toFixed(2) + '×';
   placeObj();
 });
 on('b-objscale-reset', 'click', () => {
   $('i-objscale').value = 1;
   $('i-objscale').dispatchEvent(new Event('input', { bubbles: true }));
 });
-['i-units', 'i-objup'].forEach(id => on(id, 'change', () => { if (objRoot) placeObj(); }));
-['i-drop', 'i-center'].forEach(id => on(id, 'change', () => { if (objRoot) placeObj(); }));
+['i-units', 'i-objup', 'i-drop', 'i-center'].forEach(id =>
+  on(id, 'change', () => { if (objItems.length) placeObj(); }));
 on('b-obj', 'click', () => $('f-obj').click());
 on('f-obj', 'change', (e) => {
-  const f = e.target.files && e.target.files[0];
-  if (!f) return;
-  const rd = new FileReader();
-  rd.onload = () => { try { importOBJ(String(rd.result), f.name); }
-                      catch (err){ toast(err.message, 'err', 7000); } };
-  rd.onerror = () => toast('Could not read the file.', 'err');
-  rd.readAsText(f);
+  const files = [...(e.target.files || [])];
   e.target.value = '';
+  if (!files.length) return;
+  // One at a time and in order, so several files land as one assembly rather
+  // than racing each other through importOBJ.
+  (async () => {
+    for (const f of files){
+      try { importOBJ(await f.text(), f.name); }
+      catch (err){ toast((f.name || 'That file') + ': ' +
+                         (err.message || 'could not be read'), 'err', 7000); }
+    }
+  })();
 });
 
 /* --- analysis ------------------------------------------------------------ */
@@ -5937,7 +6119,7 @@ function updateLabelSizes(){
   _lblB.set(at.x + sunPathRadius, STEREO_Y, at.z).project(camera);
   const chartPx = Math.hypot(_lblB.x - _lblA.x, (_lblB.y - _lblA.y) * (h / (renderer.domElement.clientWidth || 1)))
                   * (renderer.domElement.clientWidth || 1) / 2;
-  const crowded = chartPx < 110;
+  const crowded = chartPx < 145;
   // No upper clamp worth the name: capping the world height is what made the
   // numbers shrink again once the camera was far enough out, which is exactly
   // when they are hardest to read. The floor only stops a degenerate zero.
@@ -6053,6 +6235,9 @@ function init(){
     loadPlaces, savePlace, removePlace, renderPlaces, PLACES_KEY,
     requestRender, BUILD, setChartAt, armChartPlacement,
     OsmBuildings, occluderTriangles, contextGroup, importOBJ, placeObj,
+    placeModelAt, armPlacement, basemapGroup,
+    objItems: () => objItems.map((i, n) => ({ name: i.name, scale: i.scale,
+                                              at: { ...i.at }, active: n === objActive })),
     modelGroup, sunPathGroup, compassGroup, frameModel,
     /** Where the camera is pointing, for the "views follow the chart" checks. */
     cameraProbe: () => ({
