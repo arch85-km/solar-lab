@@ -377,7 +377,9 @@ input[type=range]:focus::-webkit-slider-thumb{box-shadow:0 0 0 3px var(--accent-
 .btn.ghost:hover{background:var(--panel-2)}
 .btn svg{width:14px;height:14px;flex:0 0 auto}
 .btn.sm{height:25px;padding:0 8px;font-size:11px}
-.btn.xs{height:20px;padding:0 7px;font-size:10px;margin-left:6px;vertical-align:middle}
+.btn.xs{height:20px;padding:0 7px;font-size:10px}
+.lbl-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.lbl-row label{margin:0}
 
 /* --- segmented control --- */
 .seg{display:flex;background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:2px;gap:2px}
@@ -823,8 +825,10 @@ body.embed{--topbar-h:44px}
               <div class="row col"><label for="i-elev">Elevation m</label><input type="number" id="i-elev" step="1" value="25"></div>
             </div>
             <div class="row col">
-              <label for="i-north">Project north rotation &mdash; <span id="v-north" class="num">0&deg;</span>
-                <button class="btn xs ghost" id="b-north-reset" title="Back to true north">Reset</button></label>
+              <div class="lbl-row">
+                <label for="i-north">Project north rotation &mdash; <span id="v-north" class="num">0&deg;</span></label>
+                <button type="button" class="btn xs ghost" id="b-north-reset" title="Back to true north">Reset</button>
+              </div>
               <input type="range" id="i-north" min="-180" max="180" step="1" value="0">
             </div>
             <label class="sw"><input type="checkbox" id="i-dst"><span class="track"></span><span class="t">Daylight saving (+1h)</span></label>
@@ -1068,8 +1072,10 @@ body.embed{--topbar-h:44px}
               </div>
             </div>
             <div class="row col" id="row-objscale" style="display:none">
-              <label for="i-objscale">Model scale &mdash; <span id="v-objscale" class="num">1.00&times;</span>
-                <button class="btn xs ghost" id="b-objscale-reset" title="Back to 1:1">Reset</button></label>
+              <div class="lbl-row">
+                <label for="i-objscale">Model scale &mdash; <span id="v-objscale" class="num">1.00&times;</span></label>
+                <button type="button" class="btn xs ghost" id="b-objscale-reset" title="Back to 1:1">Reset</button>
+              </div>
               <input type="range" id="i-objscale" min="0.1" max="5" step="0.05" value="1">
             </div>
             <label class="sw"><input type="checkbox" id="i-drop" checked><span class="track"></span><span class="t">Drop model to ground</span></label>
@@ -2256,7 +2262,7 @@ const domeGroup    = new THREE.Group();   // sky matrix patches
 scene.add(modelGroup, sunPathGroup, compassGroup, resultGroup, domeGroup);
 
 /** Canvas-based text sprite for compass bearings and hour labels. */
-function makeLabel(text, { size = 46, color = '#cfd9e4', weight = 600, scale = 1, halo = null, px = 0 } = {}){
+function makeLabel(text, { size = 46, color = '#cfd9e4', weight = 600, scale = 1, halo = null, px = 0, always = false } = {}){
   // `halo` strokes the glyphs in the opposite tone before filling them, so a
   // label stays readable over aerial imagery instead of relying on the
   // background behind it. Same trick a map uses for place names.
@@ -2294,6 +2300,7 @@ function makeLabel(text, { size = 46, color = '#cfd9e4', weight = 600, scale = 1
   // use on a chart you read numbers off. `px` asks for a height in screen
   // pixels instead, held by updateLabelSizes() on every frame that renders.
   spr.userData.labelPx = px;
+  spr.userData.alwaysLabel = always;
   spr.userData.aspect = w / h;
   spr.userData.worldH = h / size * scale;
   return spr;
@@ -2373,7 +2380,7 @@ const Mercator = (() => {
  * running build can be identified at a glance — a stale download that looks
  * almost right is otherwise very hard to tell apart from the current one.
  */
-const BUILD = '2.2';
+const BUILD = '2.3';
 
 /**
  * Aerial imagery through a tile proxy on your own server.
@@ -3081,10 +3088,10 @@ function chartLabelInk(){
 }
 
 /** A label placed on the chart, haloed so it survives a busy basemap. */
-function addChartLabel(group, text, pos, { size = 34, color, weight = 600, scale, px = 11 }){
+function addChartLabel(group, text, pos, { size = 34, color, weight = 600, scale, px = 15, always = false }){
   const li = isStereo() ? chartLabelInk() : null;
   const lab = makeLabel(text, {
-    size, weight, scale, px,
+    size, weight, scale, px, always,
     color: color || (li ? li.color : '#cfd9e4'),
     halo: li ? li.halo : null,
   });
@@ -3132,7 +3139,7 @@ function buildSunPath(){
           .multiplyScalar(flat ? 1.06 : 1.045);
         if (flat) at.y = STEREO_Y;
         addChartLabel(sunPathGroup, m === 6 ? '21 Jun' : '21 Dec', at,
-                      { size: 38, color: '#' + col.getHexString(), weight: 700, px: 13,
+                      { size: 38, color: '#' + col.getHexString(), weight: 700, px: 16,
                         scale: R * (flat ? 0.031 : 0.027) });
       }
     }
@@ -3172,7 +3179,7 @@ function buildSunPath(){
           if (flat) at.y = STEREO_Y;
           if (flat && !roomForLabel(at)) continue;
           addChartLabel(sunPathGroup, String(h).padStart(2, '0') + (flat ? 'h' : ''), at,
-                        { size: 34, color: flat ? null : THEME.hourLabel, px: 11,
+                        { size: 34, color: flat ? null : THEME.hourLabel, px: 15,
                           weight: flat ? 700 : 600, scale: R * (flat ? 0.026 : 0.021) });
         }
       }
@@ -3203,7 +3210,7 @@ function buildSunPath(){
       const at = domePoint(alt, flat ? 0 : 90, R);
       if (flat) at.x += R * 0.038; else at.multiplyScalar(1.02);
       addChartLabel(sunPathGroup, alt + '°', at,
-                    { size: 30, color: flat ? null : THEME.ringLabel, px: 11,
+                    { size: 30, color: flat ? null : THEME.ringLabel, px: 15,
                       weight: flat ? 700 : 600, scale: R * (flat ? 0.024 : 0.019) });
     }
   }
@@ -3240,7 +3247,7 @@ function buildCompass(R){
       const at = domePoint(0, a, R * 1.075);
       at.y = STEREO_Y;
       addChartLabel(compassGroup, String(a).padStart(3, '0') + '°', at,
-                    { size: 28, weight: 700, px: 10, scale: R * 0.022 });
+                    { size: 28, weight: 700, px: 14, scale: R * 0.022 });
     }
   }
 
@@ -3254,7 +3261,7 @@ function buildCompass(R){
   for (const [t, a, c] of cardinals){
     const at = domePoint(0, a, R * (flat ? 1.13 : 1.075));
     at.y = flat ? STEREO_Y : R * 0.028;
-    addChartLabel(compassGroup, t, at, { size: 52, color: c, weight: 700, px: 16,
+    addChartLabel(compassGroup, t, at, { size: 52, color: c, weight: 700, px: 22, always: true,
                                         scale: R * (flat ? 0.046 : 0.038) });
   }
 }
@@ -4327,13 +4334,24 @@ function updateCompassOverlay(){
   camera.getWorldDirection(dir);
   const heading = Math.atan2(dir.x, -dir.z) * R2D;      // camera bearing, clockwise from north
   const rot = -heading;
+  // Project north turns the model under a fixed geographic sun path, so without
+  // a mark on the rose a rotation is only visible in the massing itself — and
+  // resetting it looks like nothing happened.
+  const pn = State.northRot;
+  const proj = pn ?
+    '<g transform="rotate(' + (rot + pn).toFixed(2) + ' 50 50)">' +
+      '<path d="M50 18 L54 50 L50 46 L46 50 Z" fill="#6fb2ff"/>' +
+      '<text x="50" y="15" text-anchor="middle" font-size="9" font-weight="700" fill="#6fb2ff" font-family="Inter,sans-serif">P</text>' +
+    '</g>' +
+    '<text x="50" y="96" text-anchor="middle" font-size="9" font-weight="700" fill="#6fb2ff" font-family="Inter,sans-serif">' +
+      'P ' + pn + '°</text>' : '';
   svg.innerHTML =
     '<circle cx="50" cy="50" r="34" fill="rgba(13,17,23,.6)" stroke="rgba(120,140,160,.45)" stroke-width="1.5"/>' +
     '<g transform="rotate(' + rot.toFixed(2) + ' 50 50)">' +
       '<path d="M50 13 L57 50 L50 44 L43 50 Z" fill="#ff9a6b"/>' +
       '<path d="M50 87 L43 50 L50 56 L57 50 Z" fill="#7d8b9a"/>' +
       '<text x="50" y="9" text-anchor="middle" font-size="11" font-weight="700" fill="#ff9a6b" font-family="Inter,sans-serif">N</text>' +
-    '</g>';
+    '</g>' + proj;
 }
 
 /* ============================================================================
@@ -4754,6 +4772,7 @@ on('i-north', 'input', (e) => {
   refreshModelMetrics();
   clearResults();
   refresh(true);
+  updateCompassOverlay();
 });
 on('i-dst', 'change', (e) => { State.dstHours = e.target.checked ? 1 : 0; rebuildAll(); });
 
@@ -5905,13 +5924,28 @@ if (window.ResizeObserver) new ResizeObserver(onResize).observe(viewportEl);
  * px · 2·tan(fov/2)·distance / viewportHeight, recomputed per frame per label.
  * Sixty-odd sprites, only on frames that actually render.
  */
-const _lblPos = new THREE.Vector3();
+const _lblPos = new THREE.Vector3(), _lblA = new THREE.Vector3(), _lblB = new THREE.Vector3();
 function updateLabelSizes(){
   const h = renderer.domElement.clientHeight || 1;
   const k = 2 * Math.tan(camera.fov * D2R / 2) / h;
-  const lo = sunPathRadius * 0.012, hi = sunPathRadius * 0.10;
+  // How big the chart is on screen right now. Held at a constant pixel size the
+  // numbers stay readable as you zoom out — but past a point the chart is
+  // smaller than its own labels, so the secondary ones (altitudes, bearings,
+  // hours) drop out and the four cardinals carry on alone.
+  const at = State.disp.chartAt;
+  _lblA.set(at.x, STEREO_Y, at.z).project(camera);
+  _lblB.set(at.x + sunPathRadius, STEREO_Y, at.z).project(camera);
+  const chartPx = Math.hypot(_lblB.x - _lblA.x, (_lblB.y - _lblA.y) * (h / (renderer.domElement.clientWidth || 1)))
+                  * (renderer.domElement.clientWidth || 1) / 2;
+  const crowded = chartPx < 110;
+  // No upper clamp worth the name: capping the world height is what made the
+  // numbers shrink again once the camera was far enough out, which is exactly
+  // when they are hardest to read. The floor only stops a degenerate zero.
+  const lo = sunPathRadius * 0.004, hi = sunPathRadius * 4;
   const fit = (o) => {
     if (!o.isSprite || !o.userData.labelPx) return;
+    o.visible = o.userData.alwaysLabel || !crowded;
+    if (!o.visible) return;
     o.getWorldPosition(_lblPos);
     const worldH = clamp(o.userData.labelPx * k * camera.position.distanceTo(_lblPos), lo, hi);
     o.scale.set(worldH * o.userData.aspect, worldH, 1);
@@ -6031,7 +6065,7 @@ function init(){
       const k = 2 * Math.tan(camera.fov * D2R / 2) / h;
       const out = [];
       const scan = (o) => {
-        if (!o.isSprite || !o.userData.labelPx) return;
+        if (!o.isSprite || !o.userData.labelPx || !o.visible) return;
         const p = o.getWorldPosition(new THREE.Vector3());
         out.push(+(o.scale.y / (k * camera.position.distanceTo(p))).toFixed(2));
       };
@@ -6093,6 +6127,15 @@ function init(){
       basemapReceives: Basemap.mesh ? Basemap.mesh.receiveShadow : null,
       groundReceives: ground.receiveShadow,
     }),
+    /** Push the camera out (or in) along its own direction, for zoom checks. */
+    dolly(factor){
+      const v = camera.position.clone().sub(controls.target).multiplyScalar(factor);
+      camera.position.copy(controls.target).add(v);
+      camera.far = Math.max(camera.far, v.length() * 16);
+      camera.updateProjectionMatrix();
+      controls.update();
+      requestRender();
+    },
     /** Place the camera at an azimuth/elevation for orbit-sweep diagnostics. */
     orbitTo(azDeg, elevDeg){
       const d = camera.position.distanceTo(controls.target);

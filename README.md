@@ -215,8 +215,10 @@ cube and reframing all come back to where the chart now is rather than to the si
 This is a drawing offset and nothing more — the sun positions, the shadows and the analysis
 all come from the site's latitude and longitude and do not move with it.
 
-Chart labels — altitudes, bearings, hours — are sized in **screen pixels**, so they stay
-readable as you zoom out instead of shrinking into dots.
+Chart labels — altitudes, bearings, hours — are sized in **screen pixels** (14–22 px), so
+they stay readable as you zoom out instead of shrinking into dots. Pull back far enough
+that the chart is smaller than its own numbers and the secondary ones drop out, leaving
+the four cardinals.
 
 ![Stereographic chart in top view](docs/screenshot-stereographic.png)
 
@@ -237,8 +239,8 @@ going into a printed handout.
 the sun; the view cube jumps to plan or elevation views.
 
 **Sun & Site** — pick a preset city or type coordinates, set the time zone, elevation and
-project-north rotation (*Reset* beside it returns to true north), import an EPW, then scrub
-the date and time. The quick buttons
+project-north rotation (*Reset* beside it returns to true north, and the viewport compass
+carries a blue **P** mark while it is turned), import an EPW, then scrub the date and time. The quick buttons
 jump to the June solstice, an equinox and the December solstice.
 
 **Imported models** — after an OBJ is in, *Model units*, *OBJ up axis*, *Drop to ground*,
@@ -330,7 +332,7 @@ It is clearly labelled as synthetic; it is not real climate.
 
 ## Validation
 
-`npm test` runs 180 headless checks. Every number below is produced by that suite, not
+`npm test` runs 184 headless checks. Every number below is produced by that suite, not
 asserted by hand.
 
 | Check | Result |
@@ -424,7 +426,7 @@ rebuilds live on every change, with no "apply" step.
 ```bash
 npm install          # playwright, for the test suite only
 npm run vendor       # fetch three.js and the validation EPW
-npm test             # 180 headless checks, screenshots and sample export sheets
+npm test             # 184 headless checks, screenshots and sample export sheets
 npm run serve        # serve the folder at http://localhost:8080
 ```
 

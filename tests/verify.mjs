@@ -1347,6 +1347,45 @@ check('project north can be reset to true north in one click',
       north.rot === 0 && north.model === 0 && north.readout === '0°',
       '35° → ' + north.readout);
 
+// A real mouse click, not a synthetic one: the reset buttons used to sit inside
+// a <label for=…>, where a browser may forward the click to the range input
+// instead, and a button that works under .click() can still fail under a mouse.
+const locWasOpen = await page.evaluate(() => {
+  const sec = document.querySelector('.sec[data-sec="loc"]');
+  const open = !sec.classList.contains('closed');
+  if (!open) sec.querySelector('.sec-head').click();
+  const sl = document.getElementById('i-north');
+  sl.value = '48'; sl.dispatchEvent(new Event('input', { bubbles: true }));
+  return open;
+});
+await page.waitForTimeout(300);
+await page.click('#b-north-reset');
+const clicked = await page.evaluate(() => ({
+  rot: window.__SUNAPP.State.northRot,
+  slider: +document.getElementById('i-north').value,
+  nested: !!document.getElementById('b-north-reset').closest('label'),
+  objNested: !!document.getElementById('b-objscale-reset').closest('label'),
+}));
+check('the reset survives a real mouse click and is not nested in a label',
+      clicked.rot === 0 && clicked.slider === 0 && !clicked.nested && !clicked.objNested,
+      'clicked: 48° → ' + clicked.rot + '°');
+if (!locWasOpen) await page.evaluate(() =>
+  document.querySelector('.sec[data-sec="loc"] .sec-head').click());
+
+// Turning project north has to be visible somewhere other than the massing
+const rose = await page.evaluate(() => {
+  const A = window.__SUNAPP;
+  const read = () => document.getElementById('vp-compass').innerHTML;
+  const sl = document.getElementById('i-north');
+  sl.value = '30'; sl.dispatchEvent(new Event('input', { bubbles: true }));
+  const turned = read();
+  document.getElementById('b-north-reset').click();
+  return { turned, back: read() };
+});
+check('the viewport compass shows project north while it is turned',
+      /P 30°/.test(rose.turned) && !/P /.test(rose.back),
+      'rose marks project north at 30°, clean again at 0°');
+
 // Once the chart has been placed, the views have to come back to it
 const follow = await page.evaluate(async () => {
   const A = window.__SUNAPP;
@@ -1399,9 +1438,38 @@ const labels = await page.evaluate(async () => {
 });
 check('chart labels are sized in screen pixels, not in metres',
       labels.near.px.length > 20 &&
-      Math.min(...labels.near.px) >= 8 && Math.max(...labels.near.px) <= 20,
+      Math.min(...labels.near.px) >= 12 && Math.max(...labels.near.px) <= 24,
       labels.near.px.length + ' labels between ' +
       Math.min(...labels.near.px) + ' and ' + Math.max(...labels.near.px) + ' px');
+
+// The point of pixel sizing is the zoomed-out case, so measure it there
+const pulled = await page.evaluate(async () => {
+  const A = window.__SUNAPP;
+  A.setProjection('stereo');
+  A.orbitTo(0, 85);
+  A.frameModel();
+  const settle = async () => {
+    A.refresh(true);
+    for (let i = 0; i < 3; i++) await new Promise(r => requestAnimationFrame(r));
+    const px = A.labelProbe().sort((a, b) => a - b);
+    return { n: px.length, med: px[px.length >> 1], max: px[px.length - 1],
+             dist: Math.round(A.cameraProbe().dist) };
+  };
+  const steps = [await settle()];
+  for (let i = 0; i < 2; i++){ A.dolly(2); steps.push(await settle()); }
+  A.dolly(4);                                   // far enough that the chart is tiny
+  const tiny = await settle();
+  A.dolly(1 / 32);
+  await settle();
+  return { steps, tiny };
+});
+check('they hold that size as the camera pulls back, which is the whole point',
+      pulled.steps.every(s => s.med >= 12 && s.max <= 24) &&
+      pulled.steps.every((s, i) => i === 0 || s.n <= pulled.steps[i - 1].n),
+      pulled.steps.map(s => s.dist + ' m: ' + s.n + ' labels at ' + s.med + ' px').join(', '));
+check('when the chart is smaller than its own numbers, only the cardinals stay',
+      pulled.tiny.n === 4 && pulled.tiny.med >= 18,
+      pulled.tiny.n + ' labels left at ' + pulled.tiny.dist + ' m, ' + pulled.tiny.med + ' px');
 
 const zoomed = await page.evaluate(async () => {
   const A = window.__SUNAPP;
