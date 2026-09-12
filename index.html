@@ -409,6 +409,22 @@ table.tbl .swatch{display:inline-block;width:8px;height:8px;border-radius:2px;ma
 #vp-readout .r b{font-weight:600;color:var(--text)}
 #vp-readout .r span{color:var(--text-dim)}
 #vp-compass{top:11px;right:12px;width:52px;height:52px;opacity:.9}
+#vp-attrib{
+  bottom:8px;right:11px;
+  padding:3px 7px;border-radius:4px;
+  background:var(--overlay-bg);border:1px solid var(--overlay-line);
+  font-size:9.5px;color:var(--text-dim);letter-spacing:.2px;
+  max-width:min(60vw,320px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+#search-results{display:flex;flex-direction:column;gap:3px;margin-top:6px}
+#search-results:empty{display:none}
+#search-results button{
+  text-align:left;padding:6px 8px;
+  background:var(--panel-2);border:1px solid var(--line);border-radius:5px;
+  color:var(--text);font-size:11.5px;cursor:pointer;line-height:1.35;
+}
+#search-results button:hover{background:var(--btn-hover);border-color:var(--btn-hover-line)}
+#search-results button small{display:block;color:var(--text-faint);font-size:10px}
 #vp-empty{
   inset:0;display:none;align-items:center;justify-content:center;
   color:var(--text-faint);font-size:12px;text-align:center;padding:20px;
@@ -698,6 +714,15 @@ body.embed{--topbar-h:44px}
           </button>
           <div class="sec-body">
             <div class="row col">
+              <label for="i-search">Find a place</label>
+              <div class="row" style="margin:0">
+                <input type="text" id="i-search" class="grow" placeholder="Address, city or postcode" autocomplete="off">
+                <button class="btn sm" id="b-search">Search</button>
+              </div>
+              <div id="search-results"></div>
+              <p class="hint" id="search-hint">Geocoding by <b>Nominatim</b> / OpenStreetMap. Searches only run when you press Search or Enter, to stay inside their usage policy.</p>
+            </div>
+            <div class="row col">
               <label for="i-city">Preset city</label>
               <select id="i-city"></select>
             </div>
@@ -726,6 +751,49 @@ body.embed{--topbar-h:44px}
               <div id="epw-chip"></div>
               <dl class="kv" id="epw-kv" style="display:none"></dl>
             </div>
+          </div>
+        </section>
+
+        <!-- BASEMAP -->
+        <section class="sec closed" data-sec="basemap">
+          <button class="sec-head">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M9 3.5 3.5 5.8v14.7L9 18.2l6 2.3 5.5-2.3V3.5L15 5.8z"/><path d="M9 3.5v14.7M15 5.8v14.7"/></svg>
+            <span class="sec-title">Site Basemap</span><span class="chev"></span>
+          </button>
+          <div class="sec-body">
+            <div class="row col">
+              <label for="i-basemap">Source</label>
+              <select id="i-basemap">
+                <option value="none">None — plain ground</option>
+                <option value="osm">OpenStreetMap street map</option>
+                <option value="image">Site image (upload)</option>
+              </select>
+            </div>
+
+            <div id="bm-tiles" style="display:none">
+              <div class="row col">
+                <label for="i-bm-extent">Site extent &mdash; <span id="v-bm-extent" class="num">400 m</span></label>
+                <input type="range" id="i-bm-extent" min="100" max="2000" step="50" value="400">
+              </div>
+              <button class="btn wide" id="b-bm-load">Load map for this location</button>
+              <p class="hint" id="bm-status">Uses the latitude and longitude above. Tiles are fetched only for this extent &mdash; never pre-downloaded &mdash; and capped at 6&times;6.</p>
+            </div>
+
+            <div id="bm-image" style="display:none">
+              <button class="btn wide" id="b-bm-img">Choose site image</button>
+              <input type="file" id="f-bm-img" accept="image/*" hidden>
+              <div class="row col">
+                <label for="i-bm-width">Real-world width of the image, metres</label>
+                <input type="number" id="i-bm-width" min="5" max="5000" step="5" value="200">
+              </div>
+              <p class="hint">Any PNG or JPG &mdash; a site plan, a survey, an aerial you are licensed to use. Nothing leaves the browser.</p>
+            </div>
+
+            <div class="row col" id="bm-opacity-row" style="display:none">
+              <label for="i-bm-opacity">Opacity &mdash; <span id="v-bm-opacity" class="num">100%</span></label>
+              <input type="range" id="i-bm-opacity" min="0.1" max="1" step="0.05" value="1">
+            </div>
+            <p class="hint" id="bm-note"></p>
           </div>
         </section>
 
@@ -777,7 +845,16 @@ body.embed{--topbar-h:44px}
             <span class="sec-title">Sun Path Display</span><span class="chev"></span>
           </button>
           <div class="sec-body">
-            <label class="sw"><input type="checkbox" id="d-arcs" checked><span class="track"></span><span class="t">Monthly sun-path arcs</span></label>
+            <div class="row col">
+              <label>Projection</label>
+              <div class="seg sm" id="seg-proj">
+                <button data-p="3d" class="on">3D dome</button>
+                <button data-p="stereo">2D stereographic</button>
+              </div>
+            </div>
+            <label class="sw"><input type="checkbox" id="d-autostereo" checked><span class="track"></span><span class="t">Flatten automatically in top view</span></label>
+            <p class="hint">Stereographic is the classic printed sun-path chart: the horizon is the outer circle, the zenith the centre, radius = R&middot;tan((90&minus;altitude)/2).</p>
+            <label class="sw" style="margin-top:9px"><input type="checkbox" id="d-arcs" checked><span class="track"></span><span class="t">Monthly sun-path arcs</span></label>
             <label class="sw"><input type="checkbox" id="d-analemma" checked><span class="track"></span><span class="t">Hourly analemmas</span></label>
             <label class="sw"><input type="checkbox" id="d-today" checked><span class="track"></span><span class="t">Highlight today&rsquo;s arc</span></label>
             <label class="sw"><input type="checkbox" id="d-compass" checked><span class="track"></span><span class="t">Compass rose &amp; bearings</span></label>
@@ -804,6 +881,7 @@ body.embed{--topbar-h:44px}
         <span class="tval num" id="scrub-t">12:00</span>
         <input type="range" id="i-min2" min="0" max="1439" step="1" value="720">
       </div>
+      <div class="vp-overlay" id="vp-attrib" style="display:none"></div>
       <div class="vp-overlay" id="vp-busy"><div class="spinner"></div><div class="msg" id="busy-msg">Working…</div></div>
       <div id="scrim"></div>
     </div>
@@ -2012,6 +2090,207 @@ function disposeGroup(g){
 }
 
 /* ============================================================================
+ *  Basemap — a georeferenced ground image under the model
+ *
+ *  Two sources, both ending in the same place: a texture on a plane at true
+ *  metre scale, centred on the site's latitude/longitude.
+ *
+ *    - XYZ raster tiles (OpenStreetMap), stitched for the current site extent
+ *    - an image the user uploads, with its real-world width typed in
+ *
+ *  Web Mercator is conformal but not equal-area, so metres-per-pixel is exact
+ *  only at the centre latitude. Over a site of a few hundred metres the error is
+ *  far below the precision of anything else here; it would matter at city scale.
+ *
+ *  Tiles are fetched only for what is on screen and the tile count is capped —
+ *  the OSMF tile policy forbids bulk/prefetch downloading and asks heavy users
+ *  to run their own server.
+ * ========================================================================== */
+const Mercator = (() => {
+  const TILE = 256;
+  /** Metres per pixel at a latitude and zoom, for 256 px tiles. */
+  const metresPerPixel = (lat, z) =>
+    156543.03392804097 * Math.cos(lat * D2R) / Math.pow(2, z);
+
+  /** Position in the global pixel plane at a zoom level. */
+  function project(lon, lat, z){
+    const n = TILE * Math.pow(2, z);
+    const s = clamp(Math.sin(clamp(lat, -85.05, 85.05) * D2R), -0.9999, 0.9999);
+    return {
+      x: (lon + 180) / 360 * n,
+      y: (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * n,
+    };
+  }
+
+  /**
+   * Highest zoom whose tile block still covers `extentM` metres within
+   * `maxTiles` tiles per side.
+   */
+  function chooseZoom(lat, extentM, maxTiles, maxZoom = 19){
+    for (let z = maxZoom; z >= 1; z--){
+      const need = Math.ceil(extentM / (TILE * metresPerPixel(lat, z))) + 1;
+      if (need <= maxTiles) return { z, tiles: Math.max(need, 1) };
+    }
+    return { z: 1, tiles: 1 };
+  }
+  return { TILE, metresPerPixel, project, chooseZoom };
+})();
+
+/** Tile sources. Each carries the attribution its terms require. */
+const TILE_SOURCES = {
+  osm: {
+    label: 'OpenStreetMap',
+    url: (x, y, z) => 'https://tile.openstreetmap.org/' + z + '/' + x + '/' + y + '.png',
+    attribution: '© OpenStreetMap contributors',
+    maxZoom: 19,
+  },
+};
+
+const basemapGroup = new THREE.Group();
+scene.add(basemapGroup);
+
+const Basemap = (() => {
+  const MAX_TILES_PER_SIDE = 6;                 // 36 tiles worst case, one screenful
+  let mesh = null, texture = null;
+  let state = { kind: 'none', attribution: '', extent: 0, tainted: false, note: '' };
+
+  function clear(){
+    if (mesh){ basemapGroup.remove(mesh); mesh.geometry.dispose(); mesh.material.dispose(); mesh = null; }
+    if (texture){ texture.dispose(); texture = null; }
+    state = { kind: 'none', attribution: '', extent: 0, tainted: false, note: '' };
+    updateAttribution();
+  }
+
+  /** Put a canvas or image on the ground, `width` × `height` metres, offset in metres. */
+  function apply(source, width, height, offsetX = 0, offsetZ = 0, kind = 'image'){
+    if (mesh){ basemapGroup.remove(mesh); mesh.geometry.dispose(); mesh.material.dispose(); }
+    if (texture) texture.dispose();
+
+    texture = new THREE.CanvasTexture(source);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+    texture.needsUpdate = true;
+
+    mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(width, height),
+      new THREE.MeshStandardMaterial({
+        map: texture, roughness: 0.96, metalness: 0,
+        transparent: true, opacity: State.basemap.opacity,
+        // The map is information, not scenery: fog would wash the plan out in
+        // top view, where the whole plane sits at the fog near distance.
+        fog: false,
+      }));
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.set(offsetX, 0.004, offsetZ);
+    mesh.receiveShadow = true;
+    mesh.userData.noAnalysis = true;
+    basemapGroup.add(mesh);
+
+    state.kind = kind;
+    state.extent = Math.max(width, height);
+    updateAttribution();
+    return mesh;
+  }
+
+  /** Load one tile as an Image, CORS-enabled so the export canvas stays clean. */
+  function loadTile(url){
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      img.src = url;
+    });
+  }
+
+  /**
+   * Fetch and stitch tiles around the current site.
+   * @returns {Promise<{tiles:number, missing:number, zoom:number, extent:number}>}
+   */
+  async function loadTiles(sourceKey = 'osm'){
+    const src = TILE_SOURCES[sourceKey];
+    if (!src) throw new Error('Unknown basemap source.');
+    const { lat, lon } = State.site;
+    const extentM = State.basemap.extent;
+
+    const { z, tiles } = Mercator.chooseZoom(lat, extentM, MAX_TILES_PER_SIDE, src.maxZoom);
+    const mpp = Mercator.metresPerPixel(lat, z);
+    const c = Mercator.project(lon, lat, z);
+    const x0 = Math.floor(c.x / Mercator.TILE) - Math.floor(tiles / 2);
+    const y0 = Math.floor(c.y / Mercator.TILE) - Math.floor(tiles / 2);
+    const nTiles = Math.pow(2, z);
+
+    const cnv = document.createElement('canvas');
+    cnv.width = cnv.height = tiles * Mercator.TILE;
+    const g = cnv.getContext('2d');
+    g.fillStyle = THEME.name === 'light' ? '#e9ecf1' : '#20262e';
+    g.fillRect(0, 0, cnv.width, cnv.height);
+
+    const jobs = [];
+    for (let ty = 0; ty < tiles; ty++){
+      for (let tx = 0; tx < tiles; tx++){
+        const X = ((x0 + tx) % nTiles + nTiles) % nTiles, Y = y0 + ty;
+        if (Y < 0 || Y >= nTiles) continue;
+        jobs.push(loadTile(src.url(X, Y, z)).then(img => {
+          if (img) g.drawImage(img, tx * Mercator.TILE, ty * Mercator.TILE);
+          return img ? 1 : 0;
+        }));
+      }
+    }
+    const ok = (await Promise.all(jobs)).reduce((a, b) => a + b, 0);
+    if (!ok) throw new Error('No map tiles could be loaded — check the connection, or upload a site image instead.');
+
+    // Canvas row 0 is the northernmost tile; with three.js's default flipY that
+    // lands on the +Y edge of the plane, which is north once it is laid flat.
+    const width = cnv.width * mpp, height = cnv.height * mpp;
+    const px = c.x - x0 * Mercator.TILE, py = c.y - y0 * Mercator.TILE;
+    const offsetX = (cnv.width / 2 - px) * mpp;
+    const offsetZ = (cnv.height / 2 - py) * mpp;
+
+    apply(cnv, width, height, offsetX, offsetZ, 'tiles');
+    state.attribution = src.attribution;
+    state.note = src.label + ' · zoom ' + z + ' · ' + (mpp).toFixed(2) + ' m/px';
+    updateAttribution();
+    return { tiles: jobs.length, missing: jobs.length - ok, zoom: z, extent: width };
+  }
+
+  /** Use an uploaded image, scaled by a real-world width in metres. */
+  function loadImage(img, widthM, name){
+    const cnv = document.createElement('canvas');
+    cnv.width = img.naturalWidth || img.width;
+    cnv.height = img.naturalHeight || img.height;
+    cnv.getContext('2d').drawImage(img, 0, 0);
+    const h = widthM * cnv.height / cnv.width;
+    apply(cnv, widthM, h, 0, 0, 'image');
+    state.attribution = '';
+    state.note = name + ' · ' + fmtNum(widthM, 0) + ' × ' + fmtNum(h, 0) + ' m';
+    updateAttribution();
+    return { width: widthM, height: h };
+  }
+
+  function setOpacity(o){
+    State.basemap.opacity = clamp(o, 0.1, 1);
+    if (mesh) mesh.material.opacity = State.basemap.opacity;
+  }
+
+  return {
+    clear, apply, loadTiles, loadImage, setOpacity,
+    get mesh(){ return mesh; },
+    get info(){ return state; },
+    MAX_TILES_PER_SIDE,
+  };
+})();
+
+/** Show the basemap credit in the viewport; exports repeat it in the footer. */
+function updateAttribution(){
+  const el = $('vp-attrib');
+  if (!el) return;
+  const a = Basemap.info.attribution;
+  el.textContent = a || '';
+  el.style.display = a ? '' : 'none';
+}
+
+/* ============================================================================
  *  Sun path diagram
  * ========================================================================== */
 const SUN_COLORS = {
@@ -2024,10 +2303,32 @@ const SUN_COLORS = {
 let sunPathRadius = 40;
 
 /** Position on the sun-path dome for a given altitude/azimuth. */
+/**
+ * Where a sun position is drawn.
+ *
+ * In '3d' mode this is the point on the sun-path hemisphere. In 'stereo' mode it
+ * is the classic stereographic sun-path chart flattened onto the ground:
+ *
+ *     radius = R * tan((90 - altitude) / 2)
+ *
+ * which puts the horizon on the outer circle (tan 45 = 1) and the zenith at the
+ * centre. Everything that draws the diagram — arcs, analemmas, altitude rings,
+ * the compass, the sun marker, the sky-patch dome — goes through here, so one
+ * mode switch reprojects all of it. The shadow-casting sun keeps using the true
+ * 3D vector from SolarCore.vector(), so shadows are unaffected by the mode.
+ */
 function domePoint(altDeg, azDeg, r = sunPathRadius){
+  if (State.disp.projection === 'stereo'){
+    const a = clamp(altDeg, 0, 90);
+    const rr = r * Math.tan((90 - a) / 2 * D2R);
+    const az = azDeg * D2R;
+    return new THREE.Vector3(Math.sin(az) * rr, STEREO_Y, -Math.cos(az) * rr);
+  }
   const v = SolarCore.vector(altDeg, azDeg);
   return new THREE.Vector3(v.x * r, v.y * r, v.z * r);
 }
+const STEREO_Y = 0.12;            // just clear of the ground and any basemap
+const isStereo = () => State.disp.projection === 'stereo';
 
 function lineFromPoints(points, color, opacity = 1, width = 1){
   const geo = new THREE.BufferGeometry().setFromPoints(points);
@@ -2112,9 +2413,24 @@ function buildSunPath(){
       for (let a = 0; a <= 360; a += 4) pts.push(domePoint(alt, a, R));
       sunPathGroup.add(lineFromPoints(pts, THEME.ring, 0.55));
       const lab = makeLabel(alt + '°', { size: 30, color: THEME.ringLabel, scale: R * 0.019 });
-      lab.position.copy(domePoint(alt, 90, R)).multiplyScalar(1.02);
+      lab.position.copy(domePoint(alt, 90, R));
+      if (!isStereo()) lab.position.multiplyScalar(1.02); else lab.position.x += R * 0.03;
       sunPathGroup.add(lab);
     }
+  }
+
+  /* --- backing plate, so the flattened chart reads over a basemap --- */
+  if (isStereo()){
+    const plate = new THREE.Mesh(
+      new THREE.CircleGeometry(R, 96),
+      new THREE.MeshBasicMaterial({
+        color: THEME.name === 'light' ? 0xffffff : 0x0b1016,
+        transparent: true, opacity: 0.2, depthWrite: false, fog: false,
+      }));
+    plate.rotation.x = -Math.PI / 2;
+    plate.position.y = STEREO_Y - 0.05;
+    plate.renderOrder = -1;
+    sunPathGroup.add(plate);
   }
 
   /* --- compass rose --- */
@@ -2174,11 +2490,11 @@ scene.add(sunRay);
 function updateSunVisuals(sun){
   const R = sunPathRadius;
   const v = SolarCore.vector(sun.altitude, sun.azimuth);
-  const pos = new THREE.Vector3(v.x, v.y, v.z).multiplyScalar(R);
+  const pos = domePoint(Math.max(sun.altitude, 0), sun.azimuth, R);
   const up = sun.altitude > -0.5;
 
   sunMarker.visible = up;
-  sunRay.visible = up && State.disp.arcs;
+  sunRay.visible = up && State.disp.arcs && !isStereo();
   sunMarker.position.copy(pos);
   const s = R * 0.032;
   sunMarker.getObjectByName('core').scale.setScalar(s);
@@ -2378,7 +2694,8 @@ function contentPoints(){
     const v = SolarCore.vector(0, a);
     pts.push(new THREE.Vector3(v.x * R, 0, v.z * R));
   }
-  pts.push(new THREE.Vector3(0, R, 0));
+  // The flattened chart has no zenith to frame
+  if (!isStereo()) pts.push(new THREE.Vector3(0, R, 0));
   if (State.model.count){
     const b = State.model.bbox;
     for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z])
@@ -2496,11 +2813,13 @@ const State = {
   northRot: 0,              // project north rotation, degrees clockwise
   weather: null,            // parsed EPW or null (clear-sky fallback)
   disp: { arcs:true, analemma:true, today:true, compass:true, rings:true,
-          shadow:true, grid:true, dome:false, radius:1 },
+          shadow:true, grid:true, dome:false, radius:1,
+          projection:'3d', autoStereo:true },
   analysis: { mode:'inst', period:'year', unit:'kwh', gridSize:1.5, offset:0.02,
               density:1, groundRefl:0.2, useGround:true, shade:true,
               hourFrom:0, hourTo:24, from:null, to:null },
   legend: { scheme:'ladybug', mode:'auto', min:0, max:1000 },
+  basemap: { source:'none', extent:400, opacity:1, imageWidth:200 },
   model: { tris:new Float32Array(0), count:0, area:0, bbox:new THREE.Box3() },
   modelHeight: 24, modelRadius: 24,
   objName: null,
@@ -3017,7 +3336,7 @@ function buildDomeMesh(){
   const alpha = (Math.PI / 2) / (7 * mf + 0.5);
   const R = sunPathRadius * 0.96;
   const positions = [], colors = [];
-  const P = (alt, az) => { const v = SolarCore.vector(alt * R2D, az * R2D); return [v.x*R, v.y*R, v.z*R]; };
+  const P = (alt, az) => { const p = domePoint(alt * R2D, az * R2D, R); return [p.x, p.y, p.z]; };
 
   let p = 0;
   for (let i = 0; i < 7 * mf; i++){
@@ -3360,7 +3679,15 @@ function composeSheet(source, W, H, s){
   setFont(11, '600');
   g.fillStyle = T.sheetDim;
   g.textAlign = 'left';
-  g.fillText('© Karam Al-Obaidi', pad, fy + Math.round(34 * s));
+  const credit = '© Karam Al-Obaidi';
+  g.fillText(credit, pad, fy + Math.round(34 * s));
+  const bmAttrib = Basemap.info.attribution;
+  if (bmAttrib){
+    const w = g.measureText(credit).width;
+    setFont(9.5, '500');
+    g.fillStyle = T.sheetFaint;
+    g.fillText('·  ' + bmAttrib, pad + w + Math.round(9 * s), fy + Math.round(34 * s));
+  }
 
   const r = State.results;
   if (r){
@@ -3434,12 +3761,19 @@ function exportSheet({ theme = 'dark', scale = 2, save = true } = {}){
   }
   if (save && sheet){
     const slug = (State.site.name || 'site').replace(/\W+/g, '-').toLowerCase();
-    sheet.toBlob(b => {
-      if (!b) { toast('Could not capture the viewport.', 'err'); return; }
-      download('sun-study-' + slug + '-' + fmtDate(State.doy).replace(' ', '') + '-' +
-               fmtHM(State.minutes).replace(':', '') + (theme === 'light' ? '-print' : '') + '.png', b);
-      toast('Study sheet exported — ' + sheet.width + ' × ' + sheet.height + ' px.', 'ok');
-    }, 'image/png');
+    try {
+      sheet.toBlob(b => {
+        if (!b) { toast('Could not capture the viewport.', 'err'); return; }
+        download('sun-study-' + slug + '-' + fmtDate(State.doy).replace(' ', '') + '-' +
+                 fmtHM(State.minutes).replace(':', '') + (theme === 'light' ? '-print' : '') + '.png', b);
+        toast('Study sheet exported — ' + sheet.width + ' × ' + sheet.height + ' px.', 'ok');
+      }, 'image/png');
+    } catch (err){
+      // A cross-origin basemap image without CORS headers would taint the
+      // canvas and make toBlob throw. Say so instead of failing silently.
+      toast('The image could not be saved: ' + err.message +
+            (Basemap.info.kind === 'tiles' ? ' Try the site-image basemap instead.' : ''), 'err', 8000);
+    }
   }
   return sheet;
 }
@@ -3573,6 +3907,139 @@ function clearEPW(){
   toast('EPW removed — back to the synthetic clear-sky model.', 'info');
 }
 
+/* --- basemap ------------------------------------------------------------- */
+function syncBasemapUI(){
+  const src = State.basemap.source;
+  $('bm-tiles').style.display = src === 'osm' ? '' : 'none';
+  $('bm-image').style.display = src === 'image' ? '' : 'none';
+  $('bm-opacity-row').style.display = src === 'none' ? 'none' : '';
+  $('bm-note').textContent = Basemap.info.note || '';
+}
+
+on('i-basemap', 'change', (e) => {
+  State.basemap.source = e.target.value;
+  if (State.basemap.source === 'none') Basemap.clear();
+  syncBasemapUI();
+  if (State.basemap.source === 'osm') loadBasemapTiles();
+});
+
+on('i-bm-extent', 'input', (e) => {
+  State.basemap.extent = +e.target.value;
+  $('v-bm-extent').textContent = State.basemap.extent + ' m';
+});
+on('i-bm-extent', 'change', () => { if (State.basemap.source === 'osm') loadBasemapTiles(); });
+
+on('i-bm-opacity', 'input', (e) => {
+  Basemap.setOpacity(+e.target.value);
+  $('v-bm-opacity').textContent = Math.round(State.basemap.opacity * 100) + '%';
+});
+
+async function loadBasemapTiles(){
+  const btn = $('b-bm-load');
+  btn.disabled = true;
+  $('bm-status').textContent = 'Loading tiles…';
+  try {
+    const r = await Basemap.loadTiles('osm');
+    $('bm-status').textContent = r.tiles + ' tiles at zoom ' + r.zoom +
+      (r.missing ? ' (' + r.missing + ' failed)' : '') + '.';
+    syncBasemapUI();
+    refresh(true);
+    toast('Basemap loaded — ' + Basemap.info.note, 'ok');
+  } catch (err){
+    $('bm-status').textContent = err.message;
+    toast(err.message, 'err', 7000);
+  } finally {
+    btn.disabled = false;
+  }
+}
+on('b-bm-load', 'click', loadBasemapTiles);
+
+on('b-bm-img', 'click', () => $('f-bm-img').click());
+on('i-bm-width', 'change', (e) => {
+  State.basemap.imageWidth = clamp(+e.target.value || 200, 5, 5000);
+  if (State.basemap.source === 'image' && lastSiteImage)
+    Basemap.loadImage(lastSiteImage, State.basemap.imageWidth, lastSiteImageName), syncBasemapUI();
+});
+
+let lastSiteImage = null, lastSiteImageName = '';
+on('f-bm-img', 'change', (e) => {
+  const f = e.target.files && e.target.files[0];
+  if (!f) return;
+  const url = URL.createObjectURL(f);
+  const img = new Image();
+  img.onload = () => {
+    lastSiteImage = img; lastSiteImageName = f.name;
+    const r = Basemap.loadImage(img, State.basemap.imageWidth, f.name);
+    syncBasemapUI();
+    refresh(true);
+    toast('Site image placed — ' + fmtNum(r.width, 0) + ' × ' + fmtNum(r.height, 0) + ' m', 'ok');
+    URL.revokeObjectURL(url);
+  };
+  img.onerror = () => { toast('Could not read that image.', 'err'); URL.revokeObjectURL(url); };
+  img.src = url;
+  e.target.value = '';
+});
+
+/* --- place search (Nominatim) -------------------------------------------- */
+let lastSearchAt = 0;
+async function runSearch(){
+  const q = $('i-search').value.trim();
+  const out = $('search-results');
+  if (q.length < 3){ out.innerHTML = ''; toast('Type at least three characters.', 'info', 2500); return; }
+
+  // Nominatim asks for no more than one request a second
+  const wait = 1100 - (performance.now() - lastSearchAt);
+  if (wait > 0) await new Promise(r => setTimeout(r, wait));
+  lastSearchAt = performance.now();
+
+  $('b-search').disabled = true;
+  out.innerHTML = '<button disabled>Searching…</button>';
+  try {
+    const url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&addressdetails=0&q=' +
+                encodeURIComponent(q);
+    const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+    if (!res.ok) throw new Error('Search service returned ' + res.status + '.');
+    const rows = await res.json();
+    if (!Array.isArray(rows) || !rows.length){ out.innerHTML = '<button disabled>No matches</button>'; return; }
+
+    out.innerHTML = '';
+    for (const r of rows){
+      const b = document.createElement('button');
+      const name = String(r.display_name || 'Unnamed');
+      const short = name.split(',').slice(0, 2).join(',');
+      b.innerHTML = '<b></b><small></small>';
+      b.querySelector('b').textContent = short;
+      b.querySelector('small').textContent =
+        (+r.lat).toFixed(4) + '°, ' + (+r.lon).toFixed(4) + '°  ·  ' + name.split(',').slice(2).join(',').trim();
+      b.onclick = () => pickPlace(+r.lat, +r.lon, short);
+      out.appendChild(b);
+    }
+  } catch (err){
+    out.innerHTML = '';
+    toast('Place search failed: ' + err.message, 'err', 6000);
+  } finally {
+    $('b-search').disabled = false;
+  }
+}
+
+/**
+ * Move the site to a searched place. Time zone is *not* guessed — it cannot be
+ * derived from coordinates without another service, and a wrong zone silently
+ * shifts every sun position, so the user is told to check it.
+ */
+function pickPlace(lat, lon, name){
+  State.site.lat = lat; State.site.lon = lon; State.site.name = name;
+  $('i-lat').value = lat.toFixed(4);
+  $('i-lon').value = lon.toFixed(4);
+  $('i-city').value = '';
+  $('search-results').innerHTML = '';
+  rebuildAll();
+  if (State.basemap.source === 'osm') loadBasemapTiles();
+  toast('Moved to ' + name + ' — check the time zone is right for this location.', 'info', 6500);
+}
+on('b-search', 'click', runSearch);
+on('i-search', 'keydown', (e) => { if (e.key === 'Enter'){ e.preventDefault(); runSearch(); } });
+
 /* --- date & time --------------------------------------------------------- */
 function setDoy(doy, fromInput){
   State.doy = clamp(Math.round(doy), 1, 365);
@@ -3630,6 +4097,21 @@ for (const [id, key] of Object.entries(DISP_IDS)){
     refresh(true);
   });
 }
+/** Switch the sun-path projection and rebuild the diagram. */
+function setProjection(mode, { fromView = false } = {}){
+  const m = mode === 'stereo' ? 'stereo' : '3d';
+  if (State.disp.projection === m) return;
+  State.disp.projection = m;
+  [...$('seg-proj').children].forEach(c => c.classList.toggle('on', c.dataset.p === m));
+  todayArc = null;
+  rebuildAll({ frame: fromView });
+}
+$('seg-proj').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  setProjection(b.dataset.p);
+});
+on('d-autostereo', 'change', (e) => { State.disp.autoStereo = e.target.checked; });
+
 on('d-radius', 'input', (e) => {
   State.disp.radius = +e.target.value;
   $('v-radius').textContent = State.disp.radius.toFixed(2) + '×';
@@ -3751,14 +4233,24 @@ document.querySelectorAll('.panel-close').forEach(b =>
   b.addEventListener('click', () => setPanel(b.dataset.close, false)));
 on('scrim', 'click', () => { setPanel('left', false); setPanel('right', false); });
 
+// `top` keeps a tiny +Z so the up-vector cross product stays defined: with
+// eye (0, d, e) and up +Y, screen-right resolves to +X (east) and screen-up to
+// -Z (north), which is the orientation a plan drawing needs. Any X component
+// here rolls the view diagonally.
 const VIEWS = {
-  axo: [0.66, 0.52, 0.68], top: [0.0001, 1, 0.0001],
+  axo: [0.66, 0.52, 0.68], top: [0, 1, 0.0001],
   N:   [0, 0.34, -1], S: [0, 0.34, 1], E: [1, 0.34, 0], W: [-1, 0.34, 0],
 };
 $('view-cube').addEventListener('click', (e) => {
   const b = e.target.closest('button'); if (!b) return;
   [...e.currentTarget.children].forEach(c => c.classList.toggle('on', c === b));
-  const v = VIEWS[b.dataset.view];
+  const view = b.dataset.view;
+
+  // Looking straight down is where the flattened chart belongs; any other view
+  // wants the dome back. The toggle in Sun Path Display opts out of this.
+  if (State.disp.autoStereo) setProjection(view === 'top' ? 'stereo' : '3d', { fromView: true });
+
+  const v = VIEWS[view];
   const dist = camera.position.distanceTo(controls.target);
   camera.position.copy(controls.target).add(new THREE.Vector3(...v).normalize().multiplyScalar(dist));
   controls.update();
@@ -4180,6 +4672,9 @@ function init(){
   try { stored = localStorage.getItem(UI_THEME_KEY); } catch (e) { /* private mode */ }
   setUiTheme(stored === 'light' ? 'light' : 'dark', { persist: false });
 
+  $('v-bm-extent').textContent = State.basemap.extent + ' m';
+  syncBasemapUI();
+
   loadSample('demo');
   setPanel('left', innerWidth > 1100);
   setPanel('right', innerWidth > 1100);
@@ -4196,7 +4691,8 @@ function init(){
     runAnalysis, applyEPW, setDoy, setMinutes, loadSample, refresh,
     exportSheet, applyTheme, THEMES, getTheme: () => THEME.name,
     Tour, TOUR_KEY, setUiTheme, currentUiTheme, UI_THEME_KEY,
-    getDome, resolvePeriod, orientOf,
+    Basemap, Mercator, TILE_SOURCES, loadBasemapTiles, pickPlace, runSearch,
+    getDome, resolvePeriod, orientOf, setProjection, domePoint,
     setSite(s){ Object.assign(State.site, s);
       $('i-lat').value = State.site.lat; $('i-lon').value = State.site.lon;
       $('i-tz').value = State.site.tz; $('i-elev').value = State.site.el;

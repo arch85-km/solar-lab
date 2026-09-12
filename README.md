@@ -24,6 +24,8 @@ Below: the first-load state (London, clear-sky model) and the phone layout.
 
 | | |
 |---|---|
+| **Site basemap** | Put the model on its real site: OpenStreetMap tiles fetched for the coordinates you set, or an image you upload (site plan, survey, an aerial you are licensed to use) scaled by its real-world width. Shadows fall across the map, and the required credit appears on screen and in exports. |
+| **2D stereographic sun path** | The classic printed sun-path chart — horizon on the outer circle, zenith at the centre — laid flat on the site. Engages automatically in top view, or switch it on in any view. |
 | **Dark and light presentation** | The whole interface and the 3D scene switch together, live — dark for the studio and the lecture theatre, light for print, handouts and projectors that wash out. The choice is remembered, and exports default to whichever is on screen. |
 | **Guided intro** | A ten-step walkthrough opens on launch, spotlighting each control in turn, with a **Don't show this on launch** toggle on the first and last cards. It is non-blocking — the model stays draggable while it runs — and replays any time from **Help**. |
 | **3D sun path for a full year** | Hourly analemmas, monthly sun-path arcs, solstice and equinox highlights, compass rose with bearings, altitude rings, animated sun. |
@@ -102,6 +104,28 @@ when projecting), and `?tour=1` forces it even for a visitor who has opted out.
 
 All panel sections start collapsed, so the first thing a student sees is the model
 space. Open the ones you need.
+
+**Site basemap** — open **Site Basemap** in the left panel. *OpenStreetMap* fetches tiles
+for the latitude and longitude you have set; drag the extent slider for a wider or tighter
+site and press *Load map*. *Site image* takes any PNG or JPG and places it at true scale
+once you type its real-world width in metres — nothing is uploaded anywhere, and it works
+with no internet at all. Either way the map sits at true metre scale under the model, takes
+the building shadows, and is excluded from the radiation analysis.
+
+**Find a place** — type an address, postcode or building name and press Search. One
+caution the app will remind you of: **the time zone is not guessed** from coordinates, so
+check it after moving somewhere new. A wrong time zone silently shifts every sun position.
+
+![Site basemap in axonometric](docs/screenshot-basemap.png)
+
+**2D stereographic chart** — click **TOP** and the sun path flattens into the traditional
+chart: concentric altitude circles, the horizon as the outer circle, the zenith at the
+centre, following radius = R·tan((90−altitude)/2). Leaving top view restores the dome; the
+*Flatten automatically in top view* switch in Sun Path Display turns that behaviour off,
+and the *Projection* control forces either mode in any view. The shadow-casting sun always
+uses the true 3D position, so shadows are identical in both modes.
+
+![Stereographic chart in top view](docs/screenshot-stereographic.png)
 
 **Presentation mode** — the toolbar toggle (or `T`) switches the whole app between dark
 and light, interface and 3D scene together. Dark is the default; the choice is remembered
@@ -200,7 +224,7 @@ It is clearly labelled as synthetic; it is not real climate.
 
 ## Validation
 
-`npm test` runs 77 headless checks. Every number below is produced by that suite, not
+`npm test` runs 97 headless checks. Every number below is produced by that suite, not
 asserted by hand.
 
 | Check | Result |
@@ -260,6 +284,11 @@ bookkeeping are all consistent.
 - **The clear-sky fallback is synthetic.** For any real design decision, import an EPW.
 - **Cumulative "average W/m²"** divides by every hour in the period, night included —
   the same convention as Ladybug.
+- **The basemap is flat and Web Mercator.** There is no terrain — the map is a plane at
+  ground level. Metres-per-pixel is exact only at the site's centre latitude, which is
+  irrelevant over a few hundred metres but would matter at city scale.
+- **Time zone is never inferred** from a searched location; check it yourself after moving
+  the site, because a wrong zone silently shifts every sun position.
 - **Large meshes are slow.** Above ~200 000 triangles the app warns; decimate or use a
   coarser grid. Analysis points are capped at 120 000, with the grid coarsened
   automatically (and a notice) if a setting would exceed that.
@@ -289,7 +318,7 @@ rebuilds live on every change, with no "apply" step.
 ```bash
 npm install          # playwright, for the test suite only
 npm run vendor       # fetch three.js and the validation EPW
-npm test             # 77 headless checks, screenshots and sample export sheets
+npm test             # 97 headless checks, screenshots and sample export sheets
 npm run serve        # serve the folder at http://localhost:8080
 ```
 
@@ -355,6 +384,10 @@ above:
 
 - **three.js** (MIT) — the only runtime dependency, loaded from a CDN. If you switch to
   self-hosting it, ship its licence file alongside.
+- **OpenStreetMap** (ODbL) — optional map tiles and place search, credited on screen and in
+  exports, used within the OSMF tile and Nominatim policies. There is deliberately **no
+  Google Maps option**: its terms forbid using Maps content without a Google map present.
+  See the notices file for the detail.
 - **Radiance** (Radiance Software License v2.0, Lawrence Berkeley National Laboratory) —
   the Perez sky coefficients and the Tregenza/Reinhart patch construction are
   reimplemented from it in JavaScript.

@@ -69,6 +69,35 @@ await ctx.route('**://cdn.jsdelivr.net/**', async (route) => {
                         headers: { 'access-control-allow-origin': '*' }, body: await readFile(file, 'utf8') });
 });
 
+// Synthetic map tiles: a solid colour plus the z/x/y burnt in, so orientation
+// and count can be asserted without hitting OpenStreetMap's servers.
+let tileRequests = [];
+await ctx.route('**://tile.openstreetmap.org/**', async (route) => {
+  const m = new URL(route.request().url()).pathname.match(/^\/(\d+)\/(\d+)\/(\d+)\.png$/);
+  if (!m) return route.fulfill({ status: 404, body: '' });
+  tileRequests.push({ z: +m[1], x: +m[2], y: +m[3] });
+  // 1x1 opaque PNG is enough; the test asserts requests and geometry, not pixels
+  const png = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+    'base64');
+  await route.fulfill({ status: 200, contentType: 'image/png',
+                        headers: { 'access-control-allow-origin': '*' }, body: png });
+});
+
+let geocodeRequests = 0;
+await ctx.route('**://nominatim.openstreetmap.org/**', async (route) => {
+  geocodeRequests++;
+  await route.fulfill({
+    status: 200, contentType: 'application/json',
+    headers: { 'access-control-allow-origin': '*' },
+    body: JSON.stringify([
+      { display_name: 'Sheffield School of Architecture, Sheffield, South Yorkshire, England',
+        lat: '53.3811', lon: '-1.4701' },
+      { display_name: 'Sheffield, South Yorkshire, England', lat: '53.3800', lon: '-1.4700' },
+    ]),
+  });
+});
+
 const page = await ctx.newPage();
 const consoleErrors = [];
 page.on('console', m => { if (m.type() === 'error') consoleErrors.push(m.text()); });
@@ -463,6 +492,183 @@ const expNoResults = await page.evaluate(() => {
 check('a sun-path study can be exported with no analysis run',
       !expNoResults.hasResults && expNoResults.w > 0 && expNoResults.h > expNoResults.w * 0,
       expNoResults.w + ' × ' + expNoResults.h + ' px, results = ' + expNoResults.hasResults);
+
+/* --------------------------------------------------- basemap and projection --- */
+console.log('\n=== Web Mercator basemap ===');
+
+// Reference values: ground resolution at the equator for 256 px tiles is
+// 156543.034 m/px at zoom 0, halving each level; and London should land in a
+// known tile at zoom 12.
+const merc = await page.evaluate(() => {
+  const M = window.__SUNAPP.Mercator;
+  const p = M.project(-0.45, 51.48, 12);
+  return {
+    mppEq0: M.metresPerPixel(0, 0),
+    mppEq19: M.metresPerPixel(0, 19),
+    mpp51at19: M.metresPerPixel(51.48, 19),
+    tileX: Math.floor(p.x / 256),
+    tileY: Math.floor(p.y / 256),
+    zoomFor400m: M.chooseZoom(51.48, 400, 6),
+    zoomFor2000m: M.chooseZoom(51.48, 2000, 6),
+  };
+});
+check('metres per pixel at the equator matches the Web Mercator constant',
+      near(merc.mppEq0, 156543.034, 0.01) && near(merc.mppEq19, 156543.034 / 2 ** 19, 0.01),
+      'z0 ' + merc.mppEq0.toFixed(3) + ', z19 ' + merc.mppEq19.toFixed(4));
+check('resolution shrinks with the cosine of latitude',
+      near(merc.mpp51at19, 156543.034 * Math.cos(51.48 * Math.PI / 180) / 2 ** 19, 0.01),
+      merc.mpp51at19.toFixed(4) + ' m/px at 51.48°');
+check('London projects into the expected zoom-12 tile',
+      merc.tileX === 2042 && merc.tileY === 1362,
+      'tile ' + merc.tileX + '/' + merc.tileY);
+check('a tighter extent picks a higher zoom',
+      merc.zoomFor400m.z > merc.zoomFor2000m.z &&
+      merc.zoomFor400m.tiles <= 6 && merc.zoomFor2000m.tiles <= 6,
+      '400 m → z' + merc.zoomFor400m.z + ' (' + merc.zoomFor400m.tiles + ' tiles), ' +
+      '2000 m → z' + merc.zoomFor2000m.z + ' (' + merc.zoomFor2000m.tiles + ' tiles)');
+
+tileRequests = [];
+const bm = await page.evaluate(async () => {
+  const A = window.__SUNAPP;
+  A.State.basemap.extent = 400;
+  const r = await A.Basemap.loadTiles('osm');
+  const m = A.Basemap.mesh;
+  m.geometry.computeBoundingBox();
+  const bb = m.geometry.boundingBox;
+  return {
+    ...r,
+    width: bb.max.x - bb.min.x,
+    attribution: A.Basemap.info.attribution,
+    onScreen: document.getElementById('vp-attrib').textContent,
+    rotX: +m.rotation.x.toFixed(4),
+    y: m.position.y,
+    excluded: m.userData.noAnalysis === true,
+  };
+});
+check('the basemap covers at least the requested extent at true metre scale',
+      bm.width >= 400 && bm.width < 400 * 3,
+      bm.width.toFixed(0) + ' m wide for a 400 m extent at zoom ' + bm.zoom);
+check('tile requests stay within the 6x6 policy cap',
+      tileRequests.length === bm.tiles && tileRequests.length <= 36,
+      tileRequests.length + ' tiles requested');
+check('every tile came from one zoom level, none pre-fetched beyond the extent',
+      new Set(tileRequests.map(t => t.z)).size === 1, 'zoom ' + tileRequests[0].z);
+check('the basemap lies flat on the ground and is excluded from analysis',
+      Math.abs(bm.rotX + Math.PI / 2) < 1e-3 && bm.y > 0 && bm.y < 0.05 && bm.excluded,
+      'rotX ' + bm.rotX + ', y ' + bm.y);
+check('OpenStreetMap attribution is shown on screen',
+      /OpenStreetMap contributors/.test(bm.attribution) && /OpenStreetMap contributors/.test(bm.onScreen),
+      bm.onScreen);
+
+// A basemap must not break the image export
+const bmExport = await page.evaluate(() => {
+  const sheet = window.__SUNAPP.exportSheet({ theme: 'dark', scale: 1, save: false });
+  return { w: sheet.width, h: sheet.height };
+});
+check('the export still works with a basemap loaded (no tainted canvas)',
+      bmExport.w > 0 && bmExport.h > 0, bmExport.w + ' × ' + bmExport.h + ' px');
+
+const bmClear = await page.evaluate(() => {
+  const A = window.__SUNAPP;
+  A.Basemap.clear();
+  return { mesh: A.Basemap.mesh, attrib: document.getElementById('vp-attrib').textContent };
+});
+check('clearing the basemap removes it and its attribution',
+      bmClear.mesh === null && bmClear.attrib === '');
+
+/* ------------------------------------------------- stereographic projection --- */
+console.log('\n=== stereographic sun path ===');
+
+const stereo = await page.evaluate(() => {
+  const A = window.__SUNAPP;
+  A.setProjection('stereo');
+  const R = 100;
+  const pt = (alt, az) => { const p = A.domePoint(alt, az, R); return { x: p.x, y: p.y, z: p.z }; };
+  const rad = (alt) => { const p = A.domePoint(alt, 0, R); return Math.hypot(p.x, p.z); };
+  return {
+    mode: A.State.disp.projection,
+    rHorizon: rad(0), r45: rad(45), rZenith: rad(90),
+    north: pt(0, 0), east: pt(0, 90),
+    flat: [0, 30, 60, 90].every(a => Math.abs(pt(a, 45).y - pt(0, 45).y) < 1e-9),
+  };
+});
+check('the horizon maps to the outer circle and the zenith to the centre',
+      near(stereo.rHorizon, 100, 0.1) && stereo.rZenith < 0.01,
+      'r(0°) = ' + stereo.rHorizon.toFixed(2) + ', r(90°) = ' + stereo.rZenith.toFixed(4));
+check('mid altitudes follow R·tan((90−alt)/2)',
+      near(stereo.r45, 100 * Math.tan(22.5 * Math.PI / 180), 0.1),
+      'r(45°) = ' + stereo.r45.toFixed(3) + ', expected ' + (100 * Math.tan(22.5 * Math.PI / 180)).toFixed(3));
+check('bearings are preserved: north is −Z, east is +X',
+      stereo.north.z < -99 && Math.abs(stereo.north.x) < 0.01 &&
+      stereo.east.x > 99 && Math.abs(stereo.east.z) < 0.01,
+      'north z=' + stereo.north.z.toFixed(1) + ', east x=' + stereo.east.x.toFixed(1));
+check('the whole chart is flat — one plane, whatever the altitude', stereo.flat);
+
+// TOP view should flatten it, and leaving TOP should restore the dome
+await page.evaluate(() => window.__SUNAPP.setProjection('3d'));
+await page.click('#view-cube button[data-view="top"]');
+await page.waitForTimeout(350);
+const afterTop = await page.evaluate(() => window.__SUNAPP.State.disp.projection);
+await page.click('#view-cube button[data-view="axo"]');
+await page.waitForTimeout(350);
+const afterAxo = await page.evaluate(() => window.__SUNAPP.State.disp.projection);
+check('top view flattens the chart and leaving it restores the dome',
+      afterTop === 'stereo' && afterAxo === '3d', afterTop + ' → ' + afterAxo);
+
+const optOut = await page.evaluate(async () => {
+  const A = window.__SUNAPP;
+  document.getElementById('d-autostereo').checked = false;
+  document.getElementById('d-autostereo').dispatchEvent(new Event('change'));
+  document.querySelector('#view-cube button[data-view="top"]').click();
+  await new Promise(r => setTimeout(r, 250));
+  const p = A.State.disp.projection;
+  document.getElementById('d-autostereo').checked = true;
+  document.getElementById('d-autostereo').dispatchEvent(new Event('change'));
+  return p;
+});
+check('the auto-flatten toggle can be switched off', optOut === '3d', 'stayed ' + optOut);
+
+/* ------------------------------------------------------------ place search --- */
+console.log('\n=== place search ===');
+geocodeRequests = 0;
+const search = await page.evaluate(async () => {
+  const A = window.__SUNAPP;
+  document.getElementById('i-search').value = 'Sheffield School of Architecture';
+  document.getElementById('b-search').click();
+  await new Promise(r => setTimeout(r, 1600));
+  const results = [...document.querySelectorAll('#search-results button')];
+  const first = results[0];
+  if (first) first.click();
+  await new Promise(r => setTimeout(r, 300));
+  return {
+    count: results.length,
+    lat: A.State.site.lat, lon: A.State.site.lon, name: A.State.site.name,
+    latField: document.getElementById('i-lat').value,
+    cleared: document.getElementById('search-results').children.length,
+  };
+});
+check('a search returns results and picking one moves the site',
+      search.count === 2 && near(search.lat, 53.3811, 0.01) && near(search.lon, -1.4701, 0.01),
+      search.count + ' results → ' + search.lat + ', ' + search.lon);
+check('the coordinate fields and site name follow the pick',
+      /53\.38/.test(search.latField) && /Sheffield/.test(search.name) && search.cleared === 0,
+      'lat field "' + search.latField + '", name "' + search.name + '"');
+
+const shortQuery = await page.evaluate(async () => {
+  document.getElementById('i-search').value = 'ab';
+  document.getElementById('b-search').click();
+  await new Promise(r => setTimeout(r, 200));
+  return document.querySelectorAll('#search-results button').length;
+});
+check('a too-short query does not hit the geocoder at all',
+      shortQuery === 0 && geocodeRequests === 1,
+      geocodeRequests + ' geocoder request(s) in total');
+
+// Put the site back so later checks are unaffected
+await page.evaluate((t) => {
+  const A = window.__SUNAPP;
+  A.applyEPW(A.EPW.parse(t, 'chicago.epw'));
+}, epwText);
 
 /* ------------------------------------------------------ presentation modes --- */
 console.log('\n=== dark and light presentation ===');

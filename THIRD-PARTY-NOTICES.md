@@ -123,6 +123,39 @@ Grasshopper. No Ladybug Tools code is included in this app.
 
 ---
 
+## OpenStreetMap — map tiles and geocoding
+
+The **Site Basemap** feature can fetch raster tiles from `tile.openstreetmap.org`, and
+the **Find a place** search queries Nominatim. Both are operated by the OpenStreetMap
+Foundation and both are used under their published policies.
+
+- Map data and geocoding results are **© OpenStreetMap contributors**, licensed under the
+  Open Database License (ODbL). The app displays this credit in the viewport whenever a
+  basemap is loaded and repeats it in the footer of every exported study sheet.
+- Tiles are fetched **only for the site extent currently being viewed** and are capped at
+  6 × 6 per load. Nothing is pre-fetched, cached for offline use or archived — the OSMF
+  Tile Usage Policy prohibits bulk downloading.
+- Place searches run **only on an explicit Search or Enter**, never per keystroke, with at
+  least 1.1 s between requests, to stay inside the Nominatim usage policy.
+- Both policies may change at any time, and both ask heavy users to run their own servers.
+  **If your deployment grows beyond light teaching traffic, switch to your own tile server
+  or a commercial provider.** The basemap source is a small table (`TILE_SOURCES` in
+  `index.html`) precisely so another provider can be dropped in with its own attribution.
+
+No basemap is loaded by default, and the alternative **Site image** source uses a file you
+supply, involving no third party at all.
+
+### Why there is no Google Maps option
+
+The Google Maps Platform terms include a *No Use With Non-Google Maps* restriction —
+Google Maps content may not be used with or near a non-Google map. Painting Google tiles
+onto this app's ground plane would be Google imagery displayed with no Google map present,
+which those terms do not allow. Google Maps Platform also requires a billing-enabled API
+key, which cannot be distributed inside a freely shared file. A Google basemap is
+therefore deliberately absent rather than merely unimplemented.
+
+---
+
 ## Weather data
 
 **Sun Studio redistributes no weather data.** EPW files are supplied by the person using
