@@ -158,6 +158,10 @@ key entered in the app is stored only in that browser.
   verbatim. Honouring that provider's terms is yours to do.
 - A client-side key is visible to anyone viewing the page and is read-only, but its usage
   counts against the key owner's quota. Restrict it by HTTP origin.
+- `server/tile-proxy.php` is the alternative: the key sits in the PHP file, which is
+  executed rather than served, so it never reaches the browser. The proxy answers only
+  requests from pages on its own host, validates the tile coordinates, restricts the style
+  to an allowlist and rate-limits per visitor, so it cannot be used as an open proxy.
 
 ---
 

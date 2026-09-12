@@ -149,6 +149,22 @@ Two ways to supply it:
 
 `?maptiler=YOUR_KEY` on the URL overrides both, which is handy for a one-off demo.
 
+#### Keeping the key out of the page entirely
+
+Either of the above leaves the key readable in the page source. That is normal and the key
+is read-only, but if you would rather it never reached the browser, use the proxy — it is
+one extra file in the same folder:
+
+1. Upload `server/tile-proxy.php` next to the HTML file.
+2. Open it and set `$MAPTILER_KEY` — that is the only edit.
+3. In the HTML, set `const PROXY_URL = 'tile-proxy.php?z={z}&x={x}&y={y}&s={style}'`.
+
+Leave `MAPTILER_KEY` empty. A **Site imagery** source then appears and becomes the
+default, the key panel is replaced by "Held on the server", and there is no credential in
+the page at all — so nothing to restrict by domain either. The proxy only answers requests
+from pages on its own host, checks the tile coordinates, allows only known styles and
+rate-limits per visitor, so it cannot be turned into an open proxy.
+
 If tiles fail, the style name is the usual culprit — the *Style name* field is editable so
 you can match a style that exists in your account.
 

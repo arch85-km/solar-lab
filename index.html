@@ -904,6 +904,26 @@ body.embed{--topbar-h:44px}
               <p class="hint">If tiles fail, the style name is the usual culprit &mdash; edit it above to match a style in your account.</p>
             </div>
 
+            <div id="bm-proxy" style="display:none">
+              <div class="grid2">
+                <div class="row col">
+                  <label for="i-bm-stylepreset2">Style</label>
+                  <select id="i-bm-stylepreset2">
+                    <option value="satellite">Satellite</option>
+                    <option value="hybrid">Satellite + labels</option>
+                    <option value="streets-v2">Streets</option>
+                    <option value="topo-v2">Topographic</option>
+                    <option value="basic-v2">Basic</option>
+                  </select>
+                </div>
+                <div class="row col">
+                  <label>API key</label>
+                  <div class="chip info"><span class="cname">Held on the server</span></div>
+                </div>
+              </div>
+              <p class="hint">Tiles come through <b>tile-proxy.php</b> on this site, which holds the key. Nothing secret is in this page, so there is nothing to restrict by domain &mdash; the proxy only answers requests from pages on its own host.</p>
+            </div>
+
             <div id="bm-custom" style="display:none">
               <div class="row col">
                 <label for="i-bm-url">Tile URL template</label>
@@ -2308,6 +2328,21 @@ const Mercator = (() => {
 const BUILD = '1.7';
 
 const MAPTILER_KEY = '';
+
+/**
+ * Tile proxy on your own server, for keeping a key out of this file entirely.
+ *
+ * Upload server/tile-proxy.php beside this page, put your key in *that* file,
+ * and set the two constants below. The browser then asks your server for tiles
+ * and the key never reaches it — unlike MAPTILER_KEY above, which is readable
+ * by anyone viewing the source. The default is a relative path, so it works as
+ * soon as both files sit in the same directory; no domain to configure.
+ *
+ * Leave PROXY_URL empty and the option is simply absent from the app.
+ */
+const PROXY_URL = '';                 // e.g. 'tile-proxy.php?z={z}&x={x}&y={y}&s={style}'
+const PROXY_ATTRIBUTION = '© MapTiler © OpenStreetMap contributors';
+const PROXY_LABEL = 'Site imagery';
 const MAPTILER_KEY_STORE = 'sunpath.maptiler.v1';
 
 /** URL parameter, then this browser's saved key, then the deployed constant. */
@@ -2345,6 +2380,18 @@ const TILE_SOURCES = {
     attribution: () => '© MapTiler © OpenStreetMap contributors',
     maxZoom: 20,
     needsKey: true,
+  },
+  proxy: {
+    label: PROXY_LABEL,
+    url: (x, y, z) => PROXY_URL
+      .replace(/\{z\}/g, z).replace(/\{x\}/g, x).replace(/\{y\}/g, y)
+      .replace(/\{style\}/g, encodeURIComponent(State.basemap.style || 'satellite')),
+    attribution: () => PROXY_ATTRIBUTION,
+    maxZoom: 20,
+    // No key in the browser: the server holds it, so a total failure is a
+    // server or style problem, not a missing credential here.
+    needsKey: false,
+    viaProxy: true,
   },
   custom: {
     label: 'Custom tiles',
@@ -4423,9 +4470,10 @@ function syncBasemapUI(){
   const haveKey = !!resolveMapKey();
   $('bm-key-set').style.display = (src === 'maptiler' && haveKey && !keyEntryOpen) ? '' : 'none';
   $('bm-key-entry').style.display = (src === 'maptiler' && (!haveKey || keyEntryOpen)) ? '' : 'none';
-  const tiled = src === 'osm' || src === 'maptiler' || src === 'custom';
+  const tiled = src === 'osm' || src === 'maptiler' || src === 'custom' || src === 'proxy';
   $('bm-tiles').style.display = tiled ? '' : 'none';
   $('bm-keyed').style.display = src === 'maptiler' ? '' : 'none';
+  $('bm-proxy').style.display = src === 'proxy' ? '' : 'none';
   $('bm-custom').style.display = src === 'custom' ? '' : 'none';
   $('bm-image').style.display = src === 'image' ? '' : 'none';
   $('bm-opacity-row').style.display = src === 'none' ? 'none' : '';
@@ -4460,6 +4508,10 @@ on('b-bm-key-clear', 'click', () => {
   toast(resolveMapKey()
     ? 'Cleared the key saved in this browser; the one built into this copy is still in use.'
     : 'Key cleared from this browser.', 'info', 5000);
+});
+on('i-bm-stylepreset2', 'change', (e) => {
+  State.basemap.style = e.target.value;
+  if (State.basemap.source === 'proxy') loadBasemapTiles();
 });
 on('i-bm-stylepreset', 'change', (e) => {
   State.basemap.style = e.target.value;
@@ -5255,6 +5307,18 @@ function init(){
 
   $('build-tag').textContent = 'v' + BUILD;
 
+  // The proxy option only makes sense once a deployed copy points at one
+  if (PROXY_URL){
+    const sel = $('i-basemap');
+    const opt = document.createElement('option');
+    opt.value = 'proxy';
+    opt.textContent = PROXY_LABEL;
+    sel.insertBefore(opt, sel.querySelector('option[value="maptiler"]'));
+    sel.value = 'proxy';
+    State.basemap.source = 'proxy';
+    Selects.refreshOptions(sel);
+  }
+
   $('i-from').value = YEAR + '-01-01';
   $('i-to').value   = YEAR + '-12-31';
   State.analysis.from = 1; State.analysis.to = 365;
@@ -5287,7 +5351,7 @@ function init(){
     exportSheet, applyTheme, THEMES, getTheme: () => THEME.name,
     Tour, TOUR_KEY, setUiTheme, currentUiTheme, UI_THEME_KEY,
     Basemap, Mercator, TILE_SOURCES, loadBasemapTiles, pickPlace, runSearch, Selects,
-    resolveMapKey, MAPTILER_KEY_STORE, sourceAttribution,
+    resolveMapKey, MAPTILER_KEY_STORE, sourceAttribution, PROXY_URL, PROXY_ATTRIBUTION,
     loadPlaces, savePlace, removePlace, renderPlaces, PLACES_KEY,
     requestRender, BUILD,
     /** Place the camera at an azimuth/elevation for orbit-sweep diagnostics. */

@@ -927,6 +927,77 @@ await page.evaluate(() => {
   A.Basemap.clear();
 });
 
+// The proxy exists so the key can leave the page entirely. Verified on a
+// separate load with PROXY_URL patched in, since the committed file has none.
+{
+  const proxCtx = await browser.newContext({ viewport: { width: 1100, height: 800 } });
+  await proxCtx.route('**://cdn.jsdelivr.net/**', async (route) => {
+    const m = new URL(route.request().url()).pathname.match(/^\/npm\/three@[^/]+\/(.+)$/);
+    const f = m && join(vendorRoot, m[1]);
+    if (!f || !existsSync(f)) return route.fulfill({ status: 404, body: 'missing' });
+    await route.fulfill({ status: 200, contentType: 'text/javascript',
+                          headers: { 'access-control-allow-origin': '*' }, body: await readFile(f, 'utf8') });
+  });
+  const proxied = [];
+  await proxCtx.route('**/tile-proxy.php*', async (route) => {
+    proxied.push(route.request().url());
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+      'base64');
+    await route.fulfill({ status: 200, contentType: 'image/png',
+                          headers: { 'access-control-allow-origin': '*' }, body: png });
+  });
+  // Serve the app with PROXY_URL filled in, as a deployment would
+  const src = (await readFile(join(ROOT, 'index.html'), 'utf8'))
+    .replace("const PROXY_URL = '';",
+             "const PROXY_URL = 'tile-proxy.php?z={z}&x={x}&y={y}&s={style}';");
+  // The glob must allow a query string, or ?tour=0 slips past the route
+  await proxCtx.route('**/proxied.html*', (route) =>
+    route.fulfill({ status: 200, contentType: 'text/html', body: src }));
+
+  const pp = await proxCtx.newPage();
+  await pp.goto('http://127.0.0.1:' + port + '/proxied.html?tour=0', { waitUntil: 'load' });
+  await pp.waitForFunction(() => window.__SUNAPP && window.__SUNAPP.ready, null, { timeout: 30000 });
+
+  const px = await pp.evaluate(async () => {
+    const A = window.__SUNAPP;
+    A.State.basemap.extent = 400;
+    A.State.basemap.style = 'satellite';
+    const r = await A.Basemap.loadTiles('proxy');
+    const opts = [...document.querySelectorAll('#i-basemap option')].map(o => o.value);
+    return {
+      tiles: r.tiles,
+      selected: document.getElementById('i-basemap').value,
+      options: opts,
+      attribution: A.Basemap.info.attribution,
+      keyBlockHidden: document.getElementById('bm-keyed').style.display === 'none',
+      proxyBlockShown: document.getElementById('bm-proxy').style.display !== 'none',
+      // Look for an actual key *value* assigned to the constant. Matching on
+      // "key=" would hit the code that builds MapTiler URLs, which is fine to
+      // ship — what must not be present is a credential.
+      keyConstant: (document.documentElement.outerHTML
+        .match(/const MAPTILER_KEY = '([^']*)'/) || [, null])[1],
+      resolvedKey: A.resolveMapKey(),
+    };
+  });
+  check('a configured proxy becomes the default source',
+        px.options.includes('proxy') && px.selected === 'proxy',
+        px.options.join(', '));
+  check('tiles are requested from the proxy with substituted coordinates',
+        proxied.length === px.tiles &&
+        /tile-proxy\.php\?z=\d+&x=\d+&y=\d+&s=satellite$/.test(proxied[0] || ''),
+        (proxied[0] || '(none)').split('/').pop());
+  check('no API key appears anywhere in the served page',
+        px.keyConstant === '' && px.resolvedKey === '',
+        'MAPTILER_KEY = "' + px.keyConstant + '", resolveMapKey() = "' + px.resolvedKey + '"');
+  check('the key field is replaced by a server-side notice',
+        px.keyBlockHidden && px.proxyBlockShown);
+  check('the provider attribution still reaches the viewport',
+        /MapTiler/.test(px.attribution), px.attribution);
+
+  await proxCtx.close();
+}
+
 /* ------------------------------------------------------- saved locations --- */
 console.log('\n=== saved locations ===');
 
