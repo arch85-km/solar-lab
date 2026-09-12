@@ -105,9 +105,9 @@ if (variant === 'proxy'){
   console.log('restriction on this key: the proxy requests tiles server-side and sends no');
   console.log('browser origin, so the restriction would block it.');
 } else {
-  console.log('One file, no key anywhere: OpenStreetMap tiles, a custom tile service, or');
-  console.log('an uploaded site image. Pass --key YOUR_KEY to add aerial imagery through');
-  console.log('the tile proxy.');
+  console.log('One file, no key anywhere: OpenStreetMap street tiles, the same with 3D');
+  console.log('buildings from Overpass, or an uploaded site image. Pass --key YOUR_KEY to');
+  console.log('add MapTiler aerial imagery through the tile proxy.');
 }
 
 /* ── helpers ───────────────────────────────────────────────────────────── */
