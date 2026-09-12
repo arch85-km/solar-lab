@@ -2,3 +2,4 @@ node_modules
 tests/.vendor/
 tests/screenshots/
 tests/assets/*.epw
+deploy/
