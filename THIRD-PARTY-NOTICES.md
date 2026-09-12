@@ -145,6 +145,22 @@ Foundation and both are used under their published policies.
 No basemap is loaded by default, and the alternative **Site image** source uses a file you
 supply, involving no third party at all.
 
+## MapTiler and other keyed tile services
+
+The basemap can also use **MapTiler** or any XYZ raster service, with a key the deployer
+supplies. This project ships **no key**: `MAPTILER_KEY` is empty in the repository, and a
+key entered in the app is stored only in that browser.
+
+- Tiles from MapTiler are used under **your** MapTiler Cloud account and its terms, and
+  require the attribution **"© MapTiler © OpenStreetMap contributors"**, which the app
+  displays on screen and in exported sheets.
+- For a custom service you type the attribution that provider requires, and it is shown
+  verbatim. Honouring that provider's terms is yours to do.
+- A client-side key is visible to anyone viewing the page and is read-only, but its usage
+  counts against the key owner's quota. Restrict it by HTTP origin.
+
+---
+
 ### Why there is no Google Maps option
 
 The Google Maps Platform terms include a *No Use With Non-Google Maps* restriction —

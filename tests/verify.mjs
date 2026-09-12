@@ -100,7 +100,16 @@ await ctx.route('**://nominatim.openstreetmap.org/**', async (route) => {
 
 const page = await ctx.newPage();
 const consoleErrors = [];
-page.on('console', m => { if (m.type() === 'error') consoleErrors.push(m.text()); });
+// The rejected-key test provokes real 403s on purpose, and the browser logs every
+// failed image load. Suppress only inside that window, so genuine console errors
+// anywhere else still fail the run.
+let expectTileErrors = false;
+page.on('console', m => {
+  if (m.type() !== 'error') return;
+  const t = m.text();
+  if (expectTileErrors && /403|Forbidden|Failed to load resource/i.test(t)) return;
+  consoleErrors.push(t);
+});
 page.on('pageerror', e => consoleErrors.push('pageerror: ' + e.message));
 
 console.log('\n=== boot ===');
@@ -424,20 +433,103 @@ check('results table: the face column stays left-aligned',
 check('page declares a dark color-scheme so native popups are not light',
       /dark/.test(chrome.colorScheme), chrome.colorScheme);
 
-const selFocus = await page.evaluate(() => {
-  const el = document.getElementById('i-city');
-  const before = getComputedStyle(el).backgroundImage;
-  el.focus();
-  const after = getComputedStyle(el).backgroundImage;
-  const opt = document.querySelector('#i-city option');
-  return { before, after, optBg: opt ? getComputedStyle(opt).backgroundColor : null };
+// The native popup is out of the interaction path entirely: each select is
+// hidden and a listbox of our own is what the user operates. That is the only
+// way to stop the OS-painted popup flashing, so the checks below are about the
+// replacement, not about styling <option>.
+const dd = await page.evaluate(() => {
+  const sel = document.getElementById('i-city');
+  const btn = sel.nextElementSibling;
+  return {
+    enhanced: sel.dataset.enhanced === '1',
+    hidden: getComputedStyle(sel).clipPath !== 'none' || getComputedStyle(sel).display === 'none',
+    notTabbable: sel.getAttribute('tabindex') === '-1' && sel.getAttribute('aria-hidden') === 'true',
+    isButton: !!btn && btn.classList.contains('sel-btn'),
+    chevron: btn ? getComputedStyle(btn).backgroundImage : 'none',
+    label: btn ? btn.querySelector('.lbl').textContent : '',
+    selectedText: sel.selectedOptions[0] ? sel.selectedOptions[0].textContent : '',
+    haspopup: btn ? btn.getAttribute('aria-haspopup') : null,
+    count: window.__SUNAPP.Selects.count,
+    inDom: document.querySelectorAll('select').length,
+  };
 });
-check('focusing a dropdown does not wipe its chevron (no background shorthand)',
-      selFocus.before !== 'none' && selFocus.after !== 'none',
-      'before ' + (selFocus.before === 'none' ? 'none' : 'image') +
-      ', after ' + (selFocus.after === 'none' ? 'none' : 'image'));
-check('option rows carry an explicit dark background',
-      !!selFocus.optBg && selFocus.optBg !== 'rgba(0, 0, 0, 0)', String(selFocus.optBg));
+check('every dropdown in the page is replaced by a custom listbox',
+      dd.enhanced && dd.isButton && dd.count === dd.inDom && dd.count >= 9,
+      dd.count + ' of ' + dd.inDom + ' selects enhanced');
+check('the native select is hidden and unreachable, so no OS popup can open',
+      dd.hidden && dd.notTabbable);
+check('the custom button mirrors the select and keeps its chevron',
+      dd.label === dd.selectedText && dd.label.length > 0 &&
+      dd.chevron !== 'none' && dd.haspopup === 'listbox',
+      'button "' + dd.label + '" vs option "' + dd.selectedText + '"');
+
+// Picking a row must behave exactly like the native control did
+const ddPick = await page.evaluate(async () => {
+  const A = window.__SUNAPP;
+  const sel = document.getElementById('i-sample');
+  const btn = sel.nextElementSibling;
+  btn.click();
+  await new Promise(r => setTimeout(r, 120));
+  const list = [...document.querySelectorAll('.sel-list')].find(l => !l.hidden);
+  const rows = [...list.querySelectorAll('.sel-opt')];
+  const target = rows.find(r => r.dataset.value === 'court');
+  const opened = rows.length;
+  target.click();
+  await new Promise(r => setTimeout(r, 250));
+  return {
+    opened,
+    value: sel.value,
+    label: btn.querySelector('.lbl').textContent,
+    triangles: A.State.model.count,
+    closed: [...document.querySelectorAll('.sel-list')].every(l => l.hidden),
+    expanded: btn.getAttribute('aria-expanded'),
+  };
+});
+check('clicking a row sets the select, fires change and runs the existing handler',
+      ddPick.value === 'court' && /Courtyard/.test(ddPick.label) && ddPick.triangles > 0,
+      ddPick.opened + ' rows → "' + ddPick.label + '", ' + ddPick.triangles + ' triangles loaded');
+check('choosing an option closes the list', ddPick.closed && ddPick.expanded === 'false');
+
+const ddKeys = await page.evaluate(async () => {
+  // Panel sections start collapsed, and focus() is a no-op inside display:none,
+  // so open the section first — which is the state a user would be in anyway.
+  document.querySelector('.sec[data-sec="model"]').classList.remove('closed');
+  const sel = document.getElementById('i-units');
+  const btn = sel.nextElementSibling;
+  btn.focus();
+  const fire = (key) => btn.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+  fire('Enter');
+  await new Promise(r => setTimeout(r, 100));
+  const openedByKeyboard = [...document.querySelectorAll('.sel-list')].some(l => !l.hidden);
+  fire('ArrowDown'); fire('Enter');
+  await new Promise(r => setTimeout(r, 150));
+  const afterEnter = sel.value;
+  const focusedAfterChoose = document.activeElement === btn;
+  btn.click(); await new Promise(r => setTimeout(r, 100));
+  fire('Escape'); await new Promise(r => setTimeout(r, 100));
+  return {
+    openedByKeyboard, afterEnter, focusedAfterChoose,
+    closedByEscape: [...document.querySelectorAll('.sel-list')].every(l => l.hidden),
+    focusBack: document.activeElement === btn,
+  };
+});
+check('the listbox is fully keyboard operable',
+      ddKeys.openedByKeyboard && ddKeys.afterEnter !== '1',
+      'arrow+enter selected unit scale "' + ddKeys.afterEnter + '"');
+check('Escape closes the list and returns focus to the button',
+      ddKeys.closedByEscape && ddKeys.focusBack);
+
+const ddSync = await page.evaluate(() => {
+  const A = window.__SUNAPP;
+  const sel = document.getElementById('i-density');
+  const btn = sel.nextElementSibling;
+  sel.value = '2';                       // a programmatic write fires no event
+  const stale = btn.querySelector('.lbl').textContent;
+  A.refresh(true);                       // refresh() resyncs the labels
+  return { stale, fresh: btn.querySelector('.lbl').textContent };
+});
+check('a programmatic value change is picked up on the next refresh',
+      /Reinhart/.test(ddSync.fresh), '"' + ddSync.stale + '" → "' + ddSync.fresh + '"');
 
 /* ------------------------------------------------------------ image export --- */
 console.log('\n=== annotated image export ===');
@@ -576,6 +668,257 @@ const bmClear = await page.evaluate(() => {
 check('clearing the basemap removes it and its attribution',
       bmClear.mesh === null && bmClear.attrib === '');
 
+/* --------------------------------------------------------- keyed basemaps --- */
+console.log('\n=== MapTiler and custom tile sources ===');
+
+let maptilerUrls = [];
+let maptilerStatus = 200;
+await ctx.route('**://api.maptiler.com/**', async (route) => {
+  maptilerUrls.push(route.request().url());
+  if (maptilerStatus !== 200) return route.fulfill({ status: maptilerStatus, body: 'denied' });
+  const png = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+    'base64');
+  await route.fulfill({ status: 200, contentType: 'image/png',
+                        headers: { 'access-control-allow-origin': '*' }, body: png });
+});
+await ctx.route('**://tiles.example.org/**', async (route) => {
+  maptilerUrls.push(route.request().url());
+  const png = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+    'base64');
+  await route.fulfill({ status: 200, contentType: 'image/png',
+                        headers: { 'access-control-allow-origin': '*' }, body: png });
+});
+
+// Key priority: URL parameter, then this browser's stored key, then the constant
+{
+  const keyCtx = await browser.newContext({ viewport: { width: 1100, height: 800 } });
+  await keyCtx.route('**://cdn.jsdelivr.net/**', async (route) => {
+    const m = new URL(route.request().url()).pathname.match(/^\/npm\/three@[^/]+\/(.+)$/);
+    const f = m && join(vendorRoot, m[1]);
+    if (!f || !existsSync(f)) return route.fulfill({ status: 404, body: 'missing' });
+    await route.fulfill({ status: 200, contentType: 'text/javascript',
+                          headers: { 'access-control-allow-origin': '*' }, body: await readFile(f, 'utf8') });
+  });
+  await keyCtx.addInitScript(() => {
+    try { localStorage.setItem('sunpath.maptiler.v1', 'FROM_STORE'); } catch (e) {}
+  });
+  const kp = await keyCtx.newPage();
+  const base = 'http://127.0.0.1:' + port + '/index.html';
+  await kp.goto(base + '?tour=0&maptiler=FROM_URL', { waitUntil: 'load' });
+  await kp.waitForFunction(() => window.__SUNAPP && window.__SUNAPP.ready, null, { timeout: 30000 });
+  const fromUrl = await kp.evaluate(() => window.__SUNAPP.resolveMapKey());
+  await kp.goto(base + '?tour=0', { waitUntil: 'load' });
+  await kp.waitForFunction(() => window.__SUNAPP && window.__SUNAPP.ready, null, { timeout: 30000 });
+  const fromStore = await kp.evaluate(() => window.__SUNAPP.resolveMapKey());
+  await keyCtx.close();
+
+  // A clean context, with no init script re-seeding storage, exercises the
+  // constant fallback — the state a fresh visitor to the committed file is in.
+  const bareCtx = await browser.newContext({ viewport: { width: 1100, height: 800 } });
+  await bareCtx.route('**://cdn.jsdelivr.net/**', async (route) => {
+    const m = new URL(route.request().url()).pathname.match(/^\/npm\/three@[^/]+\/(.+)$/);
+    const f = m && join(vendorRoot, m[1]);
+    if (!f || !existsSync(f)) return route.fulfill({ status: 404, body: 'missing' });
+    await route.fulfill({ status: 200, contentType: 'text/javascript',
+                          headers: { 'access-control-allow-origin': '*' }, body: await readFile(f, 'utf8') });
+  });
+  const bp = await bareCtx.newPage();
+  await bp.goto(base + '?tour=0', { waitUntil: 'load' });
+  await bp.waitForFunction(() => window.__SUNAPP && window.__SUNAPP.ready, null, { timeout: 30000 });
+  const fromConst = await bp.evaluate(() => window.__SUNAPP.resolveMapKey());
+  await bareCtx.close();
+
+  check('the key comes from the URL first, then storage, then the constant',
+        fromUrl === 'FROM_URL' && fromStore === 'FROM_STORE' && fromConst === '',
+        [fromUrl, fromStore, JSON.stringify(fromConst)].join(' → '));
+
+  // Checked at the file level too: no key may ever be committed
+  const src = await readFile(join(ROOT, 'index.html'), 'utf8');
+  check('the committed file carries an empty key constant',
+        /const MAPTILER_KEY = '';/.test(src) && fromConst === '',
+        (src.match(/const MAPTILER_KEY = '[^']*';/) || ['not found'])[0]);
+}
+
+maptilerUrls = [];
+const mt = await page.evaluate(async () => {
+  const A = window.__SUNAPP;
+  try { localStorage.setItem('sunpath.maptiler.v1', 'TESTKEY123'); } catch (e) {}
+  A.State.basemap.source = 'maptiler';
+  A.State.basemap.style = 'satellite';
+  A.State.basemap.extent = 400;
+  const r = await A.Basemap.loadTiles('maptiler');
+  const m = A.Basemap.mesh;
+  m.geometry.computeBoundingBox();
+  return { ...r, width: m.geometry.boundingBox.max.x - m.geometry.boundingBox.min.x,
+           attribution: A.Basemap.info.attribution,
+           onScreen: document.getElementById('vp-attrib').textContent };
+});
+const sampleUrl = maptilerUrls[0] || '';
+check('MapTiler tiles use the documented path shape with key and style',
+      /\/maps\/satellite\/256\/\d+\/\d+\/\d+\.jpg\?key=TESTKEY123$/.test(sampleUrl),
+      sampleUrl.replace('TESTKEY123', '<key>'));
+check('imagery styles request JPEG, not PNG', /\.jpg\?/.test(sampleUrl));
+check('a keyed basemap georeferences the same way as the OSM one',
+      mt.width >= 400 && mt.width < 400 * 3, mt.width.toFixed(0) + ' m at zoom ' + mt.zoom);
+check('MapTiler attribution is shown on screen',
+      /MapTiler/.test(mt.attribution) && /MapTiler/.test(mt.onScreen), mt.onScreen);
+
+const styleSwap = await page.evaluate(async () => {
+  const A = window.__SUNAPP;
+  A.State.basemap.style = 'streets-v2';
+  await A.Basemap.loadTiles('maptiler');
+  return true;
+});
+check('a non-imagery style switches to PNG',
+      styleSwap && /\/maps\/streets-v2\/256\/.*\.png\?/.test(maptilerUrls[maptilerUrls.length - 1]),
+      maptilerUrls[maptilerUrls.length - 1].replace('TESTKEY123', '<key>'));
+
+maptilerStatus = 403;
+expectTileErrors = true;
+const denied = await page.evaluate(async () => {
+  const A = window.__SUNAPP;
+  try { await A.Basemap.loadTiles('maptiler'); return 'no error'; }
+  catch (e) { return e.message; }
+});
+maptilerStatus = 200;
+await page.waitForTimeout(150);
+expectTileErrors = false;
+check('a rejected key reports the key or style, not a connection problem',
+      /API key/i.test(denied) && /domain|style/i.test(denied) && !/connection/i.test(denied),
+      denied.slice(0, 96) + '…');
+
+maptilerUrls = [];
+const custom = await page.evaluate(async () => {
+  const A = window.__SUNAPP;
+  A.State.basemap.source = 'custom';
+  A.State.basemap.customUrl = 'https://tiles.example.org/layer/{z}/{x}/{y}.png?tok=abc';
+  A.State.basemap.customAttrib = '© Example Imagery Ltd';
+  await A.Basemap.loadTiles('custom');
+  return { attribution: A.Basemap.info.attribution,
+           onScreen: document.getElementById('vp-attrib').textContent };
+});
+check('a custom template substitutes {z}/{x}/{y}',
+      /^https:\/\/tiles\.example\.org\/layer\/\d+\/\d+\/\d+\.png\?tok=abc$/.test(maptilerUrls[0] || ''),
+      maptilerUrls[0] || '(no request)');
+check('a custom source uses the attribution the user typed, verbatim',
+      custom.attribution === '© Example Imagery Ltd' && custom.onScreen === '© Example Imagery Ltd',
+      custom.onScreen);
+
+// The key must not leak into anything the user hands to someone else
+const leak = await page.evaluate(async () => {
+  const A = window.__SUNAPP;
+  A.State.basemap.source = 'maptiler';
+  let captured = '';
+  const realCreate = URL.createObjectURL;
+  // Capture the blob but still hand back a real URL, or the anchor click logs
+  // "Not allowed to load local resource" and trips the console-error check.
+  URL.createObjectURL = (blob) => { captured = blob; return realCreate.call(URL, blob); };
+  A.setAnalysis({ mode: 'inst', gridSize: 4 });
+  await A.runAnalysis();
+  A.Selects.closeOpen();
+  document.getElementById('b-csv').click();
+  await new Promise(r => setTimeout(r, 300));
+  URL.createObjectURL = realCreate;
+  const text = captured && captured.text ? await captured.text() : '';
+  return { len: text.length, hasKey: text.includes('TESTKEY123'), head: text.slice(0, 60) };
+});
+check('the API key never appears in an exported CSV',
+      leak.len > 0 && !leak.hasKey, leak.len + ' bytes exported, key present: ' + leak.hasKey);
+
+await page.evaluate(() => { window.__SUNAPP.Basemap.clear(); window.__SUNAPP.State.basemap.source = 'none'; });
+
+/* ------------------------------------------------------- saved locations --- */
+console.log('\n=== saved locations ===');
+
+const saved = await page.evaluate(() => {
+  const A = window.__SUNAPP;
+  try { localStorage.removeItem(A.PLACES_KEY); } catch (e) {}
+  A.renderPlaces();
+  A.State.site = { lat: 53.3811, lon: -1.4701, tz: 1, el: 105, name: 'Sheffield campus' };
+  document.getElementById('i-place-name').value = 'Sheffield campus';
+  A.savePlace();
+  const sel = document.getElementById('i-city');
+  const grp = [...sel.querySelectorAll('optgroup')].map(g => g.label);
+  const savedOpts = [...sel.querySelectorAll('optgroup[label="Saved locations"] option')]
+    .map(o => ({ v: o.value, t: o.textContent }));
+  return { stored: A.loadPlaces(), groups: grp, savedOpts,
+           rows: document.querySelectorAll('#place-list .place-row').length };
+});
+check('saving records the name, coordinates, time zone and elevation together',
+      saved.stored.length === 1 && saved.stored[0].tz === 1 && saved.stored[0].el === 105,
+      JSON.stringify(saved.stored[0]));
+check('it appears in a Saved locations group above the presets',
+      saved.groups[0] === 'Saved locations' && saved.groups[1] === 'Preset cities' &&
+      saved.savedOpts.length === 1 && /Sheffield/.test(saved.savedOpts[0].t),
+      saved.groups.join(' | '));
+check('and in the removable list', saved.rows === 1);
+
+const restored = await page.evaluate(async () => {
+  const A = window.__SUNAPP;
+  A.State.site = { lat: 0, lon: 0, tz: 0, el: 0, name: 'wiped' };
+  const sel = document.getElementById('i-city');
+  sel.value = 's0';
+  sel.dispatchEvent(new Event('change', { bubbles: true }));
+  await new Promise(r => setTimeout(r, 250));
+  return { ...A.State.site, tzField: document.getElementById('i-tz').value };
+});
+check('choosing a saved location restores all four values, time zone included',
+      near(restored.lat, 53.3811, 0.01) && near(restored.lon, -1.4701, 0.01) &&
+      restored.tz === 1 && restored.el === 105 && restored.tzField === '1',
+      restored.name + ' @ ' + restored.lat + ', ' + restored.lon + ' UTC+' + restored.tz);
+
+const dup = await page.evaluate(() => {
+  const A = window.__SUNAPP;
+  A.State.site.tz = 2;
+  document.getElementById('i-place-name').value = 'sheffield CAMPUS';   // same name, different case
+  A.savePlace();
+  return A.loadPlaces();
+});
+check('saving the same name overwrites instead of duplicating',
+      dup.length === 1 && dup[0].tz === 2, dup.length + ' entry, tz now ' + dup[0].tz);
+
+await page.reload({ waitUntil: 'load' });
+await page.waitForFunction(() => window.__SUNAPP && window.__SUNAPP.ready, null, { timeout: 30000 });
+const afterReload2 = await page.evaluate(() => ({
+  stored: window.__SUNAPP.loadPlaces().length,
+  inSelect: document.querySelectorAll('#i-city optgroup[label="Saved locations"] option').length,
+}));
+check('saved locations survive a reload',
+      afterReload2.stored === 1 && afterReload2.inSelect === 1,
+      afterReload2.stored + ' stored, ' + afterReload2.inSelect + ' in the dropdown');
+
+const removed = await page.evaluate(() => {
+  const A = window.__SUNAPP;
+  A.removePlace(A.loadPlaces()[0].n);
+  return { stored: A.loadPlaces().length,
+           groups: [...document.querySelectorAll('#i-city optgroup')].map(g => g.label),
+           rows: document.querySelectorAll('#place-list .place-row').length };
+});
+check('removing one clears it from the list and the dropdown',
+      removed.stored === 0 && removed.rows === 0 && !removed.groups.includes('Saved locations'),
+      removed.groups.join(' | '));
+
+const corrupt = await page.evaluate(() => {
+  const A = window.__SUNAPP;
+  try { localStorage.setItem(A.PLACES_KEY, '{{{not json'); } catch (e) {}
+  const list = A.loadPlaces();
+  A.renderPlaces();
+  const presets = document.querySelectorAll('#i-city optgroup[label="Preset cities"] option').length;
+  try { localStorage.removeItem(A.PLACES_KEY); } catch (e) {}
+  return { list, presets };
+});
+check('corrupt storage degrades to the built-in presets rather than throwing',
+      Array.isArray(corrupt.list) && corrupt.list.length === 0 && corrupt.presets > 20,
+      corrupt.presets + ' presets still listed');
+
+// The reload above reset the page, so restore the EPW the later checks expect
+await page.evaluate((t) => {
+  const A = window.__SUNAPP;
+  A.applyEPW(A.EPW.parse(t, 'chicago.epw'));
+}, epwText);
+
 /* ------------------------------------------------- stereographic projection --- */
 console.log('\n=== stereographic sun path ===');
 
@@ -699,6 +1042,8 @@ async function probeTheme(){
     const status = getComputedStyle(document.getElementById('statusbar'));
     const btn = document.querySelector('.btn.primary');
     const btnCs = btn ? getComputedStyle(btn) : null;
+    const opt = document.querySelector('.sel-opt');
+    const list = document.querySelector('.sel-list');
     const A = window.__SUNAPP;
     return {
       attr: document.documentElement.dataset.theme || '(none)',
@@ -709,6 +1054,8 @@ async function probeTheme(){
       titleContrast: window.__contrast(title.color, panel.backgroundColor),
       creditContrast: window.__contrast(value.color, status.backgroundColor),
       btnContrast: btnCs ? window.__contrast(btnCs.color, btnCs.backgroundColor) : null,
+      optContrast: (opt && list)
+        ? window.__contrast(getComputedStyle(opt).color, getComputedStyle(list).backgroundColor) : null,
       chevron: getComputedStyle(document.getElementById('i-city')).backgroundImage,
     };
   }, CONTRAST_FN);
@@ -737,6 +1084,8 @@ for (const [name, t] of [['dark', darkT], ['light', lightT]]){
         t.creditContrast >= 4.0, t.creditContrast.toFixed(2) + ':1');
   check('primary button text meets 4.5:1 on its fill in ' + name + ' mode',
         t.btnContrast >= 4.5, t.btnContrast.toFixed(2) + ':1');
+  check('dropdown rows meet 4.5:1 against the list in ' + name + ' mode',
+        t.optContrast >= 4.5, t.optContrast.toFixed(2) + ':1');
 }
 
 // The viewport itself must follow, not just the chrome

@@ -24,7 +24,8 @@ Below: the first-load state (London, clear-sky model) and the phone layout.
 
 | | |
 |---|---|
-| **Site basemap** | Put the model on its real site: OpenStreetMap tiles fetched for the coordinates you set, or an image you upload (site plan, survey, an aerial you are licensed to use) scaled by its real-world width. Shadows fall across the map, and the required credit appears on screen and in exports. |
+| **Site basemap** | Put the model on its real site: OpenStreetMap tiles (no key), **MapTiler aerial/satellite or any XYZ service with your own key**, or an image you upload scaled by its real-world width. Shadows fall across the map, and the required credit appears on screen and in exports. |
+| **Saved locations** | Search a place, correct its time zone once, then save it by name — coordinates, time zone and elevation together — and it stays in the city list. |
 | **2D stereographic sun path** | The classic printed sun-path chart — horizon on the outer circle, zenith at the centre — laid flat on the site. Engages automatically in top view, or switch it on in any view. |
 | **Dark and light presentation** | The whole interface and the 3D scene switch together, live — dark for the studio and the lecture theatre, light for print, handouts and projectors that wash out. The choice is remembered, and exports default to whichever is on screen. |
 | **Guided intro** | A ten-step walkthrough opens on launch, spotlighting each control in turn, with a **Don't show this on launch** toggle on the first and last cards. It is non-blocking — the model stays draggable while it runs — and replays any time from **Help**. |
@@ -116,6 +117,39 @@ the building shadows, and is excluded from the radiation analysis.
 caution the app will remind you of: **the time zone is not guessed** from coordinates, so
 check it after moving somewhere new. A wrong time zone silently shifts every sun position.
 
+**Save this location** — once the time zone is right, give the site a name and press Save.
+It joins a *Saved locations* group at the top of the city list, carrying its coordinates,
+**time zone** and elevation, and it persists in the browser. That last part is the point:
+the time zone is the one thing searching cannot work out, so it is worth keeping.
+
+![Saved locations in the city list](docs/screenshot-dropdown.png)
+
+### Aerial imagery with your own key
+
+The OpenStreetMap source needs no key, but it is a street map. For aerial or satellite
+imagery, pick **MapTiler aerial / satellite** and supply a key from
+[MapTiler Cloud](https://cloud.maptiler.com/) — or **Custom XYZ tiles** for Mapbox, Esri,
+a university WMS or anything else that serves `{z}/{x}/{y}` raster tiles, with whatever
+attribution that provider requires.
+
+**Restrict the key to your domain before you publish.** A key on a public page is visible
+to anyone who views source — that is normal for map keys and they are read-only, so nobody
+can alter your maps — but the requests count against *your* quota. Set *Allowed HTTP
+origins* in MapTiler Cloud to your domain and a copied key is useless elsewhere.
+
+Two ways to supply it:
+
+- **Paste it into the app** — saved in that browser only, good for your own machine.
+- **Bake it into your deployed copy** — set `const MAPTILER_KEY = '…'` near the top of
+  `index.html` and every visitor gets imagery without typing anything. The copy in this
+  repository is deliberately empty: a key committed to git is in every clone permanently,
+  and rotating it later would not remove it.
+
+`?maptiler=YOUR_KEY` on the URL overrides both, which is handy for a one-off demo.
+
+If tiles fail, the style name is the usual culprit — the *Style name* field is editable so
+you can match a style that exists in your account.
+
 ![Site basemap in axonometric](docs/screenshot-basemap.png)
 
 **2D stereographic chart** — click **TOP** and the sun path flattens into the traditional
@@ -126,6 +160,12 @@ and the *Projection* control forces either mode in any view. The shadow-casting 
 uses the true 3D position, so shadows are identical in both modes.
 
 ![Stereographic chart in top view](docs/screenshot-stereographic.png)
+
+**Dropdowns** are custom listboxes rather than native `<select>` popups. Native popups are
+painted by the browser and the OS, could not be made to match either theme, and flashed
+dark as they opened; the native element is still there underneath holding the value, but
+what you click is ours. Fully keyboard operable: Enter or Space opens, arrows move, Enter
+picks, Escape closes.
 
 **Presentation mode** — the toolbar toggle (or `T`) switches the whole app between dark
 and light, interface and 3D scene together. Dark is the default; the choice is remembered
@@ -224,7 +264,7 @@ It is clearly labelled as synthetic; it is not real climate.
 
 ## Validation
 
-`npm test` runs 97 headless checks. Every number below is produced by that suite, not
+`npm test` runs 124 headless checks. Every number below is produced by that suite, not
 asserted by hand.
 
 | Check | Result |
@@ -318,7 +358,7 @@ rebuilds live on every change, with no "apply" step.
 ```bash
 npm install          # playwright, for the test suite only
 npm run vendor       # fetch three.js and the validation EPW
-npm test             # 97 headless checks, screenshots and sample export sheets
+npm test             # 124 headless checks, screenshots and sample export sheets
 npm run serve        # serve the folder at http://localhost:8080
 ```
 
