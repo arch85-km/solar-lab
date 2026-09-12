@@ -210,9 +210,13 @@ view, since that is the only place it does anything.
 
 **Place on site** — the chart normally sits on the model centre. Press *Place on site* in
 Sun Path Display and click the spot you want it over: a courtyard, a roof, a street corner.
-*Centre* puts it back. This is a drawing offset and nothing more — the sun positions, the
-shadows and the analysis all come from the site's latitude and longitude and do not move
-with it.
+*Centre* puts it back. The view follows it: the camera pans with the chart, and the view
+cube and reframing all come back to where the chart now is rather than to the site origin.
+This is a drawing offset and nothing more — the sun positions, the shadows and the analysis
+all come from the site's latitude and longitude and do not move with it.
+
+Chart labels — altitudes, bearings, hours — are sized in **screen pixels**, so they stay
+readable as you zoom out instead of shrinking into dots.
 
 ![Stereographic chart in top view](docs/screenshot-stereographic.png)
 
@@ -233,8 +237,15 @@ going into a printed handout.
 the sun; the view cube jumps to plan or elevation views.
 
 **Sun & Site** — pick a preset city or type coordinates, set the time zone, elevation and
-project-north rotation, import an EPW, then scrub the date and time. The quick buttons
+project-north rotation (*Reset* beside it returns to true north), import an EPW, then scrub
+the date and time. The quick buttons
 jump to the June solstice, an equinox and the December solstice.
+
+**Imported models** — after an OBJ is in, *Model units*, *OBJ up axis*, *Drop to ground*,
+*Centre on site origin* and a *Model scale* slider (0.1×–5×, with a Reset) all re-place the
+model that is already loaded, rather than being read once at import. Swapping the model
+also rebuilds the shadow map, so the previous massing's shadows do not linger on the
+ground.
 
 **Model & Analysis** — choose a sample massing or import an OBJ, set the analysis grid,
 sky density and ground reflectance, then **Run analysis**.
@@ -319,7 +330,7 @@ It is clearly labelled as synthetic; it is not real climate.
 
 ## Validation
 
-`npm test` runs 167 headless checks. Every number below is produced by that suite, not
+`npm test` runs 180 headless checks. Every number below is produced by that suite, not
 asserted by hand.
 
 | Check | Result |
@@ -413,7 +424,7 @@ rebuilds live on every change, with no "apply" step.
 ```bash
 npm install          # playwright, for the test suite only
 npm run vendor       # fetch three.js and the validation EPW
-npm test             # 167 headless checks, screenshots and sample export sheets
+npm test             # 180 headless checks, screenshots and sample export sheets
 npm run serve        # serve the folder at http://localhost:8080
 ```
 

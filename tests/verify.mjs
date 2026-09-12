@@ -1328,6 +1328,203 @@ const adaptive = await page.evaluate(async () => {
 check('loading a map restyles the chart for what is now behind it',
       adaptive.bare === false && adaptive.onMap === true && adaptive.rebuilt);
 
+/* ------------------------------------------------ north, views, labels, OBJ --- */
+console.log('\n=== controls that were missing ===');
+
+// North rotation needs a way back to true north
+const north = await page.evaluate(() => {
+  const A = window.__SUNAPP;
+  const sl = document.getElementById('i-north');
+  sl.value = '35';
+  sl.dispatchEvent(new Event('input', { bubbles: true }));
+  const turned = { rot: A.State.northRot, model: +A.modelGroup.rotation.y.toFixed(4) };
+  document.getElementById('b-north-reset').click();
+  return { turned, rot: A.State.northRot, model: +A.modelGroup.rotation.y.toFixed(4),
+           readout: document.getElementById('v-north').textContent };
+});
+check('project north can be reset to true north in one click',
+      north.turned.rot === 35 && north.turned.model !== 0 &&
+      north.rot === 0 && north.model === 0 && north.readout === '0°',
+      '35° → ' + north.readout);
+
+// Once the chart has been placed, the views have to come back to it
+const follow = await page.evaluate(async () => {
+  const A = window.__SUNAPP;
+  A.setProjection('stereo');
+  A.setChartAt(60, -45);
+  const panned = A.cameraProbe();
+  const views = {};
+  for (const v of ['axo', 'top', 'N']){
+    document.querySelector('#view-cube button[data-view="' + v + '"]').click();
+    await new Promise(r => setTimeout(r, 260));
+    const c = A.cameraProbe();
+    views[v] = [c.target[0], c.target[2]];
+  }
+  A.frameModel();
+  const framed = A.cameraProbe();
+  A.setChartAt(0, 0);
+  const home = A.cameraProbe();
+  return { panned, views, framed, home };
+});
+check('moving the chart pans the view with it, so it stays on screen',
+      Math.abs(follow.panned.target[0] - 60) < 0.01 &&
+      Math.abs(follow.panned.target[2] + 45) < 0.01,
+      'pivot at ' + follow.panned.target[0] + ', ' + follow.panned.target[2]);
+check('every view comes back to the chart, not to the site origin',
+      Object.values(follow.views).every(([x, z]) => Math.abs(x - 60) < 0.01 && Math.abs(z + 45) < 0.01),
+      Object.entries(follow.views).map(([k, v]) => k + ' ' + v.join('/')).join(', '));
+check('reframing frames the chart where it now sits',
+      Math.abs(follow.framed.target[0] - 60) < 0.01 && Math.abs(follow.framed.target[2] + 45) < 0.01);
+check('centring the chart brings the view back with it',
+      Math.abs(follow.home.target[0]) < 0.01 && Math.abs(follow.home.target[2]) < 0.01);
+
+// Labels are read as numbers, so they must not shrink to dots when you zoom out
+const labels = await page.evaluate(async () => {
+  const A = window.__SUNAPP;
+  A.setProjection('stereo');
+  const sample = () => {
+    A.refresh(true);
+    const px = A.labelProbe();
+    const spr = [];
+    A.sunPathGroup.traverse(o => { if (o.isSprite && o.userData.labelPx) spr.push(+o.scale.y.toFixed(3)); });
+    return { px, world: spr[0], dist: A.cameraProbe().dist };
+  };
+  A.orbitTo(0, 80);
+  const near = sample();
+  // Pull the camera back a long way
+  A.zoomBy ? A.zoomBy(4) : null;
+  const cam = A.cameraProbe();
+  A.setChartAt(0, 0);
+  return { near };
+});
+check('chart labels are sized in screen pixels, not in metres',
+      labels.near.px.length > 20 &&
+      Math.min(...labels.near.px) >= 8 && Math.max(...labels.near.px) <= 20,
+      labels.near.px.length + ' labels between ' +
+      Math.min(...labels.near.px) + ' and ' + Math.max(...labels.near.px) + ' px');
+
+const zoomed = await page.evaluate(async () => {
+  const A = window.__SUNAPP;
+  const read = () => {
+    A.refresh(true);
+    const px = A.labelProbe();
+    let world = 0;
+    A.sunPathGroup.traverse(o => { if (!world && o.isSprite && o.userData.labelPx) world = o.scale.y; });
+    return { med: px.sort((a, b) => a - b)[px.length >> 1], world: +world.toFixed(3),
+             dist: A.cameraProbe().dist };
+  };
+  A.orbitTo(0, 80);
+  const a = read();
+  A.dollyTo ? A.dollyTo(3) : null;
+  return { a };
+});
+check('their world size is recomputed per frame, which is what holds them steady',
+      zoomed.a.world > 0 && zoomed.a.med >= 8 && zoomed.a.med <= 20,
+      'median ' + zoomed.a.med + ' px at ' + zoomed.a.dist.toFixed(0) + ' m, world height ' +
+      zoomed.a.world + ' m');
+
+// The default colour ramp is named for what it is
+{
+  const src = await readFile(join(ROOT, 'index.html'), 'utf8');
+  const ui = await page.evaluate(() => {
+    const o = [...document.querySelectorAll('#i-scheme option')];
+    return { values: o.map(x => x.value), labels: o.map(x => x.textContent.trim()) };
+  });
+  check('the default colour scheme is named for the ramp, not for another tool',
+        ui.values[0] === 'spectral' && /Spectral/.test(ui.labels[0]) &&
+        !/ladybug:/i.test(src) && !ui.labels.some(l => /ladybug/i.test(l)),
+        ui.labels[0]);
+}
+
+// Importing a model must not leave the previous one's shadows on the ground
+const boxObj = (w, h) => ['v 0 0 0','v ' + w + ' 0 0','v ' + w + ' 0 ' + w,'v 0 0 ' + w,
+                          'v 0 ' + h + ' 0','v ' + w + ' ' + h + ' 0',
+                          'v ' + w + ' ' + h + ' ' + w,'v 0 ' + h + ' ' + w,
+                          'f 1 4 3 2','f 5 6 7 8','f 1 2 6 5','f 2 3 7 6','f 3 4 8 7','f 4 1 5 8',
+                          ''].join('\n');
+// A half-metre cube: its own shadow is a few pixels, so anything else dark on
+// the ground after the import is the previous model's shadow, left in the map.
+const cubeObj = boxObj(0.5, 0.5);
+const swap = await page.evaluate(async (t) => {
+  const A = window.__SUNAPP;
+  A.State.basemap.source = 'none'; A.Basemap.clear(); A.OsmBuildings.clear();
+  A.setProjection('3d');
+  A.setChartAt(0, 0);
+  A.loadSample('demo');
+  A.setDoy(172); A.setMinutes(600);
+  A.refresh(true);
+  const cnv = document.querySelector('#viewport canvas');
+  const scratch = document.createElement('canvas');
+  const g = scratch.getContext('2d');
+  const grab = async () => {
+    await new Promise(r => requestAnimationFrame(r));
+    await new Promise(r => requestAnimationFrame(r));
+    const w = 220, h = 160;
+    scratch.width = w; scratch.height = h;
+    g.drawImage(cnv, 0, 0, w, h);
+    const d = g.getImageData(0, 0, w, h).data;
+    const lum = [];
+    for (let i = 0; i < d.length; i += 4) lum.push(d[i] * 0.299 + d[i+1] * 0.587 + d[i+2] * 0.114);
+    return lum;
+  };
+  // How much shadow is drawn = how much the frame changes when the shadow
+  // catcher is hidden. Switching the sun off instead would change the whole
+  // scene's lighting, and counting dark pixels picks up fog and the dome.
+  const shadowLoad = async () => {
+    const on = await grab();
+    A.setShadowCatcher(false);
+    const off = await grab();
+    A.setShadowCatcher(true);
+    await grab();
+    let diff = 0;
+    for (let i = 0; i < on.length; i++) diff += Math.abs(on[i] - off[i]);
+    return diff / on.length;
+  };
+  const withDemo = await shadowLoad();
+  A.importOBJ(t, 'cube.obj');
+  const flagged = A.shadowProbe().needsUpdate;     // read before the next render clears it
+  await new Promise(r => setTimeout(r, 250));
+  const withCube = await shadowLoad();
+  return { withDemo, withCube, flagged, tris: A.State.model.count };
+}, cubeObj);
+check('importing a model clears the previous one, shadows included',
+      swap.tris === 12 && swap.withDemo > 1 && swap.withCube < swap.withDemo * 0.15,
+      'shadow drawn ' + swap.withDemo.toFixed(2) + ' → ' + swap.withCube.toFixed(2) +
+      ' mean luminance after swapping a 60 m massing for a 0.5 m cube');
+check('a model swap flags the shadow map for a rebuild, which is what fixes it',
+      swap.flagged, 'shadow.needsUpdate = ' + swap.flagged + ' straight after the import');
+
+const resize = await page.evaluate((t) => {
+  const A = window.__SUNAPP;
+  A.importOBJ(t, 'block.obj');
+  const height = () => +(A.State.model.bbox.max.y - A.State.model.bbox.min.y).toFixed(2);
+  const rowShown = document.getElementById('row-objscale').style.display !== 'none';
+  const asImported = height();
+  const sl = document.getElementById('i-objscale');
+  sl.value = '2.5'; sl.dispatchEvent(new Event('input', { bubbles: true }));
+  const scaled = height();
+  document.getElementById('b-objscale-reset').click();
+  const reset = height();
+  // Units are read again too, rather than only at import
+  const units = document.getElementById('i-units');
+  units.value = '0.3048'; units.dispatchEvent(new Event('change', { bubbles: true }));
+  const feet = height();
+  units.value = '1'; units.dispatchEvent(new Event('change', { bubbles: true }));
+  const back = height();
+  A.loadSample('demo');
+  return { rowShown, asImported, scaled, reset, feet, back,
+           rowHidden: document.getElementById('row-objscale').style.display === 'none' };
+}, boxObj(8, 9));
+check('an imported model can be resized after the fact',
+      resize.rowShown && resize.asImported === 9 &&
+      Math.abs(resize.scaled - 22.5) < 0.01 && resize.reset === 9,
+      '9 m → ' + resize.scaled + ' m at 2.5×, back to ' + resize.reset + ' m');
+check('changing the units re-places the model instead of doing nothing',
+      Math.abs(resize.feet - 9 * 0.3048) < 0.01 && resize.back === 9,
+      '9 m as feet → ' + resize.feet.toFixed(2) + ' m');
+check('the scale control is offered only while an imported model is loaded',
+      resize.rowHidden);
+
 /* ------------------------------------------------------- placing the chart --- */
 // The chart can be dropped over a particular courtyard or roof. It is a drawing
 // offset: the sun, the shadows and the numbers must not move with it.

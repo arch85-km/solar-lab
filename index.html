@@ -377,6 +377,7 @@ input[type=range]:focus::-webkit-slider-thumb{box-shadow:0 0 0 3px var(--accent-
 .btn.ghost:hover{background:var(--panel-2)}
 .btn svg{width:14px;height:14px;flex:0 0 auto}
 .btn.sm{height:25px;padding:0 8px;font-size:11px}
+.btn.xs{height:20px;padding:0 7px;font-size:10px;margin-left:6px;vertical-align:middle}
 
 /* --- segmented control --- */
 .seg{display:flex;background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:2px;gap:2px}
@@ -822,7 +823,8 @@ body.embed{--topbar-h:44px}
               <div class="row col"><label for="i-elev">Elevation m</label><input type="number" id="i-elev" step="1" value="25"></div>
             </div>
             <div class="row col">
-              <label for="i-north">Project north rotation &mdash; <span id="v-north" class="num">0&deg;</span></label>
+              <label for="i-north">Project north rotation &mdash; <span id="v-north" class="num">0&deg;</span>
+                <button class="btn xs ghost" id="b-north-reset" title="Back to true north">Reset</button></label>
               <input type="range" id="i-north" min="-180" max="180" step="1" value="0">
             </div>
             <label class="sw"><input type="checkbox" id="i-dst"><span class="track"></span><span class="t">Daylight saving (+1h)</span></label>
@@ -1065,6 +1067,11 @@ body.embed{--topbar-h:44px}
                 <select id="i-objup"><option value="y">Y up</option><option value="z">Z up</option></select>
               </div>
             </div>
+            <div class="row col" id="row-objscale" style="display:none">
+              <label for="i-objscale">Model scale &mdash; <span id="v-objscale" class="num">1.00&times;</span>
+                <button class="btn xs ghost" id="b-objscale-reset" title="Back to 1:1">Reset</button></label>
+              <input type="range" id="i-objscale" min="0.1" max="5" step="0.05" value="1">
+            </div>
             <label class="sw"><input type="checkbox" id="i-drop" checked><span class="track"></span><span class="t">Drop model to ground</span></label>
             <label class="sw"><input type="checkbox" id="i-center" checked><span class="track"></span><span class="t">Centre on site origin</span></label>
             <dl class="kv" id="model-kv"></dl>
@@ -1163,7 +1170,7 @@ body.embed{--topbar-h:44px}
                 <div class="row col">
                   <label for="i-scheme">Colour scheme</label>
                   <select id="i-scheme">
-                    <option value="ladybug">Ladybug spectrum</option>
+                    <option value="spectral">Spectral (blue&ndash;red)</option>
                     <option value="viridis">Viridis</option>
                     <option value="turbo">Turbo</option>
                     <option value="heat">Heat</option>
@@ -2249,7 +2256,7 @@ const domeGroup    = new THREE.Group();   // sky matrix patches
 scene.add(modelGroup, sunPathGroup, compassGroup, resultGroup, domeGroup);
 
 /** Canvas-based text sprite for compass bearings and hour labels. */
-function makeLabel(text, { size = 46, color = '#cfd9e4', weight = 600, scale = 1, halo = null } = {}){
+function makeLabel(text, { size = 46, color = '#cfd9e4', weight = 600, scale = 1, halo = null, px = 0 } = {}){
   // `halo` strokes the glyphs in the opposite tone before filling them, so a
   // label stays readable over aerial imagery instead of relying on the
   // background behind it. Same trick a map uses for place names.
@@ -2283,6 +2290,12 @@ function makeLabel(text, { size = 46, color = '#cfd9e4', weight = 600, scale = 1
   const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false }));
   spr.scale.set(w / size * scale, h / size * scale, 1);
   spr.renderOrder = 900;
+  // Sized in world metres a label shrinks to a dot as you zoom out, which is no
+  // use on a chart you read numbers off. `px` asks for a height in screen
+  // pixels instead, held by updateLabelSizes() on every frame that renders.
+  spr.userData.labelPx = px;
+  spr.userData.aspect = w / h;
+  spr.userData.worldH = h / size * scale;
   return spr;
 }
 
@@ -2360,7 +2373,7 @@ const Mercator = (() => {
  * running build can be identified at a glance — a stale download that looks
  * almost right is otherwise very hard to tell apart from the current one.
  */
-const BUILD = '2.1';
+const BUILD = '2.2';
 
 /**
  * Aerial imagery through a tile proxy on your own server.
@@ -2923,6 +2936,15 @@ function applyChartOffset(){
 
 /** Move the diagram, update the readout, and keep the sun marker with it. */
 function setChartAt(x, z){
+  // Pan the camera by the same vector, so the chart does not walk off screen
+  // and the orbit pivot stays on it.
+  const prev = State.disp.chartAt;
+  const dx = x - prev.x, dz = z - prev.z;
+  if (dx || dz){
+    controls.target.x += dx; controls.target.z += dz;
+    camera.position.x += dx; camera.position.z += dz;
+    controls.update();
+  }
   State.disp.chartAt = { x, z };
   applyChartOffset();
   const note = $('chart-at-note');
@@ -3059,10 +3081,10 @@ function chartLabelInk(){
 }
 
 /** A label placed on the chart, haloed so it survives a busy basemap. */
-function addChartLabel(group, text, pos, { size = 34, color, weight = 600, scale }){
+function addChartLabel(group, text, pos, { size = 34, color, weight = 600, scale, px = 11 }){
   const li = isStereo() ? chartLabelInk() : null;
   const lab = makeLabel(text, {
-    size, weight, scale,
+    size, weight, scale, px,
     color: color || (li ? li.color : '#cfd9e4'),
     halo: li ? li.halo : null,
   });
@@ -3110,7 +3132,7 @@ function buildSunPath(){
           .multiplyScalar(flat ? 1.06 : 1.045);
         if (flat) at.y = STEREO_Y;
         addChartLabel(sunPathGroup, m === 6 ? '21 Jun' : '21 Dec', at,
-                      { size: 38, color: '#' + col.getHexString(), weight: 700,
+                      { size: 38, color: '#' + col.getHexString(), weight: 700, px: 13,
                         scale: R * (flat ? 0.031 : 0.027) });
       }
     }
@@ -3150,7 +3172,7 @@ function buildSunPath(){
           if (flat) at.y = STEREO_Y;
           if (flat && !roomForLabel(at)) continue;
           addChartLabel(sunPathGroup, String(h).padStart(2, '0') + (flat ? 'h' : ''), at,
-                        { size: 34, color: flat ? null : THEME.hourLabel,
+                        { size: 34, color: flat ? null : THEME.hourLabel, px: 11,
                           weight: flat ? 700 : 600, scale: R * (flat ? 0.026 : 0.021) });
         }
       }
@@ -3181,7 +3203,7 @@ function buildSunPath(){
       const at = domePoint(alt, flat ? 0 : 90, R);
       if (flat) at.x += R * 0.038; else at.multiplyScalar(1.02);
       addChartLabel(sunPathGroup, alt + '°', at,
-                    { size: 30, color: flat ? null : THEME.ringLabel,
+                    { size: 30, color: flat ? null : THEME.ringLabel, px: 11,
                       weight: flat ? 700 : 600, scale: R * (flat ? 0.024 : 0.019) });
     }
   }
@@ -3218,7 +3240,7 @@ function buildCompass(R){
       const at = domePoint(0, a, R * 1.075);
       at.y = STEREO_Y;
       addChartLabel(compassGroup, String(a).padStart(3, '0') + '°', at,
-                    { size: 28, weight: 700, scale: R * 0.022 });
+                    { size: 28, weight: 700, px: 10, scale: R * 0.022 });
     }
   }
 
@@ -3232,7 +3254,7 @@ function buildCompass(R){
   for (const [t, a, c] of cardinals){
     const at = domePoint(0, a, R * (flat ? 1.13 : 1.075));
     at.y = flat ? STEREO_Y : R * 0.028;
-    addChartLabel(compassGroup, t, at, { size: 52, color: c, weight: 700,
+    addChartLabel(compassGroup, t, at, { size: 52, color: c, weight: 700, px: 16,
                                         scale: R * (flat ? 0.046 : 0.038) });
   }
 }
@@ -3473,6 +3495,10 @@ function refreshModelMetrics(){
                        'consider decimating the mesh or increasing the grid size.';
   } else warn.style.display = 'none';
   State.bvhDirty = true;
+  // The shadow map is not rebuilt every frame, so swapping the model has to say
+  // so — otherwise the previous model's shadows stay printed on the ground.
+  sunLight.shadow.needsUpdate = true;
+  requestRender();
 }
 
 /** Replace the model with one of the built-in samples. */
@@ -3480,7 +3506,10 @@ function loadSample(key){
   disposeGroup(modelGroup);
   modelGroup.add(SAMPLES[key] ? SAMPLES[key]() : SAMPLES.demo());
   State.objName = null;
+  objRoot = null;
   document.getElementById('obj-chip').innerHTML = '';
+  const row = document.getElementById('row-objscale');
+  if (row) row.style.display = 'none';
   clearResults();
   refreshModelMetrics();
   buildSunPath();
@@ -3494,13 +3523,14 @@ function loadSample(key){
  */
 function contentPoints(){
   const R = sunPathRadius * 1.09;
+  const at = State.disp.chartAt;
   const pts = [];
   for (let a = 0; a < 360; a += 22.5){
     const v = SolarCore.vector(0, a);
-    pts.push(new THREE.Vector3(v.x * R, 0, v.z * R));
+    pts.push(new THREE.Vector3(at.x + v.x * R, 0, at.z + v.z * R));
   }
   // The flattened chart has no zenith to frame
-  if (!isStereo()) pts.push(new THREE.Vector3(0, R, 0));
+  if (!isStereo()) pts.push(new THREE.Vector3(at.x, R, at.z));
   if (State.model.count){
     const b = State.model.bbox;
     for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z])
@@ -3520,7 +3550,11 @@ function contentPoints(){
 function frameModel(){
   const R = sunPathRadius * 1.09;                        // dome plus label overshoot
   const top = Math.max(sunPathRadius, State.modelHeight);
-  controls.target.set(0, top * 0.40, 0);
+  // Frame what the diagram is actually over: once the chart has been placed on
+  // a courtyard, "reset the view" has to come back to the courtyard, not to the
+  // site origin the chart no longer sits on.
+  const at = State.disp.chartAt;
+  controls.target.set(at.x, top * 0.40, at.z);
 
   const dir = camera.position.clone().sub(controls.target).normalize();
   if (!isFinite(dir.x) || dir.lengthSq() < 1e-6) dir.set(0.62, 0.5, 0.6).normalize();
@@ -3582,9 +3616,37 @@ function importOBJ(text, name){
     g.add(mesh);
   }
 
-  const scale = parseFloat(document.getElementById('i-units').value) || 1;
+  disposeGroup(modelGroup);
+  modelGroup.add(g);
+  objRoot = g;
+  State.objName = name;
+  document.getElementById('obj-chip').innerHTML =
+    '<div class="chip"><span class="cname" title="' + name.replace(/"/g,'&quot;') + '">' + name +
+    '</span><button class="cx" id="obj-x" title="Remove">&times;</button></div>';
+  document.getElementById('obj-x').onclick = () => loadSample(document.getElementById('i-sample').value);
+  document.getElementById('row-objscale').style.display = '';
+  const size = placeObj();
+  frameModel();
+  toast('Imported ' + name + ' — ' + fmtNum(State.model.count) + ' triangles, ' +
+        fmtNum(size.x, 1) + ' × ' + fmtNum(size.z, 1) + ' × ' + fmtNum(size.y, 1) + ' m', 'ok');
+}
+
+/**
+ * The imported geometry, kept so units, up axis, scale and placement can be
+ * changed after the fact. Re-parsing the file for every tweak would be wasteful
+ * and — worse — those controls used to do nothing at all once a model was in.
+ */
+let objRoot = null;
+
+/** Apply units × scale, up axis, drop and centring; returns the placed size. */
+function placeObj(){
+  const g = objRoot;
+  if (!g) return new THREE.Vector3();
+  const unit = parseFloat(document.getElementById('i-units').value) || 1;
+  g.rotation.set(0, 0, 0);
+  g.position.set(0, 0, 0);
   if (document.getElementById('i-objup').value === 'z') g.rotation.x = -Math.PI / 2;
-  g.scale.setScalar(scale);
+  g.scale.setScalar(unit * State.objScale);
   g.updateMatrixWorld(true);
 
   const bb = new THREE.Box3().setFromObject(g);
@@ -3593,21 +3655,12 @@ function importOBJ(text, name){
   if (document.getElementById('i-center').checked){ off.x = -ctr.x; off.z = -ctr.z; }
   if (document.getElementById('i-drop').checked)  off.y = -bb.min.y;
   g.position.add(off);
+  g.updateMatrixWorld(true);
 
-  disposeGroup(modelGroup);
-  modelGroup.add(g);
-  State.objName = name;
-  const size = bb.getSize(new THREE.Vector3());
-  document.getElementById('obj-chip').innerHTML =
-    '<div class="chip"><span class="cname" title="' + name.replace(/"/g,'&quot;') + '">' + name +
-    '</span><button class="cx" id="obj-x" title="Remove">&times;</button></div>';
-  document.getElementById('obj-x').onclick = () => loadSample(document.getElementById('i-sample').value);
   clearResults();
   refreshModelMetrics();
   buildSunPath();
-  frameModel();
-  toast('Imported ' + name + ' — ' + fmtNum(State.model.count) + ' triangles, ' +
-        fmtNum(size.x, 1) + ' × ' + fmtNum(size.z, 1) + ' × ' + fmtNum(size.y, 1) + ' m', 'ok');
+  return bb.getSize(new THREE.Vector3());
 }
 
 /* ============================================================================
@@ -3623,10 +3676,11 @@ const State = {
   disp: { arcs:true, analemma:true, today:true, compass:true, rings:true,
           shadow:true, grid:true, dome:false, radius:1, chart:1, chartAt:{ x:0, z:0 },
           projection:'3d', autoStereo:true },
+  objScale: 1,              // extra scaling on an imported OBJ, on top of its units
   analysis: { mode:'inst', period:'year', unit:'kwh', gridSize:1.5, offset:0.02,
               density:1, groundRefl:0.2, useGround:true, shade:true,
               hourFrom:0, hourTo:24, from:null, to:null, osmShade:true },
-  legend: { scheme:'ladybug', mode:'auto', min:0, max:1000 },
+  legend: { scheme:'spectral', mode:'auto', min:0, max:1000 },
   basemap: { source:'none', extent:400, opacity:1, imageWidth:200,
              style:'satellite' },
   model: { tris:new Float32Array(0), count:0, area:0, bbox:new THREE.Box3() },
@@ -3642,9 +3696,10 @@ const State = {
  *  Colour schemes
  * ========================================================================== */
 const SCHEMES = {
-  // Ladybug Tools "Original" spectrum — the palette architecture students
-  // will already recognise from Grasshopper.
-  ladybug: [[75,107,169],[115,147,202],[170,200,247],[193,213,208],[245,239,103],
+  // The classic blue-to-red radiation spectrum. Named for what it is rather
+  // than for any one tool, though it is the ramp students will recognise from
+  // Ladybug Tools in Grasshopper, and it is the default here for that reason.
+  spectral: [[75,107,169],[115,147,202],[170,200,247],[193,213,208],[245,239,103],
             [252,230,74],[239,156,21],[234,123,0],[234,74,0],[234,38,0]],
   viridis: [[68,1,84],[72,40,120],[62,74,137],[49,104,142],[38,130,142],
             [31,158,137],[53,183,121],[109,205,89],[180,222,44],[253,231,37]],
@@ -3658,14 +3713,14 @@ const SCHEMES = {
 
 /** Sample a scheme at t in [0,1] -> {r,g,b} in 0..1. */
 function sampleScheme(name, t){
-  const s = SCHEMES[name] || SCHEMES.ladybug;
+  const s = SCHEMES[name] || SCHEMES.spectral;
   const x = clamp(t, 0, 1) * (s.length - 1);
   const i = Math.min(Math.floor(x), s.length - 2), f = x - i;
   const a = s[i], b = s[i + 1];
   return { r: lerp(a[0], b[0], f) / 255, g: lerp(a[1], b[1], f) / 255, b: lerp(a[2], b[2], f) / 255 };
 }
 function schemeCss(name){
-  const s = SCHEMES[name] || SCHEMES.ladybug;
+  const s = SCHEMES[name] || SCHEMES.spectral;
   return 'linear-gradient(90deg,' + s.map((c, i) =>
     'rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ') ' + (i / (s.length - 1) * 100).toFixed(1) + '%').join(',') + ')';
 }
@@ -4687,6 +4742,11 @@ on('i-city', 'change', (e) => {
   if (State.basemap.source !== 'none' && State.basemap.source !== 'image') loadBasemapTiles();
 });
 
+on('b-north-reset', 'click', () => {
+  $('i-north').value = 0;
+  $('i-north').dispatchEvent(new Event('input', { bubbles: true }));
+});
+
 on('i-north', 'input', (e) => {
   State.northRot = +e.target.value;
   $('v-north').textContent = State.northRot + '°';
@@ -5312,6 +5372,20 @@ on('d-chart', 'input', (e) => {
 
 /* --- model --------------------------------------------------------------- */
 on('i-sample', 'change', (e) => loadSample(e.target.value));
+
+// Units, up axis, scale and placement re-place the model that is already in,
+// rather than being read once at import and then ignored.
+on('i-objscale', 'input', (e) => {
+  State.objScale = +e.target.value;
+  $('v-objscale').textContent = State.objScale.toFixed(2) + '×';
+  placeObj();
+});
+on('b-objscale-reset', 'click', () => {
+  $('i-objscale').value = 1;
+  $('i-objscale').dispatchEvent(new Event('input', { bubbles: true }));
+});
+['i-units', 'i-objup'].forEach(id => on(id, 'change', () => { if (objRoot) placeObj(); }));
+['i-drop', 'i-center'].forEach(id => on(id, 'change', () => { if (objRoot) placeObj(); }));
 on('b-obj', 'click', () => $('f-obj').click());
 on('f-obj', 'change', (e) => {
   const f = e.target.files && e.target.files[0];
@@ -5821,7 +5895,32 @@ function onResize(){
 addEventListener('resize', onResize);
 if (window.ResizeObserver) new ResizeObserver(onResize).observe(viewportEl);
 
-function render(){ renderer.render(scene, camera); }
+/**
+ * Hold every chart label at a constant height in screen pixels.
+ *
+ * Sprite scale is in world metres, so a label that reads well at the default
+ * framing becomes an unreadable dot two zoom steps out — which is exactly what
+ * happens to the altitude and bearing numbers on the flattened chart. For a
+ * perspective camera the world height that covers `px` pixels is
+ * px · 2·tan(fov/2)·distance / viewportHeight, recomputed per frame per label.
+ * Sixty-odd sprites, only on frames that actually render.
+ */
+const _lblPos = new THREE.Vector3();
+function updateLabelSizes(){
+  const h = renderer.domElement.clientHeight || 1;
+  const k = 2 * Math.tan(camera.fov * D2R / 2) / h;
+  const lo = sunPathRadius * 0.012, hi = sunPathRadius * 0.10;
+  const fit = (o) => {
+    if (!o.isSprite || !o.userData.labelPx) return;
+    o.getWorldPosition(_lblPos);
+    const worldH = clamp(o.userData.labelPx * k * camera.position.distanceTo(_lblPos), lo, hi);
+    o.scale.set(worldH * o.userData.aspect, worldH, 1);
+  };
+  sunPathGroup.traverse(fit);
+  compassGroup.traverse(fit);
+}
+
+function render(){ updateLabelSizes(); renderer.render(scene, camera); }
 
 /**
  * Keep drawing for a short window after anything changes, rather than running a
@@ -5919,7 +6018,26 @@ function init(){
     sourceAttribution, PROXY_URL, PROXY_ATTRIBUTION,
     loadPlaces, savePlace, removePlace, renderPlaces, PLACES_KEY,
     requestRender, BUILD, setChartAt, armChartPlacement,
-    OsmBuildings, occluderTriangles, contextGroup,
+    OsmBuildings, occluderTriangles, contextGroup, importOBJ, placeObj,
+    modelGroup, sunPathGroup, compassGroup, frameModel,
+    /** Where the camera is pointing, for the "views follow the chart" checks. */
+    cameraProbe: () => ({
+      target: controls.target.toArray().map(v => +v.toFixed(3)),
+      dist: +camera.position.distanceTo(controls.target).toFixed(3),
+    }),
+    /** On-screen height, in CSS pixels, of every chart label. */
+    labelProbe: () => {
+      const h = renderer.domElement.clientHeight || 1;
+      const k = 2 * Math.tan(camera.fov * D2R / 2) / h;
+      const out = [];
+      const scan = (o) => {
+        if (!o.isSprite || !o.userData.labelPx) return;
+        const p = o.getWorldPosition(new THREE.Vector3());
+        out.push(+(o.scale.y / (k * camera.position.distanceTo(p))).toFixed(2));
+      };
+      sunPathGroup.traverse(scan); compassGroup.traverse(scan);
+      return out;
+    },
     chartAt: () => ({ ...State.disp.chartAt,
                       group: [sunPathGroup.position.x, sunPathGroup.position.z],
                       marker: [sunMarker.position.x, sunMarker.position.z] }),
@@ -5956,8 +6074,15 @@ function init(){
         value: State.disp.chart,
       };
     },
+    /**
+     * Show or hide the shadow catcher, so a test can measure exactly how much
+     * shadow is drawn by diffing two frames — without switching the sun off,
+     * which changes the whole scene's lighting rather than just its shadows.
+     */
+    setShadowCatcher: (v) => { shadowCatcher.visible = v; requestRender(); },
     /** Shadow frustum vs what actually receives shadows. */
     shadowProbe: () => ({
+      needsUpdate: sunLight.shadow.needsUpdate,
       ext: sunLight.shadow.camera.right,
       far: sunLight.shadow.camera.far,
       lightDist: sunLight.position.length(),
