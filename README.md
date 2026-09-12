@@ -24,7 +24,7 @@ Below: the first-load state (London, clear-sky model) and the phone layout.
 
 | | |
 |---|---|
-| **Site basemap** | Put the model on its real site: OpenStreetMap tiles (no key), **MapTiler aerial/satellite or any XYZ service with your own key**, or an image you upload scaled by its real-world width. Shadows fall across the map, and the required credit appears on screen and in exports. |
+| **Site basemap** | Put the model on its real site: OpenStreetMap tiles, any XYZ tile service you can reach, or an image you upload scaled by its real-world width. Shadows fall across the map, and the required credit appears on screen and in exports. The app holds no map key of its own — aerial imagery goes through a small proxy on your own server, so nothing secret is in the page. |
 | **Saved locations** | Search a place, correct its time zone once, then save it by name — coordinates, time zone and elevation together — and it stays in the city list. |
 | **2D stereographic sun path** | The classic printed sun-path chart — horizon on the outer circle, zenith at the centre — laid flat on the site. Engages automatically in top view, or switch it on in any view. |
 | **Dark and light presentation** | The whole interface and the 3D scene switch together, live — dark for the studio and the lecture theatre, light for print, handouts and projectors that wash out. The choice is remembered, and exports default to whichever is on screen. |
@@ -128,74 +128,59 @@ the time zone is the one thing searching cannot work out, so it is worth keeping
 
 ![Saved locations in the city list](docs/screenshot-dropdown.png)
 
-### Aerial imagery with your own key
+### Aerial imagery, with the key on your server
 
-The OpenStreetMap source needs no key, but it is a street map. For aerial or satellite
-imagery, pick **MapTiler aerial / satellite** and supply a key from
-[MapTiler Cloud](https://cloud.maptiler.com/) — or **Custom XYZ tiles** for Mapbox, Esri,
-a university WMS or anything else that serves `{z}/{x}/{y}` raster tiles, with whatever
-attribution that provider requires.
+The OpenStreetMap source needs no key and needs no setup, but it is a street map.
+**Custom XYZ tiles** takes any `{z}/{x}/{y}` raster service — Esri, a university WMS,
+anything you are licensed to use — with the attribution that provider requires typed in
+beside it.
 
-**Restrict the key to your domain before you publish.** A key on a public page is visible
-to anyone who views source — that is normal for map keys and they are read-only, so nobody
-can alter your maps — but the requests count against *your* quota. Set *Allowed HTTP
-origins* in MapTiler Cloud to your domain and a copied key is useless elsewhere.
-
-Two ways to supply it:
-
-- **Paste it into the app** — saved in that browser only, good for your own machine.
-- **Bake it into your deployed copy** — `node tools/make-deploy.mjs --key YOUR_KEY
-  --key-in-page` writes a single file with the key in it, and every visitor gets imagery
-  without typing anything. The copy in this repository is deliberately empty: a key
-  committed to git is in every clone permanently, and rotating it later would not remove
-  it — which is why the key goes in at build time and `deploy/` is gitignored.
-
-`?maptiler=YOUR_KEY` on the URL overrides both, which is handy for a one-off demo.
-
-#### Keeping the key out of the page entirely
-
-Either of the above leaves the key readable in the page source. That is normal and the key
-is read-only, but if you would rather it never reached the browser, build the proxy pair —
-two files in one folder, and no credential in the page at all:
+For MapTiler aerial imagery there is one route, and it deliberately does not involve the
+page holding a key: a key in a public HTML file is readable by anyone who views the
+source, and the requests count against *your* quota. So the key lives on your server
+instead, in a small PHP proxy:
 
 ```bash
 node tools/make-deploy.mjs --key YOUR_MAPTILER_KEY
 ```
 
-That writes `deploy/sun-studio-v<version>-proxy/` containing `index.html` (with **no key
-in it**) and `tile-proxy.php` (with the key). Upload both into the same folder, keeping
-those names. `PROXY_URL` is a relative path, so the pair works in any directory on any
-domain — renaming or moving them is fine as long as they stay together.
+That writes `deploy/sun-studio-v<version>-proxy/` containing `index.html` — with **no key
+in it** — and `tile-proxy.php`, which has the key. Upload both into the same folder,
+keeping those names. `PROXY_URL` inside the page is a relative path, so the pair works in
+any directory on any domain; moving or renaming the folder is fine as long as they stay
+together. The script refuses to write the page if the key has leaked into it, which is the
+one thing here worth automating.
 
-The script refuses to write the page if the key has leaked into it, which is the one thing
-worth automating here. `--key-in-page` builds the older single file instead, key included,
-for a server without PHP; `--out DIR` changes where it writes. `deploy/` is gitignored.
+A **Site imagery** source then appears in the app and becomes the default, and the key
+panel reads "Held on the server". **Do not** set *Allowed origins* on a key used this way:
+the proxy fetches tiles server-side and sends no browser origin, so the restriction would
+block it. The proxy answers only requests from pages on its own host, checks the tile
+coordinates, allows only known styles and rate-limits per visitor, so it cannot be turned
+into an open proxy.
 
-In the proxy build a **Site imagery** source appears and becomes the default, the key
-panel is replaced by "Held on the server", and there is nothing to restrict by domain —
-in fact **do not** set *Allowed origins* on a key used this way: the proxy fetches tiles
-server-side and sends no browser origin, so the restriction would block it. It only
-answers requests from pages on its own host, checks the tile coordinates, allows only
-known styles and rate-limits per visitor, so it cannot be turned into an open proxy.
-
-If tiles fail, the style name is the usual culprit — the *Style name* field is editable so
-you can match a style that exists in your account.
+Without `--key` the build is a single file with no key and no proxy — which is what to
+upload if you are happy with OpenStreetMap, your own aerial image, or another tile
+service. `--out DIR` changes where it writes; `deploy/` is gitignored either way, so a
+key-bearing file is never a candidate for a commit.
 
 ![Site basemap in axonometric](docs/screenshot-basemap.png)
 
 **2D stereographic chart** — click **TOP** and the sun path flattens into the traditional
-chart: concentric altitude circles, the horizon as the outer circle, the zenith at the
-centre, following radius = R·tan((90−altitude)/2). Leaving top view restores the dome; the
-*Flatten automatically in top view* switch in Sun Path Display turns that behaviour off,
-and the *Projection* control forces either mode in any view. The shadow-casting sun always
-uses the true 3D position, so shadows are identical in both modes.
+chart: altitude circles every 10° labelled up the centre, bearings around the rim, the
+horizon as the outer circle and the zenith at the centre, following
+radius = R·tan((90−altitude)/2). Leaving top view restores the dome; the *Flatten
+automatically in top view* switch in Sun Path Display turns that behaviour off, and the
+*Projection* control forces either mode in any view. The shadow-casting sun always uses
+the true 3D position, so shadows are identical in both modes.
 
-**Chart clarity** — the flattened chart is normally read over aerial imagery, which is
-busy enough to swallow it. The *Chart clarity* slider in Sun Path Display puts a backdrop
-disc under the chart and strengthens the arcs together, from barely-there to an almost
-solid plate; it appears only in the flattened view, since that is the only place it does
-anything. Building shadows still read through it, and the default setting is already
-legible over satellite imagery.
+Flattened, the chart is drawn the way a printed one is: every line has a real width in
+metres and carries a **casing** — a thin outline in the opposite tone — so it reads over
+aerial imagery without anything being laid behind it. The site stays visible between the
+lines, which is the whole point of putting the chart on the site. (WebGL ignores line
+width, so a chart drawn as plain lines is one pixel wide whatever you ask for; that is why
+this is a ribbon of geometry rather than a line.) The *Chart line weight* slider scales
+all of it from 0.5× to 2.5× for a projector, a handout or a dense aerial; it appears only
+in the flattened view, since that is the only place it does anything.
 
 ![Stereographic chart in top view](docs/screenshot-stereographic.png)
 
@@ -302,7 +287,7 @@ It is clearly labelled as synthetic; it is not real climate.
 
 ## Validation
 
-`npm test` runs 153 headless checks. Every number below is produced by that suite, not
+`npm test` runs 150 headless checks. Every number below is produced by that suite, not
 asserted by hand.
 
 | Check | Result |
@@ -396,7 +381,7 @@ rebuilds live on every change, with no "apply" step.
 ```bash
 npm install          # playwright, for the test suite only
 npm run vendor       # fetch three.js and the validation EPW
-npm test             # 153 headless checks, screenshots and sample export sheets
+npm test             # 150 headless checks, screenshots and sample export sheets
 npm run serve        # serve the folder at http://localhost:8080
 ```
 

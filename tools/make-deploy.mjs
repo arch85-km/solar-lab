@@ -2,21 +2,18 @@
 /**
  * Sun Studio — build the files to upload to a web server.
  *
- * The app is one HTML file, but a MapTiler key must not live inside it: the page
- * is public, so the key would be public too. This script therefore emits a pair —
- * a page with no key in it, and a small PHP proxy that holds the key server-side —
- * and refuses to write the page if the key has leaked into it.
+ * The app itself holds no map key — a key in a public page is readable by anyone
+ * who views the source, so there is nowhere in the HTML to put one. For aerial
+ * imagery this script emits a pair: the page, plus a small PHP proxy that keeps
+ * the key server-side. It refuses to write the page if the key has leaked into
+ * it.
  *
- *   node tools/make-deploy.mjs --key YOUR_MAPTILER_KEY
- *   node tools/make-deploy.mjs --key YOUR_MAPTILER_KEY --key-in-page
- *   node tools/make-deploy.mjs                      (no keyed imagery at all)
+ *   node tools/make-deploy.mjs                      just the page
+ *   node tools/make-deploy.mjs --key YOUR_KEY       page + keyed tile proxy
  *
  * Options
- *   --key KEY       your MapTiler Cloud key
- *   --key-in-page   single file, key inside the HTML. Only for servers without
- *                   PHP, and only with the key restricted to your domain in
- *                   MapTiler Cloud — the key stays readable by visitors.
- *   --out DIR       output directory (default: deploy/)
+ *   --key KEY   your MapTiler Cloud key — goes into the PHP file only
+ *   --out DIR   output directory (default: deploy/)
  *
  * Output lands in deploy/, which is gitignored, so a key-bearing file is never a
  * candidate for a commit.
@@ -46,10 +43,7 @@ if (flag('--help') || flag('-h')){
 }
 
 const key = (value('--key') || '').trim();
-const keyInPage = flag('--key-in-page');
 const outRoot = value('--out') || join(ROOT, 'deploy');
-
-if (keyInPage && !key) fail('--key-in-page needs --key.');
 
 /* ── read the source ───────────────────────────────────────────────────── */
 
@@ -63,13 +57,10 @@ if (!build) fail('Could not find the BUILD constant in index.html.');
 
 /* ── rewrite ───────────────────────────────────────────────────────────── */
 
-const variant = keyInPage ? 'key-in-page' : (key ? 'proxy' : 'plain');
+const variant = key ? 'proxy' : 'plain';
 let page = html;
 
-if (keyInPage){
-  page = replaceOnce(page, "const MAPTILER_KEY = '';",
-                           `const MAPTILER_KEY = '${key}';`, 'MAPTILER_KEY');
-} else if (key){
+if (key){
   // Takes the "e.g." comment with it, which would otherwise read as if the
   // line were still unconfigured.
   page = replaceOnce(page, /const PROXY_URL = '';[^\n]*/,
@@ -79,7 +70,7 @@ if (keyInPage){
 /* ── the check that matters ────────────────────────────────────────────── */
 
 // Everything above is convenience; this is the part that makes the build safe.
-if (key && !keyInPage && page.includes(key)){
+if (key && page.includes(key)){
   fail('The key appears in the generated page. Refusing to write it.');
 }
 
@@ -94,7 +85,7 @@ mkdirSync(dir, { recursive: true });
 writeFileSync(join(dir, 'index.html'), page);
 const written = ['index.html'];
 
-if (key && !keyInPage){
+if (key){
   writeFileSync(join(dir, 'tile-proxy.php'),
     replaceOnce(php, "$MAPTILER_KEY = 'PUT_YOUR_MAPTILER_KEY_HERE';",
                      `$MAPTILER_KEY = '${key}';`, '$MAPTILER_KEY'));
@@ -113,13 +104,10 @@ if (variant === 'proxy'){
   console.log('serves, so it is not readable from the page. Do not set an allowed-origins');
   console.log('restriction on this key: the proxy requests tiles server-side and sends no');
   console.log('browser origin, so the restriction would block it.');
-} else if (variant === 'key-in-page'){
-  console.log('WARNING: the key is readable in this file by anyone who views the source.');
-  console.log('Restrict it to your domain in MapTiler Cloud (Keys → Allowed origins)');
-  console.log('before uploading, or the quota can be spent by someone else.');
 } else {
-  console.log('No key given: OpenStreetMap tiles and uploaded site images only.');
-  console.log('Pass --key YOUR_KEY to include MapTiler aerial imagery.');
+  console.log('One file, no key anywhere: OpenStreetMap tiles, a custom tile service, or');
+  console.log('an uploaded site image. Pass --key YOUR_KEY to add aerial imagery through');
+  console.log('the tile proxy.');
 }
 
 /* ── helpers ───────────────────────────────────────────────────────────── */

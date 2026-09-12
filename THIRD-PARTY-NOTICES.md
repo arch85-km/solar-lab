@@ -145,23 +145,23 @@ Foundation and both are used under their published policies.
 No basemap is loaded by default, and the alternative **Site image** source uses a file you
 supply, involving no third party at all.
 
-## MapTiler and other keyed tile services
+## MapTiler and other tile services
 
-The basemap can also use **MapTiler** or any XYZ raster service, with a key the deployer
-supplies. This project ships **no key**: `MAPTILER_KEY` is empty in the repository, and a
-key entered in the app is stored only in that browser.
+The basemap can also use **MapTiler** aerial imagery or any XYZ raster service. The app
+itself holds **no key and no way to store one**: a key in a public page is readable by
+anyone who views the source, and its usage counts against the key owner's quota.
 
+- MapTiler imagery reaches the app only through `server/tile-proxy.php`. The key sits in
+  that PHP file, which a server executes rather than serves, so it never reaches the
+  browser. The proxy answers only requests from pages on its own host, validates the tile
+  coordinates, restricts the style to an allowlist and rate-limits per visitor, so it
+  cannot be used as an open proxy.
 - Tiles from MapTiler are used under **your** MapTiler Cloud account and its terms, and
   require the attribution **"© MapTiler © OpenStreetMap contributors"**, which the app
   displays on screen and in exported sheets.
-- For a custom service you type the attribution that provider requires, and it is shown
-  verbatim. Honouring that provider's terms is yours to do.
-- A client-side key is visible to anyone viewing the page and is read-only, but its usage
-  counts against the key owner's quota. Restrict it by HTTP origin.
-- `server/tile-proxy.php` is the alternative: the key sits in the PHP file, which is
-  executed rather than served, so it never reaches the browser. The proxy answers only
-  requests from pages on its own host, validates the tile coordinates, restricts the style
-  to an allowlist and rate-limits per visitor, so it cannot be used as an open proxy.
+- For a custom XYZ service you type the attribution that provider requires, and it is
+  shown verbatim. Honouring that provider's terms is yours to do. A template you type is
+  held in memory for the session only; it is never stored or written into the file.
 
 ---
 

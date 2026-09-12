@@ -863,45 +863,9 @@ body.embed{--topbar-h:44px}
               <select id="i-basemap">
                 <option value="none">None</option>
                 <option value="osm">OpenStreetMap</option>
-                <option value="maptiler">MapTiler aerial / satellite</option>
                 <option value="custom">Custom XYZ tiles</option>
                 <option value="image">Site image</option>
               </select>
-            </div>
-
-            <div id="bm-keyed" style="display:none">
-              <div class="row col" id="bm-key-set" style="display:none">
-                <label>MapTiler API key</label>
-                <div class="chip info">
-                  <span class="cname">Configured &mdash; not shown here</span>
-                  <button class="btn sm ghost" id="b-bm-key-replace">Replace</button>
-                </div>
-              </div>
-              <div class="row col" id="bm-key-entry" style="display:none">
-                <label for="i-bm-key">MapTiler API key</label>
-                <div class="row" style="margin:0">
-                  <input type="password" id="i-bm-key" class="grow" placeholder="Paste your key" autocomplete="off">
-                  <button class="btn sm" id="b-bm-key-clear" title="Forget the key stored in this browser">Clear</button>
-                </div>
-              </div>
-              <div class="grid2">
-                <div class="row col">
-                  <label for="i-bm-stylepreset">Style</label>
-                  <select id="i-bm-stylepreset">
-                    <option value="satellite">Satellite</option>
-                    <option value="hybrid">Satellite + labels</option>
-                    <option value="streets-v2">Streets</option>
-                    <option value="topo-v2">Topographic</option>
-                    <option value="basic-v2">Basic</option>
-                  </select>
-                </div>
-                <div class="row col">
-                  <label for="i-bm-style">Style name</label>
-                  <input type="text" id="i-bm-style" value="satellite" spellcheck="false">
-                </div>
-              </div>
-              <p class="hint warn">The key is never displayed here, so it stays off screenshots and projectors &mdash; but it is still readable in the page source, as any browser map key must be. It is read-only, so nobody can alter your maps; the requests do count against <b>your</b> quota. Restrict it to your domain under <b>Allowed HTTP origins</b> in MapTiler Cloud.</p>
-              <p class="hint">If tiles fail, the style name is the usual culprit &mdash; edit it above to match a style in your account.</p>
             </div>
 
             <div id="bm-proxy" style="display:none">
@@ -1033,9 +997,9 @@ body.embed{--topbar-h:44px}
               <input type="range" id="d-radius" min="0.5" max="2.2" step="0.05" value="1">
             </div>
             <div class="row col" id="row-chart">
-              <label for="d-chart">Chart clarity &mdash; <span id="v-chart" class="num">50%</span></label>
-              <input type="range" id="d-chart" min="0" max="1" step="0.05" value="0.5">
-              <p class="hint">Raise this to read the flattened chart over aerial imagery: it darkens the disc behind the chart and strengthens the arcs.</p>
+              <label for="d-chart">Chart line weight &mdash; <span id="v-chart" class="num">1.0&times;</span></label>
+              <input type="range" id="d-chart" min="0.5" max="2.5" step="0.1" value="1">
+              <p class="hint">How heavily the flattened chart is drawn. Every line carries a casing of its own, so it reads over aerial imagery with nothing laid behind it &mdash; the site stays visible between the lines.</p>
             </div>
           </div>
         </section>
@@ -2138,6 +2102,15 @@ const THEMES = {
     ring: 0x3d4b5a, ringLabel: '#5d6e80',
     compass: 0x5a6a7c, tickMajor: 0x8f9fb0, tickMinor: 0x4d5b6b,
     cardinalN: '#ff9a6b', cardinal: '#a9b8c7', hourLabel: '#8ea3b7',
+    // The flattened chart is read over aerial imagery, so its contrast cannot
+    // come from the background: every line carries a casing of its own. Dark
+    // presentation means light ink on a dark casing.
+    chart: {
+      grid: 0xaab8c8, hour: 0xb9c7d5, ring: 0x9fb0c2,
+      casing: 0x080c12, casingAlpha: 0.85,
+      label: '#eaf1f8', labelHalo: 'rgba(6,10,16,0.92)',
+      cardinal: '#ffd9c4', cardinalN: '#ffa678',
+    },
     sheetBg: '#0d1117', sheetPanel: '#151b23', sheetLine: '#2a3441',
     sheetText: '#e8eef5', sheetDim: '#9aa8b8', sheetFaint: '#6b7887', sheetAccent: '#ffb340',
   },
@@ -2154,6 +2127,12 @@ const THEMES = {
     ring: 0xb4bdc8, ringLabel: '#78838f',
     compass: 0x94a0ac, tickMajor: 0x5a6673, tickMinor: 0xafb8c2,
     cardinalN: '#c2410c', cardinal: '#5a6673', hourLabel: '#68737f',
+    chart: {
+      grid: 0x55606d, hour: 0x46515e, ring: 0x5d6875,
+      casing: 0xffffff, casingAlpha: 0.9,
+      label: '#16202b', labelHalo: 'rgba(255,255,255,0.94)',
+      cardinal: '#25303c', cardinalN: '#b03a08',
+    },
     sheetBg: '#ffffff', sheetPanel: '#f3f5f8', sheetLine: '#d4dae2',
     sheetText: '#111a24', sheetDim: '#4a5765', sheetFaint: '#7b8794', sheetAccent: '#b45309',
   },
@@ -2268,13 +2247,24 @@ const domeGroup    = new THREE.Group();   // sky matrix patches
 scene.add(modelGroup, sunPathGroup, compassGroup, resultGroup, domeGroup);
 
 /** Canvas-based text sprite for compass bearings and hour labels. */
-function makeLabel(text, { size = 46, color = '#cfd9e4', weight = 600, scale = 1 } = {}){
-  const pad = 8, cnv = document.createElement('canvas'), ctx = cnv.getContext('2d');
+function makeLabel(text, { size = 46, color = '#cfd9e4', weight = 600, scale = 1, halo = null } = {}){
+  // `halo` strokes the glyphs in the opposite tone before filling them, so a
+  // label stays readable over aerial imagery instead of relying on the
+  // background behind it. Same trick a map uses for place names.
+  const pad = Math.round(size * 0.28), cnv = document.createElement('canvas'), ctx = cnv.getContext('2d');
   ctx.font = weight + ' ' + size + 'px Inter, system-ui, sans-serif';
   const w = Math.ceil(ctx.measureText(text).width) + pad * 2, h = size + pad * 2;
   cnv.width = w; cnv.height = h;
   ctx.font = weight + ' ' + size + 'px Inter, system-ui, sans-serif';
-  ctx.fillStyle = color; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+  if (halo){
+    ctx.strokeStyle = halo;
+    ctx.lineWidth = Math.max(3, size * 0.20);
+    ctx.lineJoin = 'round';
+    ctx.miterLimit = 2;
+    ctx.strokeText(text, w / 2, h / 2);
+  }
+  ctx.fillStyle = color;
   ctx.fillText(text, w / 2, h / 2);
   const tex = new THREE.CanvasTexture(cnv);
   tex.minFilter = THREE.LinearFilter;
@@ -2359,41 +2349,28 @@ const Mercator = (() => {
  * running build can be identified at a glance — a stale download that looks
  * almost right is otherwise very hard to tell apart from the current one.
  */
-const BUILD = '1.9';
-
-const MAPTILER_KEY = '';
+const BUILD = '2.0';
 
 /**
- * Tile proxy on your own server, for keeping a key out of this file entirely.
+ * Aerial imagery through a tile proxy on your own server.
  *
- * Upload server/tile-proxy.php beside this page, put your key in *that* file,
- * and set the two constants below. The browser then asks your server for tiles
- * and the key never reaches it — unlike MAPTILER_KEY above, which is readable
- * by anyone viewing the source. The default is a relative path, so it works as
- * soon as both files sit in the same directory; no domain to configure.
+ * This app holds no map key of its own: there is nowhere to put one, because a
+ * key in a public page is readable by anyone who views the source. For aerial
+ * imagery, upload server/tile-proxy.php beside this page, put the key in *that*
+ * file — servers execute PHP rather than serve it — and set PROXY_URL below. The
+ * default is a relative path, so it works as soon as both files sit in the same
+ * directory; there is no domain to configure.
  *
- * Leave PROXY_URL empty and the option is simply absent from the app.
+ * Leave PROXY_URL empty and the option is simply absent from the app, which is
+ * how the published copy ships: OpenStreetMap, a custom tile service, or your
+ * own site image.
  */
 const PROXY_URL = '';                 // e.g. 'tile-proxy.php?z={z}&x={x}&y={y}&s={style}'
 const PROXY_ATTRIBUTION = '© MapTiler © OpenStreetMap contributors';
 const PROXY_LABEL = 'Site imagery';
-const MAPTILER_KEY_STORE = 'sunpath.maptiler.v1';
-
-/** URL parameter, then this browser's saved key, then the deployed constant. */
-function resolveMapKey(){
-  const p = new URLSearchParams(location.search).get('maptiler');
-  if (p) return p.trim();
-  try { const v = localStorage.getItem(MAPTILER_KEY_STORE); if (v) return v.trim(); }
-  catch (e) { /* private mode */ }
-  return MAPTILER_KEY;
-}
-
-/** Imagery styles are served as JPEG; vector-derived styles as PNG. */
-const mapTilerExt = (style) => /satellite|hybrid|aerial/i.test(style) ? 'jpg' : 'png';
-
 /**
  * Tile sources. Each carries the attribution its terms require, and says whether
- * it needs a key — which changes what a total failure most likely means.
+ * a total failure is likely to be the connection or the configuration.
  */
 const TILE_SOURCES = {
   osm: {
@@ -2401,19 +2378,6 @@ const TILE_SOURCES = {
     url: (x, y, z) => 'https://tile.openstreetmap.org/' + z + '/' + x + '/' + y + '.png',
     attribution: '© OpenStreetMap contributors',
     maxZoom: 19,
-    needsKey: false,
-  },
-  maptiler: {
-    label: 'MapTiler',
-    url: (x, y, z) => {
-      const style = (State.basemap.style || 'satellite').trim();
-      return 'https://api.maptiler.com/maps/' + encodeURIComponent(style) +
-             '/256/' + z + '/' + x + '/' + y + '.' + mapTilerExt(style) +
-             '?key=' + encodeURIComponent(resolveMapKey());
-    },
-    attribution: () => '© MapTiler © OpenStreetMap contributors',
-    maxZoom: 20,
-    needsKey: true,
   },
   proxy: {
     label: PROXY_LABEL,
@@ -2422,9 +2386,10 @@ const TILE_SOURCES = {
       .replace(/\{style\}/g, encodeURIComponent(State.basemap.style || 'satellite')),
     attribution: () => PROXY_ATTRIBUTION,
     maxZoom: 20,
-    // No key in the browser: the server holds it, so a total failure is a
-    // server or style problem, not a missing credential here.
-    needsKey: false,
+    // Nothing to authenticate from here — the server holds the key — so a total
+    // failure points at the proxy or the style, not at a missing credential.
+    failHint: 'No tiles came back from tile-proxy.php. Check the key and the style name ' +
+              'on the server, and that PHP can reach the tile service.',
     viaProxy: true,
   },
   custom: {
@@ -2434,7 +2399,8 @@ const TILE_SOURCES = {
       .replace(/\{s\}/g, 'a'),
     attribution: () => State.basemap.customAttrib || '',
     maxZoom: 22,
-    needsKey: true,
+    failHint: 'No tiles loaded from that template. Check the URL, any credentials it ' +
+              'carries, and that the service allows requests from this page.',
   },
 };
 const sourceAttribution = (src) =>
@@ -2545,12 +2511,10 @@ const Basemap = (() => {
     }
     const ok = (await Promise.all(jobs)).reduce((a, b) => a + b, 0);
     if (!ok){
-      // A keyed source failing completely is almost never "no internet": it is a
-      // rejected key, an origin restriction, or a style name that does not exist.
-      throw new Error(src.needsKey
-        ? 'No tiles loaded from ' + src.label + '. Check the API key is valid and allowed ' +
-          'for this domain, and that the style name is right. The site-image basemap works offline.'
-        : 'No map tiles could be loaded — check the connection, or upload a site image instead.');
+      // A configured source failing completely is almost never "no internet": it
+      // is the configuration. Say which, so the fix is obvious.
+      throw new Error(src.failHint ||
+        'No map tiles could be loaded — check the connection, or upload a site image instead.');
     }
 
     // Canvas row 0 is the northernmost tile; with three.js's default flipY that
@@ -2650,13 +2614,101 @@ function lineFromPoints(points, color, opacity = 1, width = 1){
 }
 
 /**
- * Line opacity, boosted by the chart-clarity slider.
+ * Stroke widths for the flattened chart, as a fraction of the chart radius.
  *
- * Only in stereographic mode: the flattened chart is normally read against an
- * aerial basemap, where the 0.4-0.5 opacities that look right over the plain
- * ground plane all but vanish. The 3D dome is left exactly as it was.
+ * WebGL ignores LineBasicMaterial.linewidth — every THREE.Line is one pixel
+ * wide, whatever you ask for — which is why the flattened chart disappeared
+ * into aerial imagery. In stereographic mode each polyline is therefore drawn
+ * as a ribbon of real width in metres, with a casing of the opposite tone
+ * underneath, the way a map draws a road over a photograph. Contrast then comes
+ * from the line itself rather than from whatever is behind it, so nothing has
+ * to be laid over the site to make the chart readable.
  */
-const ink = (base) => isStereo() ? Math.min(1, base * (1 + 0.9 * State.disp.chart)) : base;
+const CHART_W = {
+  grid: 0.0047, tick: 0.0056, rim: 0.0073,
+  hour: 0.0053, arc: 0.0086, solstice: 0.0120, today: 0.0133,
+};
+// Calibrated against the default top-view framing, where the chart spans most
+// of the viewport: the ink of a grid line lands at about 1.4 px and a solstice
+// arc at 3.6 px, with a 1 px casing either side. Sub-pixel ink was the flaw in
+// the first attempt — the casing was all you could see.
+const CASING_EXTRA = 0.0060;
+/** Casings first, then every ink stroke, or one line's casing hides another's ink. */
+const CHART_ORDER = { casing: 810, ink: 820 };
+
+/**
+ * A flat polyline as a triangle strip in the ground plane.
+ *
+ * Every point is at the same height in stereographic mode, so the offset
+ * direction is simply the 2D normal of the path in XZ — no need for a general
+ * fat-line implementation or the extra CDN modules that would come with it.
+ */
+function ribbonFromPoints(points, color, widthM, opacity = 1, renderOrder = 0){
+  const n = points.length;
+  const pos = new Float32Array(n * 6);
+  const idx = [];
+  const half = Math.max(widthM, 1e-4) / 2;
+  for (let i = 0; i < n; i++){
+    const prev = points[Math.max(i - 1, 0)], next = points[Math.min(i + 1, n - 1)];
+    let tx = next.x - prev.x, tz = next.z - prev.z;
+    const len = Math.hypot(tx, tz);
+    if (len < 1e-9){ tx = 1; tz = 0; } else { tx /= len; tz /= len; }
+    const nx = -tz * half, nz = tx * half;       // 2D normal, scaled to half width
+    const p = points[i];
+    pos[i * 6 + 0] = p.x + nx; pos[i * 6 + 1] = p.y; pos[i * 6 + 2] = p.z + nz;
+    pos[i * 6 + 3] = p.x - nx; pos[i * 6 + 4] = p.y; pos[i * 6 + 5] = p.z - nz;
+    if (i < n - 1){
+      const a = i * 2;
+      idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setIndex(idx);
+  const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+    // Always transparent, even at full alpha: three.js draws the opaque list
+    // before the transparent one, so an opaque ink stroke would be painted over
+    // by the next line's translucent casing whatever its renderOrder says.
+    color, transparent: true, opacity,
+    // The chart is a diagram laid over the site, not an object in it: it reads
+    // over both the map and the massing rather than being sliced by a building.
+    depthTest: false, depthWrite: false, fog: false, side: THREE.DoubleSide,
+  }));
+  mesh.renderOrder = renderOrder;
+  mesh.userData.noAnalysis = true;
+  return mesh;
+}
+
+/**
+ * Add one chart stroke to a group: a cased ribbon in stereographic mode, the
+ * original hairline in the 3D dome, which is unchanged by any of this.
+ */
+function addChartLine(group, points, color, weightKey, opacity3d = 1){
+  if (points.length < 2) return;
+  if (!isStereo()){
+    group.add(lineFromPoints(points, color, opacity3d));
+    return;
+  }
+  const k = sunPathRadius * State.disp.chart;
+  const w = CHART_W[weightKey] * k;
+  const c = THEME.chart;
+  group.add(ribbonFromPoints(points, c.casing, w + CASING_EXTRA * k, c.casingAlpha, CHART_ORDER.casing));
+  const ink = ribbonFromPoints(points, color, w, 1, CHART_ORDER.ink);
+  ink.name = 'chartInk';
+  group.add(ink);
+}
+
+/** A label placed on the chart, haloed so it survives a busy basemap. */
+function addChartLabel(group, text, pos, { size = 34, color, weight = 600, scale }){
+  const lab = makeLabel(text, {
+    size, weight, scale,
+    color: color || (isStereo() ? THEME.chart.label : '#cfd9e4'),
+    halo: isStereo() ? THEME.chart.labelHalo : null,
+  });
+  lab.position.copy(pos);
+  group.add(lab);
+  return lab;
+}
 
 /**
  * Rebuild the whole sun-path diagram for the current site.
@@ -2668,6 +2720,7 @@ function buildSunPath(){
   disposeGroup(compassGroup);
   const site = State.site, dst = State.dstHours;
   const R = sunPathRadius;
+  const flat = isStereo();
 
   /* --- monthly arcs (21st of each month) --- */
   if (State.disp.arcs){
@@ -2685,33 +2738,44 @@ function buildSunPath(){
       const isWarm = doy > 80 && doy < 266;
       const col = SUN_COLORS.winter.clone().lerp(SUN_COLORS.summer, isWarm ? 0.35 + w : 0.12);
       const solstice = (m === 6 || m === 12);
-      sunPathGroup.add(lineFromPoints(pts, col, ink(solstice ? 0.95 : 0.5)));
+      addChartLine(sunPathGroup, pts, col, solstice ? 'solstice' : 'arc', solstice ? 0.95 : 0.5);
       if (solstice){
-        const lab = makeLabel(m === 6 ? '21 Jun' : '21 Dec', { size: 38, color: '#' + col.getHexString(), scale: R * 0.027 });
-        lab.position.copy(pts[Math.floor(pts.length / 2)]).multiplyScalar(1.045);
-        sunPathGroup.add(lab);
+        // Just off the arc rather than on it, as a printed chart does
+        const at = pts[Math.floor(pts.length / 2)].clone().multiplyScalar(flat ? 1.06 : 1.045);
+        if (flat) at.y = STEREO_Y;
+        addChartLabel(sunPathGroup, m === 6 ? '21 Jun' : '21 Dec', at,
+                      { size: 38, color: '#' + col.getHexString(), weight: 700,
+                        scale: R * (flat ? 0.036 : 0.027) });
       }
     }
   }
 
   /* --- hourly analemmas --- */
   if (State.disp.analemma){
+    const hourCol = flat ? THEME.chart.hour : SUN_COLORS.analemma;
     for (let h = 0; h < 24; h++){
       const pts = [];
       let above = false;
       for (let doy = 1; doy <= 366; doy += 3){
         const p = SolarCore.position(site, Math.min(doy, 365), h * 60, dst);
-        if (p.altitude < -0.35) { if (above && pts.length > 2) { sunPathGroup.add(lineFromPoints(pts, SUN_COLORS.analemma, ink(0.42))); } pts.length = 0; above = false; continue; }
+        if (p.altitude < -0.35) {
+          if (above && pts.length > 2) addChartLine(sunPathGroup, pts.slice(), hourCol, 'hour', 0.42);
+          pts.length = 0; above = false; continue;
+        }
         above = true;
         pts.push(domePoint(p.altitude, p.azimuth, R));
       }
       if (pts.length > 2){
-        sunPathGroup.add(lineFromPoints(pts, SUN_COLORS.analemma, ink(0.42)));
+        addChartLine(sunPathGroup, pts, hourCol, 'hour', 0.42);
         const noonish = SolarCore.position(site, 172, h * 60, dst);
-        if (noonish.altitude > 3){
-          const lab = makeLabel(String(h).padStart(2,'0'), { size: 34, color: THEME.hourLabel, scale: R * 0.021 });
-          lab.position.copy(domePoint(noonish.altitude, noonish.azimuth, R)).multiplyScalar(1.06);
-          sunPathGroup.add(lab);
+        // Flattened, a radial nudge puts the hour outside the June curve and
+        // spreads the labels that would otherwise pile up around noon.
+        if (noonish.altitude > (flat ? 8 : 3)){
+          const at = domePoint(noonish.altitude, noonish.azimuth, R).multiplyScalar(flat ? 1.075 : 1.06);
+          if (flat) at.y = STEREO_Y;
+          addChartLabel(sunPathGroup, String(h).padStart(2, '0') + (flat ? 'h' : ''), at,
+                        { size: 34, color: flat ? THEME.chart.label : THEME.hourLabel,
+                          weight: flat ? 700 : 600, scale: R * (flat ? 0.030 : 0.021) });
         }
       }
     }
@@ -2725,45 +2789,25 @@ function buildSunPath(){
       if (p.altitude < -0.35) continue;
       pts.push(domePoint(Math.max(p.altitude, 0), p.azimuth, R));
     }
-    if (pts.length > 1) sunPathGroup.add(lineFromPoints(pts, SUN_COLORS.today, 1));
+    addChartLine(sunPathGroup, pts, SUN_COLORS.today, 'today', 1);
   }
 
-  /* --- altitude rings --- */
+  /* --- altitude rings: every 10° flattened, as on a printed chart --- */
   if (State.disp.rings){
-    for (let alt = 15; alt < 90; alt += 15){
+    const step = flat ? 10 : 15;
+    const ringCol = flat ? THEME.chart.ring : THEME.ring;
+    for (let alt = step; alt < 90; alt += step){
       const pts = [];
       for (let a = 0; a <= 360; a += 4) pts.push(domePoint(alt, a, R));
-      sunPathGroup.add(lineFromPoints(pts, THEME.ring, ink(0.55)));
-      const lab = makeLabel(alt + '°', { size: 30, color: THEME.ringLabel, scale: R * 0.019 });
-      lab.position.copy(domePoint(alt, 90, R));
-      if (!isStereo()) lab.position.multiplyScalar(1.02); else lab.position.x += R * 0.03;
-      sunPathGroup.add(lab);
+      addChartLine(sunPathGroup, pts, ringCol, 'grid', 0.55);
+      // Up the north centre line when flat, which is where the printed chart
+      // puts them; beside the dome otherwise.
+      const at = domePoint(alt, flat ? 0 : 90, R);
+      if (flat) at.x += R * 0.022; else at.multiplyScalar(1.02);
+      addChartLabel(sunPathGroup, alt + '°', at,
+                    { size: 30, color: flat ? THEME.chart.label : THEME.ringLabel,
+                      weight: flat ? 700 : 600, scale: R * (flat ? 0.028 : 0.019) });
     }
-  }
-
-  /* --- backing plate, so the flattened chart reads over a basemap ---
-     Its opacity is the chart-clarity slider: 0 leaves the imagery almost
-     untouched, 1 covers it with an all but solid disc under the chart lines.
-     The model still reads over it — the plate sits below building height. */
-  if (isStereo()){
-    const plate = new THREE.Mesh(
-      // Slightly wider than the chart, so the compass letters at R*1.075 sit on
-      // the backdrop too rather than on the imagery just outside it.
-      new THREE.CircleGeometry(R * 1.12, 96),
-      new THREE.MeshBasicMaterial({
-        color: THEME.name === 'light' ? 0xffffff : 0x0b1016,
-        transparent: true, opacity: 0.06 + 0.9 * State.disp.chart,
-        depthWrite: false, fog: false,
-      }));
-    plate.name = 'stereoPlate';
-    plate.rotation.x = -Math.PI / 2;
-    plate.position.y = STEREO_Y - 0.05;
-    // The basemap sits lower, so back-to-front sorting already draws the plate
-    // over it. Staying at the default order keeps the plate *under* the shadow
-    // catcher (order 1), so building shadows still read inside the chart disc —
-    // which is the whole point of looking at a site from above.
-    plate.renderOrder = 0;
-    sunPathGroup.add(plate);
   }
 
   /* --- compass rose --- */
@@ -2772,21 +2816,46 @@ function buildSunPath(){
 
 function buildCompass(R){
   if (!State.disp.compass) return;
+  const flat = isStereo();
+  const gridCol = flat ? THEME.chart.grid : THEME.compass;
+
   const ringPts = [];
   for (let a = 0; a <= 360; a += 2) ringPts.push(domePoint(0, a, R));
-  compassGroup.add(lineFromPoints(ringPts, THEME.compass, ink(0.85)));
+  addChartLine(compassGroup, ringPts, gridCol, 'rim', 0.85);
 
   for (let a = 0; a < 360; a += 10){
     const inner = (a % 90 === 0) ? 0.9 : (a % 30 === 0 ? 0.945 : 0.968);
     const p0 = domePoint(0, a, R * inner), p1 = domePoint(0, a, R);
-    compassGroup.add(lineFromPoints([p0, p1], a % 90 === 0 ? THEME.tickMajor : THEME.tickMinor, ink(a % 90 === 0 ? 0.95 : 0.6)));
+    addChartLine(compassGroup, [p0, p1],
+                 flat ? THEME.chart.grid : (a % 90 === 0 ? THEME.tickMajor : THEME.tickMinor),
+                 a % 90 === 0 ? 'tick' : 'grid', a % 90 === 0 ? 0.95 : 0.6);
   }
-  const cardinals = [['N',0,THEME.cardinalN],['E',90,THEME.cardinal],['S',180,THEME.cardinal],['W',270,THEME.cardinal]];
+
+  // Flattened, the chart also carries the azimuth grid of a printed sun-path
+  // chart: spokes across the disc every 30°, and the bearing written outside
+  // the rim. Those are what let you read a bearing off the chart at all.
+  if (flat){
+    for (let a = 0; a < 360; a += 30){
+      addChartLine(compassGroup, [domePoint(88, a, R), domePoint(0, a, R)],
+                   THEME.chart.grid, 'grid');
+      if (a % 90 === 0) continue;                       // N/E/S/W are lettered
+      const at = domePoint(0, a, R * 1.075);
+      at.y = STEREO_Y;
+      addChartLabel(compassGroup, String(a).padStart(3, '0') + '°', at,
+                    { size: 28, color: THEME.chart.label, weight: 700, scale: R * 0.026 });
+    }
+  }
+
+  const cardinals = flat
+    ? [['N', 0, THEME.chart.cardinalN], ['E', 90, THEME.chart.cardinal],
+       ['S', 180, THEME.chart.cardinal], ['W', 270, THEME.chart.cardinal]]
+    : [['N', 0, THEME.cardinalN], ['E', 90, THEME.cardinal],
+       ['S', 180, THEME.cardinal], ['W', 270, THEME.cardinal]];
   for (const [t, a, c] of cardinals){
-    const lab = makeLabel(t, { size: 52, color: c, weight: 700, scale: R * 0.038 });
-    lab.position.copy(domePoint(0, a, R * 1.075));
-    lab.position.y = R * 0.028;
-    compassGroup.add(lab);
+    const at = domePoint(0, a, R * (flat ? 1.13 : 1.075));
+    at.y = flat ? STEREO_Y : R * 0.028;
+    addChartLabel(compassGroup, t, at, { size: 52, color: c, weight: 700,
+                                        scale: R * (flat ? 0.052 : 0.038) });
   }
 }
 
@@ -3158,7 +3227,7 @@ const State = {
   northRot: 0,              // project north rotation, degrees clockwise
   weather: null,            // parsed EPW or null (clear-sky fallback)
   disp: { arcs:true, analemma:true, today:true, compass:true, rings:true,
-          shadow:true, grid:true, dome:false, radius:1, chart:0.5,
+          shadow:true, grid:true, dome:false, radius:1, chart:1,
           projection:'3d', autoStereo:true },
   analysis: { mode:'inst', period:'year', unit:'kwh', gridSize:1.5, offset:0.02,
               density:1, groundRefl:0.2, useGround:true, shade:true,
@@ -4165,7 +4234,7 @@ function refresh(force = false){
 let todayArc = null;
 function rebuildTodayArc(){
   if (todayArc && todayArc.userData.doy === State.doy && todayArc.userData.key === State.siteKey) return;
-  if (todayArc){ todayArc.geometry.dispose(); todayArc.material.dispose(); sunPathGroup.remove(todayArc); }
+  if (todayArc){ disposeGroup(todayArc); sunPathGroup.remove(todayArc); }
   const pts = [];
   for (let t = 0; t <= 1440; t += 4){
     const p = SolarCore.position(State.site, State.doy, t, State.dstHours);
@@ -4173,7 +4242,9 @@ function rebuildTodayArc(){
     pts.push(domePoint(Math.max(p.altitude, 0), p.azimuth, sunPathRadius));
   }
   if (pts.length < 2){ todayArc = null; return; }
-  todayArc = lineFromPoints(pts, SUN_COLORS.today, 1);
+  // A group, because flattened it is a cased ribbon pair rather than one line
+  todayArc = new THREE.Group();
+  addChartLine(todayArc, pts, SUN_COLORS.today, 'today', 1);
   todayArc.userData = { doy: State.doy, key: State.siteKey };
   sunPathGroup.add(todayArc);
 }
@@ -4532,14 +4603,8 @@ on('i-place-name', 'keydown', (e) => { if (e.key === 'Enter'){ e.preventDefault(
 /* --- basemap ------------------------------------------------------------- */
 function syncBasemapUI(){
   const src = State.basemap.source;
-  // Show that a key exists without ever putting its value in the DOM: this gets
-  // projected in lectures, and a key on screen is a key in every photo of it.
-  const haveKey = !!resolveMapKey();
-  $('bm-key-set').style.display = (src === 'maptiler' && haveKey && !keyEntryOpen) ? '' : 'none';
-  $('bm-key-entry').style.display = (src === 'maptiler' && (!haveKey || keyEntryOpen)) ? '' : 'none';
-  const tiled = src === 'osm' || src === 'maptiler' || src === 'custom' || src === 'proxy';
+  const tiled = src === 'osm' || src === 'custom' || src === 'proxy';
   $('bm-tiles').style.display = tiled ? '' : 'none';
-  $('bm-keyed').style.display = src === 'maptiler' ? '' : 'none';
   $('bm-proxy').style.display = src === 'proxy' ? '' : 'none';
   $('bm-custom').style.display = src === 'custom' ? '' : 'none';
   $('bm-image').style.display = src === 'image' ? '' : 'none';
@@ -4553,41 +4618,11 @@ on('i-basemap', 'change', (e) => {
   syncBasemapUI();
   // Only auto-load when there is enough to load with
   if (State.basemap.source === 'osm') loadBasemapTiles();
-  else if (State.basemap.source === 'maptiler' && resolveMapKey()) loadBasemapTiles();
 });
 
-let keyEntryOpen = false;
-on('i-bm-key', 'change', (e) => {
-  const k = e.target.value.trim();
-  try { if (k) localStorage.setItem(MAPTILER_KEY_STORE, k);
-        else localStorage.removeItem(MAPTILER_KEY_STORE); } catch (err) { /* private mode */ }
-  e.target.value = '';                     // do not leave it sitting in the field
-  keyEntryOpen = false;
-  syncBasemapUI();
-  if (State.basemap.source === 'maptiler' && resolveMapKey()) loadBasemapTiles();
-});
-on('b-bm-key-replace', 'click', () => { keyEntryOpen = true; syncBasemapUI(); $('i-bm-key').focus(); });
-on('b-bm-key-clear', 'click', () => {
-  try { localStorage.removeItem(MAPTILER_KEY_STORE); } catch (err) { /* private mode */ }
-  $('i-bm-key').value = '';
-  keyEntryOpen = false;
-  syncBasemapUI();
-  toast(resolveMapKey()
-    ? 'Cleared the key saved in this browser; the one built into this copy is still in use.'
-    : 'Key cleared from this browser.', 'info', 5000);
-});
 on('i-bm-stylepreset2', 'change', (e) => {
   State.basemap.style = e.target.value;
   if (State.basemap.source === 'proxy') loadBasemapTiles();
-});
-on('i-bm-stylepreset', 'change', (e) => {
-  State.basemap.style = e.target.value;
-  $('i-bm-style').value = e.target.value;
-  if (State.basemap.source === 'maptiler') loadBasemapTiles();
-});
-on('i-bm-style', 'change', (e) => {
-  State.basemap.style = e.target.value.trim() || 'satellite';
-  if (State.basemap.source === 'maptiler') loadBasemapTiles();
 });
 on('i-bm-url', 'change', (e) => {
   State.basemap.customUrl = e.target.value.trim();
@@ -4817,7 +4852,8 @@ on('d-radius', 'input', (e) => {
 
 on('d-chart', 'input', (e) => {
   State.disp.chart = +e.target.value;
-  $('v-chart').textContent = Math.round(State.disp.chart * 100) + '%';
+  $('v-chart').textContent = State.disp.chart.toFixed(1) + '×';
+  todayArc = null;                       // its width changes with the slider too
   rebuildAll();
 });
 
@@ -5386,7 +5422,7 @@ function init(){
     const opt = document.createElement('option');
     opt.value = 'proxy';
     opt.textContent = PROXY_LABEL;
-    sel.insertBefore(opt, sel.querySelector('option[value="maptiler"]'));
+    sel.insertBefore(opt, sel.querySelector('option[value="custom"]'));
     sel.value = 'proxy';
     State.basemap.source = 'proxy';
     Selects.refreshOptions(sel);
@@ -5427,36 +5463,38 @@ function init(){
     exportSheet, applyTheme, THEMES, getTheme: () => THEME.name,
     Tour, TOUR_KEY, setUiTheme, currentUiTheme, UI_THEME_KEY,
     Basemap, Mercator, TILE_SOURCES, loadBasemapTiles, pickPlace, runSearch, Selects,
-    resolveMapKey, MAPTILER_KEY_STORE, sourceAttribution, PROXY_URL, PROXY_ATTRIBUTION,
+    sourceAttribution, PROXY_URL, PROXY_ATTRIBUTION,
     loadPlaces, savePlace, removePlace, renderPlaces, PLACES_KEY,
     requestRender, BUILD,
-    /** How prominent the flattened chart is drawn — the clarity slider. */
+    /** How the chart is drawn, and where it lands on screen. */
     chartProbe: () => {
-      const plate = sunPathGroup.getObjectByName('stereoPlate');
-      // Where the disc lands on screen, so a test can sample pixels that are
-      // inside the chart but clear of the model in the middle.
-      let screen = null;
-      if (plate){
-        const cnv = renderer.domElement;
-        const w = cnv.clientWidth, h = cnv.clientHeight;
-        const toPx = (v) => {
-          const p = v.clone().project(camera);
-          return { x: (p.x * 0.5 + 0.5) * w, y: (1 - (p.y * 0.5 + 0.5)) * h };
-        };
-        const c = toPx(plate.position);
-        const rim = toPx(new THREE.Vector3(sunPathRadius, plate.position.y, 0));
-        screen = { cx: c.x, cy: c.y, r: Math.hypot(rim.x - c.x, rim.y - c.y), w, h };
-      }
-      const lines = [];
-      sunPathGroup.traverse(o => { if (o.isLine) lines.push(o.material.opacity); });
-      compassGroup.traverse(o => { if (o.isLine) lines.push(o.material.opacity); });
+      const cnv = renderer.domElement;
+      const w = cnv.clientWidth, h = cnv.clientHeight;
+      const toPx = (v) => {
+        const p = v.clone().project(camera);
+        return { x: (p.x * 0.5 + 0.5) * w, y: (1 - (p.y * 0.5 + 0.5)) * h };
+      };
+      // Where the chart lands on screen, so a test can sample pixels between
+      // its lines as well as across them.
+      const c = toPx(new THREE.Vector3(0, STEREO_Y, 0));
+      const rim = toPx(new THREE.Vector3(sunPathRadius, STEREO_Y, 0));
+      const lines = [], casings = [], inks = [];
+      const scan = (g) => g.traverse(o => {
+        if (o.isLine) lines.push(o.material.opacity);
+        else if (o.isMesh && o.renderOrder === CHART_ORDER.casing) casings.push(o.renderOrder);
+        else if (o.isMesh && o.renderOrder === CHART_ORDER.ink) inks.push(o.renderOrder);
+      });
+      scan(sunPathGroup); scan(compassGroup);
       return {
-        plateOpacity: plate ? plate.material.opacity : null,
-        minLineOpacity: lines.length ? Math.min(...lines) : null,
+        screen: { cx: c.x, cy: c.y, r: Math.hypot(rim.x - c.x, rim.y - c.y), w, h },
         lineCount: lines.length,
+        minLineOpacity: lines.length ? Math.min(...lines) : null,
+        casings: casings.length, inks: inks.length,
+        casingsBeforeInk: casings.every(o => inks.every(i => o < i)),
+        plate: !!sunPathGroup.getObjectByName('stereoPlate'),
+        solsticeWidthM: CHART_W.solstice * sunPathRadius * State.disp.chart,
         rowVisible: $('row-chart').style.display !== 'none',
         value: State.disp.chart,
-        screen,
       };
     },
     /** Shadow frustum vs what actually receives shadows. */

@@ -790,199 +790,77 @@ const bmClear = await page.evaluate(() => {
 check('clearing the basemap removes it and its attribution',
       bmClear.mesh === null && bmClear.attrib === '');
 
-/* --------------------------------------------------------- keyed basemaps --- */
-console.log('\n=== MapTiler and custom tile sources ===');
+/* ----------------------------------------------------- other tile sources --- */
+console.log('\n=== custom tiles, and no key anywhere ===');
 
-let maptilerUrls = [];
-let maptilerStatus = 200;
-await ctx.route('**://api.maptiler.com/**', async (route) => {
-  maptilerUrls.push(route.request().url());
-  if (maptilerStatus !== 200) return route.fulfill({ status: maptilerStatus, body: 'denied' });
-  await route.fulfill({ status: 200, contentType: 'image/png',
-                        headers: { 'access-control-allow-origin': '*' }, body: TILE_PNG });
-});
+let tileUrls = [];
 await ctx.route('**://tiles.example.org/**', async (route) => {
-  maptilerUrls.push(route.request().url());
+  tileUrls.push(route.request().url());
+  if (/\/nope\//.test(route.request().url()))
+    return route.fulfill({ status: 404, body: 'no such layer' });
   await route.fulfill({ status: 200, contentType: 'image/png',
                         headers: { 'access-control-allow-origin': '*' }, body: TILE_PNG });
 });
 
-// Key priority: URL parameter, then this browser's stored key, then the constant
+// The MapTiler source and its key field are gone: a key in a public page is
+// readable by anyone who views the source, so the app now holds none at all.
+// Asserted against the file as well as the running page, because the file is
+// what gets uploaded.
 {
-  const keyCtx = await browser.newContext({ viewport: { width: 1100, height: 800 } });
-  await keyCtx.route('**://cdn.jsdelivr.net/**', async (route) => {
-    const m = new URL(route.request().url()).pathname.match(/^\/npm\/three@[^/]+\/(.+)$/);
-    const f = m && join(vendorRoot, m[1]);
-    if (!f || !existsSync(f)) return route.fulfill({ status: 404, body: 'missing' });
-    await route.fulfill({ status: 200, contentType: 'text/javascript',
-                          headers: { 'access-control-allow-origin': '*' }, body: await readFile(f, 'utf8') });
-  });
-  await keyCtx.addInitScript(() => {
-    try { localStorage.setItem('sunpath.maptiler.v1', 'FROM_STORE'); } catch (e) {}
-  });
-  const kp = await keyCtx.newPage();
-  const base = 'http://127.0.0.1:' + port + '/index.html';
-  await kp.goto(base + '?tour=0&maptiler=FROM_URL', { waitUntil: 'load' });
-  await kp.waitForFunction(() => window.__SUNAPP && window.__SUNAPP.ready, null, { timeout: 30000 });
-  const fromUrl = await kp.evaluate(() => window.__SUNAPP.resolveMapKey());
-  await kp.goto(base + '?tour=0', { waitUntil: 'load' });
-  await kp.waitForFunction(() => window.__SUNAPP && window.__SUNAPP.ready, null, { timeout: 30000 });
-  const fromStore = await kp.evaluate(() => window.__SUNAPP.resolveMapKey());
-  await keyCtx.close();
-
-  // A clean context, with no init script re-seeding storage, exercises the
-  // constant fallback — the state a fresh visitor to the committed file is in.
-  const bareCtx = await browser.newContext({ viewport: { width: 1100, height: 800 } });
-  await bareCtx.route('**://cdn.jsdelivr.net/**', async (route) => {
-    const m = new URL(route.request().url()).pathname.match(/^\/npm\/three@[^/]+\/(.+)$/);
-    const f = m && join(vendorRoot, m[1]);
-    if (!f || !existsSync(f)) return route.fulfill({ status: 404, body: 'missing' });
-    await route.fulfill({ status: 200, contentType: 'text/javascript',
-                          headers: { 'access-control-allow-origin': '*' }, body: await readFile(f, 'utf8') });
-  });
-  const bp = await bareCtx.newPage();
-  await bp.goto(base + '?tour=0', { waitUntil: 'load' });
-  await bp.waitForFunction(() => window.__SUNAPP && window.__SUNAPP.ready, null, { timeout: 30000 });
-  const fromConst = await bp.evaluate(() => window.__SUNAPP.resolveMapKey());
-  await bareCtx.close();
-
-  check('the key comes from the URL first, then storage, then the constant',
-        fromUrl === 'FROM_URL' && fromStore === 'FROM_STORE' && fromConst === '',
-        [fromUrl, fromStore, JSON.stringify(fromConst)].join(' → '));
-
-  // Checked at the file level too: no key may ever be committed
   const src = await readFile(join(ROOT, 'index.html'), 'utf8');
-  check('the committed file carries an empty key constant',
-        /const MAPTILER_KEY = '';/.test(src) && fromConst === '',
-        (src.match(/const MAPTILER_KEY = '[^']*';/) || ['not found'])[0]);
+  check('the app carries no map key and no way to store one',
+        !/MAPTILER_KEY/.test(src) && !/resolveMapKey/.test(src) &&
+        !/api\.maptiler\.com/.test(src) && !/sunpath\.maptiler/.test(src),
+        'no key constant, no key store, no keyed endpoint');
+
+  const ui = await page.evaluate(() => ({
+    sources: [...document.querySelectorAll('#i-basemap option')].map(o => o.value),
+    keyFields: document.querySelectorAll('input[type="password"]').length,
+    saysReadable: /readable in the page source/i.test(document.body.textContent),
+  }));
+  check('the basemap panel offers no key field and no key warning',
+        ui.keyFields === 0 && !ui.saysReadable && !ui.sources.includes('maptiler'),
+        'sources: ' + ui.sources.join(', '));
 }
 
-maptilerUrls = [];
-const mt = await page.evaluate(async () => {
+tileUrls = [];
+const custom = await page.evaluate(async () => {
   const A = window.__SUNAPP;
-  try { localStorage.setItem('sunpath.maptiler.v1', 'TESTKEY123'); } catch (e) {}
-  A.State.basemap.source = 'maptiler';
-  A.State.basemap.style = 'satellite';
+  A.State.basemap.source = 'custom';
   A.State.basemap.extent = 400;
-  const r = await A.Basemap.loadTiles('maptiler');
+  A.State.basemap.customUrl = 'https://tiles.example.org/layer/{z}/{x}/{y}.png?tok=abc';
+  A.State.basemap.customAttrib = '© Example Imagery Ltd';
+  const r = await A.Basemap.loadTiles('custom');
   const m = A.Basemap.mesh;
   m.geometry.computeBoundingBox();
   return { ...r, width: m.geometry.boundingBox.max.x - m.geometry.boundingBox.min.x,
            attribution: A.Basemap.info.attribution,
            onScreen: document.getElementById('vp-attrib').textContent };
 });
-const sampleUrl = maptilerUrls[0] || '';
-check('MapTiler tiles use the documented path shape with key and style',
-      /\/maps\/satellite\/256\/\d+\/\d+\/\d+\.jpg\?key=TESTKEY123$/.test(sampleUrl),
-      sampleUrl.replace('TESTKEY123', '<key>'));
-check('imagery styles request JPEG, not PNG', /\.jpg\?/.test(sampleUrl));
-check('a keyed basemap georeferences the same way as the OSM one',
-      mt.width >= 400 && mt.width < 400 * 3, mt.width.toFixed(0) + ' m at zoom ' + mt.zoom);
-check('MapTiler attribution is shown on screen',
-      /MapTiler/.test(mt.attribution) && /MapTiler/.test(mt.onScreen), mt.onScreen);
-
-const styleSwap = await page.evaluate(async () => {
-  const A = window.__SUNAPP;
-  A.State.basemap.style = 'streets-v2';
-  await A.Basemap.loadTiles('maptiler');
-  return true;
-});
-check('a non-imagery style switches to PNG',
-      styleSwap && /\/maps\/streets-v2\/256\/.*\.png\?/.test(maptilerUrls[maptilerUrls.length - 1]),
-      maptilerUrls[maptilerUrls.length - 1].replace('TESTKEY123', '<key>'));
-
-maptilerStatus = 403;
-expectTileErrors = true;
-const denied = await page.evaluate(async () => {
-  const A = window.__SUNAPP;
-  try { await A.Basemap.loadTiles('maptiler'); return 'no error'; }
-  catch (e) { return e.message; }
-});
-maptilerStatus = 200;
-await page.waitForTimeout(150);
-expectTileErrors = false;
-check('a rejected key reports the key or style, not a connection problem',
-      /API key/i.test(denied) && /domain|style/i.test(denied) && !/connection/i.test(denied),
-      denied.slice(0, 96) + '…');
-
-maptilerUrls = [];
-const custom = await page.evaluate(async () => {
-  const A = window.__SUNAPP;
-  A.State.basemap.source = 'custom';
-  A.State.basemap.customUrl = 'https://tiles.example.org/layer/{z}/{x}/{y}.png?tok=abc';
-  A.State.basemap.customAttrib = '© Example Imagery Ltd';
-  await A.Basemap.loadTiles('custom');
-  return { attribution: A.Basemap.info.attribution,
-           onScreen: document.getElementById('vp-attrib').textContent };
-});
 check('a custom template substitutes {z}/{x}/{y}',
-      /^https:\/\/tiles\.example\.org\/layer\/\d+\/\d+\/\d+\.png\?tok=abc$/.test(maptilerUrls[0] || ''),
-      maptilerUrls[0] || '(no request)');
+      /^https:\/\/tiles\.example\.org\/layer\/\d+\/\d+\/\d+\.png\?tok=abc$/.test(tileUrls[0] || ''),
+      tileUrls[0] || '(no request)');
+check('a custom source georeferences the same way as the OSM one',
+      custom.width >= 400 && custom.width < 400 * 3,
+      custom.width.toFixed(0) + ' m at zoom ' + custom.zoom);
 check('a custom source uses the attribution the user typed, verbatim',
       custom.attribution === '© Example Imagery Ltd' && custom.onScreen === '© Example Imagery Ltd',
       custom.onScreen);
 
-// The key must not leak into anything the user hands to someone else
-const leak = await page.evaluate(async () => {
+expectTileErrors = true;
+const failMsg = await page.evaluate(async () => {
   const A = window.__SUNAPP;
-  A.State.basemap.source = 'maptiler';
-  let captured = '';
-  const realCreate = URL.createObjectURL;
-  // Capture the blob but still hand back a real URL, or the anchor click logs
-  // "Not allowed to load local resource" and trips the console-error check.
-  URL.createObjectURL = (blob) => { captured = blob; return realCreate.call(URL, blob); };
-  A.setAnalysis({ mode: 'inst', gridSize: 4 });
-  await A.runAnalysis();
-  A.Selects.closeOpen();
-  document.getElementById('b-csv').click();
-  await new Promise(r => setTimeout(r, 300));
-  URL.createObjectURL = realCreate;
-  const text = captured && captured.text ? await captured.text() : '';
-  return { len: text.length, hasKey: text.includes('TESTKEY123'), head: text.slice(0, 60) };
+  A.State.basemap.customUrl = 'https://tiles.example.org/nope/{z}/{x}/{y}.png';
+  try { await A.Basemap.loadTiles('custom'); return 'no error'; }
+  catch (e) { return e.message; }
 });
-check('the API key never appears in an exported CSV',
-      leak.len > 0 && !leak.hasKey, leak.len + ' bytes exported, key present: ' + leak.hasKey);
+await page.waitForTimeout(150);
+expectTileErrors = false;
+check('a configured source that returns nothing blames the configuration, not the connection',
+      /template|URL|credentials/i.test(failMsg) && !/check the connection/i.test(failMsg),
+      failMsg.slice(0, 90) + '…');
 
 await page.evaluate(() => { window.__SUNAPP.Basemap.clear(); window.__SUNAPP.State.basemap.source = 'none'; });
-
-// A key on screen ends up in every screenshot and every projected lecture
-const keyUi = await page.evaluate(() => {
-  const A = window.__SUNAPP;
-  try { localStorage.setItem(A.MAPTILER_KEY_STORE, 'SECRET_KEY_9876'); } catch (e) {}
-  A.State.basemap.source = 'maptiler';
-  const sel = document.getElementById('i-basemap');
-  sel.value = 'maptiler';
-  sel.dispatchEvent(new Event('change', { bubbles: true }));
-  return {
-    resolves: A.resolveMapKey(),
-    setShown: document.getElementById('bm-key-set').style.display !== 'none',
-    entryShown: document.getElementById('bm-key-entry').style.display !== 'none',
-    fieldValue: document.getElementById('i-bm-key').value,
-    inMarkup: document.body.innerHTML.includes('SECRET_KEY_9876'),
-  };
-});
-check('a configured key is acknowledged but never rendered on screen',
-      keyUi.resolves === 'SECRET_KEY_9876' && keyUi.setShown && !keyUi.entryShown &&
-      keyUi.fieldValue === '' && !keyUi.inMarkup,
-      'shown as configured: ' + keyUi.setShown + ', key anywhere in the DOM: ' + keyUi.inMarkup);
-
-const keyReplace = await page.evaluate(() => {
-  document.getElementById('b-bm-key-replace').click();
-  return {
-    entryShown: document.getElementById('bm-key-entry').style.display !== 'none',
-    setShown: document.getElementById('bm-key-set').style.display !== 'none',
-    empty: document.getElementById('i-bm-key').value === '',
-  };
-});
-check('Replace opens an empty field rather than revealing the old key',
-      keyReplace.entryShown && !keyReplace.setShown && keyReplace.empty);
-
-await page.evaluate(() => {
-  const A = window.__SUNAPP;
-  try { localStorage.removeItem(A.MAPTILER_KEY_STORE); } catch (e) {}
-  A.State.basemap.source = 'none';
-  A.Basemap.clear();
-});
 
 // The proxy exists so the key can leave the page entirely. Verified on a
 // separate load with PROXY_URL patched in, since the committed file has none.
@@ -1024,14 +902,9 @@ await page.evaluate(() => {
       selected: document.getElementById('i-basemap').value,
       options: opts,
       attribution: A.Basemap.info.attribution,
-      keyBlockHidden: document.getElementById('bm-keyed').style.display === 'none',
       proxyBlockShown: document.getElementById('bm-proxy').style.display !== 'none',
-      // Look for an actual key *value* assigned to the constant. Matching on
-      // "key=" would hit the code that builds MapTiler URLs, which is fine to
-      // ship — what must not be present is a credential.
-      keyConstant: (document.documentElement.outerHTML
-        .match(/const MAPTILER_KEY = '([^']*)'/) || [, null])[1],
-      resolvedKey: A.resolveMapKey(),
+      // Nothing that looks like a credential may reach the served page
+      keyish: /[?&]key=[A-Za-z0-9]/.test(document.documentElement.outerHTML),
     };
   });
   check('a configured proxy becomes the default source',
@@ -1041,11 +914,8 @@ await page.evaluate(() => {
         proxied.length === px.tiles &&
         /tile-proxy\.php\?z=\d+&x=\d+&y=\d+&s=satellite$/.test(proxied[0] || ''),
         (proxied[0] || '(none)').split('/').pop());
-  check('no API key appears anywhere in the served page',
-        px.keyConstant === '' && px.resolvedKey === '',
-        'MAPTILER_KEY = "' + px.keyConstant + '", resolveMapKey() = "' + px.resolvedKey + '"');
-  check('the key field is replaced by a server-side notice',
-        px.keyBlockHidden && px.proxyBlockShown);
+  check('no credential appears anywhere in the served page', !px.keyish);
+  check('the proxy build says the key is held on the server', px.proxyBlockShown);
   check('the provider attribution still reaches the viewport',
         /MapTiler/.test(px.attribution), px.attribution);
 
@@ -1194,11 +1064,13 @@ const optOut = await page.evaluate(async () => {
 });
 check('the auto-flatten toggle can be switched off', optOut === '3d', 'stayed ' + optOut);
 
-/* ---------------------------------------------------- chart clarity slider --- */
-// Over aerial imagery the flattened chart vanished: the 0.42-0.55 opacities that
-// suit the plain ground plane have nothing to read against. One slider raises
-// both the backdrop disc and the line ink, and must leave the 3D dome alone.
-const clarity = await page.evaluate(async () => {
+/* ------------------------------------------------------ the flattened chart --- */
+// WebGL ignores LineBasicMaterial.linewidth, so the flattened chart was drawn in
+// one-pixel lines and disappeared into aerial imagery; the first fix put a grey
+// disc behind it, which made it readable by hiding the site. Now each line is a
+// ribbon of real width with a casing of the opposite tone, and nothing is drawn
+// behind the chart at all. These checks pin down both halves of that.
+const chart = await page.evaluate(async () => {
   const A = window.__SUNAPP;
   const set = (v) => {
     const s = document.getElementById('d-chart');
@@ -1206,82 +1078,120 @@ const clarity = await page.evaluate(async () => {
     s.dispatchEvent(new Event('input', { bubbles: true }));
   };
   A.setProjection('3d');
-  const dome25 = A.chartProbe();
-  set(0.6);
-  const dome60 = A.chartProbe();
-  set(0.25);
-  A.setProjection('stereo');
-  set(0);
-  const low = A.chartProbe();
+  const dome = A.chartProbe();
+  set(2.0);
+  const domeHeavy = A.chartProbe();
   set(1);
-  const high = A.chartProbe();
-  const readout = document.getElementById('v-chart').textContent;
-  set(0.25);
-  return { dome25, dome60, low, high, readout };
-});
-check('the clarity slider is offered only where it does something',
-      clarity.dome25.rowVisible === false && clarity.low.rowVisible === true,
-      '3D hidden, stereographic shown');
-check('the backdrop goes from all but invisible to all but solid',
-      clarity.low.plateOpacity < 0.1 && clarity.high.plateOpacity > 0.9,
-      'plate ' + clarity.low.plateOpacity.toFixed(2) + ' → ' + clarity.high.plateOpacity.toFixed(2));
-check('the faintest chart lines are strengthened with it',
-      clarity.high.minLineOpacity > clarity.low.minLineOpacity + 0.3 &&
-      clarity.high.minLineOpacity <= 1,
-      'faintest line ' + clarity.low.minLineOpacity.toFixed(2) + ' → ' +
-      clarity.high.minLineOpacity.toFixed(2) + ' over ' + clarity.high.lineCount + ' lines');
-check('the 3D dome is unaffected by it',
-      clarity.dome25.plateOpacity === null &&
-      clarity.dome25.minLineOpacity === clarity.dome60.minLineOpacity,
-      'dome faintest line ' + clarity.dome25.minLineOpacity.toFixed(2) + ' at both settings');
-check('the slider reads out as a percentage', clarity.readout === '100%', clarity.readout);
-
-// The point of the control is pixels, not material properties: looking straight
-// down on a basemap, turning it up must actually replace the imagery behind the
-// chart with a flat backdrop.
-const clarityPx = await page.evaluate(async () => {
-  const A = window.__SUNAPP;
-  A.State.basemap.extent = 400;
-  await A.Basemap.loadTiles('osm');
   A.setProjection('stereo');
-  A.orbitTo(0, 88);                       // straight down on the chart
-  const cnv = document.querySelector('#viewport canvas');
-  const scratch = document.createElement('canvas');
-  const g = scratch.getContext('2d');
-  const sample = async (v) => {
-    const s = document.getElementById('d-chart');
-    s.value = String(v);
-    s.dispatchEvent(new Event('input', { bubbles: true }));
-    await new Promise(r => requestAnimationFrame(r));
-    await new Promise(r => requestAnimationFrame(r));
-    const sc = A.chartProbe().screen;
-    scratch.width = sc.w; scratch.height = sc.h;
-    g.drawImage(cnv, 0, 0, sc.w, sc.h);
-    // Four patches at 55% of the chart radius: inside the disc, outside the
-    // model in the middle, so what is measured is chart against imagery.
-    const lum = [];
-    for (const deg of [45, 135, 225, 315]){
-      const a = deg * Math.PI / 180;
-      const px = Math.round(sc.cx + Math.cos(a) * sc.r * 0.55) - 6;
-      const py = Math.round(sc.cy + Math.sin(a) * sc.r * 0.55) - 6;
-      const d = g.getImageData(px, py, 12, 12).data;
-      for (let i = 0; i < d.length; i += 4)
-        lum.push(d[i] * 0.299 + d[i+1] * 0.587 + d[i+2] * 0.114);
-    }
-    return { mean: lum.reduce((x, y) => x + y, 0) / lum.length, n: lum.length };
-  };
-  const low = await sample(0);
-  const high = await sample(1);
-  const s = document.getElementById('d-chart');
-  s.value = '0.25';
-  s.dispatchEvent(new Event('input', { bubbles: true }));
-  A.Basemap.clear();
-  return { low, high };
+  const flat = A.chartProbe();
+  set(0.5);
+  const thin = A.chartProbe();
+  set(2.5);
+  const thick = A.chartProbe();
+  const readout = document.getElementById('v-chart').textContent;
+  set(1);
+  return { dome, domeHeavy, flat, thin, thick, readout };
 });
-check('turning it up visibly replaces the imagery behind the chart',
-      clarityPx.low.mean - clarityPx.high.mean > 60,
-      'mean luminance ' + clarityPx.low.mean.toFixed(0) + ' → ' + clarityPx.high.mean.toFixed(0) +
-      ' over ' + clarityPx.high.n + ' px');
+check('the flattened chart is drawn as cased ribbons, not hairlines',
+      chart.flat.inks > 40 && chart.flat.casings === chart.flat.inks && chart.flat.lineCount === 0,
+      chart.flat.inks + ' strokes, each with a casing');
+check('nothing is drawn behind the chart',
+      chart.flat.plate === false);
+check('every casing is painted before every ink stroke',
+      chart.flat.casingsBeforeInk);
+check('the weight slider scales the strokes',
+      chart.thick.solsticeWidthM > chart.thin.solsticeWidthM * 4.5 &&
+      chart.thin.solsticeWidthM > 0,
+      'solstice arc ' + chart.thin.solsticeWidthM.toFixed(2) + ' m → ' +
+      chart.thick.solsticeWidthM.toFixed(2) + ' m');
+check('the slider reads out as a multiplier', chart.readout === '2.5×', chart.readout);
+check('the 3D dome still uses plain lines and ignores the slider',
+      chart.dome.lineCount > 40 && chart.dome.inks === 0 &&
+      chart.dome.lineCount === chart.domeHeavy.lineCount &&
+      chart.dome.minLineOpacity === chart.domeHeavy.minLineOpacity,
+      chart.dome.lineCount + ' lines, faintest ' + chart.dome.minLineOpacity.toFixed(2) +
+      ' at both settings');
+check('the weight slider is offered only where it does something',
+      chart.dome.rowVisible === false && chart.flat.rowVisible === true,
+      '3D hidden, stereographic shown');
+
+// Pixels, in both presentations: between the lines the basemap must come through
+// untouched, and across a line there must be real contrast to read.
+for (const theme of ['dark', 'light']){
+  const px = await page.evaluate(async (t) => {
+    const A = window.__SUNAPP;
+    A.setUiTheme(t);
+    A.State.basemap.extent = 400;
+    await A.Basemap.loadTiles('osm');
+    A.setProjection('stereo');
+    A.orbitTo(0, 88);                          // straight down on the chart
+    const cnv = document.querySelector('#viewport canvas');
+    const scratch = document.createElement('canvas');
+    const g = scratch.getContext('2d');
+    const grab = async () => {
+      await new Promise(r => requestAnimationFrame(r));
+      await new Promise(r => requestAnimationFrame(r));
+      const sc = A.chartProbe().screen;
+      scratch.width = sc.w; scratch.height = sc.h;
+      g.drawImage(cnv, 0, 0, sc.w, sc.h);
+      return { sc, data: g.getImageData(0, 0, sc.w, sc.h) };
+    };
+    const lum = (d, i) => d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114;
+    // A radial scanline at a bearing clear of the model, from just outside the
+    // altitude rings to the rim: it crosses month arcs and the grid.
+    const scanline = ({ sc, data }) => {
+      const out = [];
+      const a = 225 * Math.PI / 180;
+      for (let r = sc.r * 0.45; r < sc.r * 0.95; r += 0.5){
+        const x = Math.round(sc.cx + Math.cos(a) * r), y = Math.round(sc.cy + Math.sin(a) * r);
+        if (x < 1 || y < 1 || x >= sc.w - 1 || y >= sc.h - 1) continue;
+        out.push(lum(data.data, (y * sc.w + x) * 4));
+      }
+      return out;
+    };
+    const withChart = scanline(await grab());
+    // Turn the whole diagram off and look at the same pixels: the basemap alone
+    ['d-arcs','d-analemma','d-today','d-compass','d-rings'].forEach(id => {
+      const c = document.getElementById(id); c.checked = false;
+      c.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    const bare = scanline(await grab());
+    ['d-arcs','d-analemma','d-today','d-compass','d-rings'].forEach(id => {
+      const c = document.getElementById(id); c.checked = true;
+      c.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await grab();
+    A.Basemap.clear();
+    const median = (xs) => [...xs].sort((p, q) => p - q)[xs.length >> 1];
+    // "Between the lines" = the pixels that did not change: their level must be
+    // the basemap's own, or something is being laid over the site.
+    const same = withChart.filter((v, i) => Math.abs(v - bare[i]) < 6);
+    const spread = Math.max(...withChart) - Math.min(...withChart);
+    return {
+      bareMedian: median(bare), chartMedian: median(withChart),
+      untouchedFrac: same.length / withChart.length,
+      spread, n: withChart.length,
+    };
+  }, theme);
+  const ratio = (a, b) => { const [h, l] = a > b ? [a, b] : [b, a];
+                            return (h / 255 + 0.05) / (l / 255 + 0.05); };
+  check('in ' + theme + ' mode the site still shows through between the lines',
+        px.untouchedFrac > 0.5 && Math.abs(px.chartMedian - px.bareMedian) < 24,
+        (px.untouchedFrac * 100).toFixed(0) + '% of pixels unchanged, median ' +
+        px.bareMedian.toFixed(0) + ' → ' + px.chartMedian.toFixed(0));
+  check('in ' + theme + ' mode the chart lines carry real contrast over imagery',
+        ratio(Math.max(0, px.bareMedian), Math.min(255, px.bareMedian - px.spread)) > 1 &&
+        px.spread > 70,
+        'luminance range across the scanline ' + px.spread.toFixed(0) + ' over ' + px.n + ' samples');
+}
+// Hand the app back exactly as it was found: the presentation checks further
+// down assert the default, and setUiTheme also writes the stored preference.
+await page.evaluate(() => {
+  const A = window.__SUNAPP;
+  A.setUiTheme('dark');
+  try { localStorage.removeItem(A.UI_THEME_KEY); } catch (e) {}
+  A.setProjection('3d');
+});
 
 /* ------------------------------------------------------------ place search --- */
 console.log('\n=== place search ===');
@@ -1487,8 +1397,11 @@ console.log('\n=== guided tour ===');
         onScreen: cr.left >= 0 && cr.top >= 0 &&
                   cr.right <= innerWidth + 1 && cr.bottom <= innerHeight + 1,
         pointed,
+        // Real overlap, not a one-pixel abutment: the card sitting flush against
+        // the panel it points at is correct placement, not a defect.
         overlaps: pointed &&
-          !(cr.right < sr.left || cr.left > sr.right || cr.bottom < sr.top || cr.top > sr.bottom),
+          Math.min(cr.right, sr.right) - Math.max(cr.left, sr.left) > 6 &&
+          Math.min(cr.bottom, sr.bottom) - Math.max(cr.top, sr.top) > 6,
         spotVisible: !spot.hidden,
         pointerThrough: getComputedStyle(spot).pointerEvents === 'none',
       };
@@ -1632,9 +1545,9 @@ for (const s of sizes){
 }
 
 /* ----------------------------------------------------------- deploy build --- */
-// The key must never be in the page the public downloads. The build script is
-// what guarantees that, so it is checked here with a fake key: the page it emits
-// must not contain the key anywhere, only the PHP proxy may.
+// The key must never be in the page the public downloads. The app has nowhere to
+// put one at all now, and the build script is what keeps it that way: checked
+// here with a fake key, which may appear in the PHP proxy and nowhere else.
 console.log('\n=== deploy build ===');
 {
   const { execFileSync } = await import('node:child_process');
@@ -1660,26 +1573,14 @@ console.log('\n=== deploy build ===');
     const html = readFileSync(pageFile, 'utf8');
     const php = readFileSync(phpFile, 'utf8');
     check('the emitted page contains no key at all',
-          !html.includes(FAKE) && /const MAPTILER_KEY = '';/.test(html));
+          !html.includes(FAKE) && !/MAPTILER_KEY/.test(html));
     check('it points at the proxy by relative path, so it works in any folder',
           /const PROXY_URL = 'tile-proxy\.php\?z=\{z\}&x=\{x\}&y=\{y\}&s=\{style\}';/.test(html));
     check('the key goes into the PHP file, which servers execute rather than serve',
           php.includes("$MAPTILER_KEY = '" + FAKE + "';"));
   }
 
-  // The single-file variant is still available, but it is the one that exposes
-  // the key — so it must say so rather than emit quietly.
-  let warned = '';
-  try {
-    warned = execFileSync(process.execPath,
-      [join(ROOT, 'tools', 'make-deploy.mjs'), '--key', FAKE, '--key-in-page', '--out', out],
-      { encoding: 'utf8' });
-  } catch (e) { warned = String(e.stdout || e.message); }
-  const inPage = join(out, 'sun-studio-v' + build + '-key-in-page', 'index.html');
-  check('the single-file variant warns that the key is readable',
-        exists(inPage) && readFileSync(inPage, 'utf8').includes(FAKE) &&
-        /readable|Allowed origins/i.test(warned));
-  check('a build with no key emits neither a proxy nor a key', (() => {
+  check('a build with no key is a single file with no proxy wired in', (() => {
     try {
       execFileSync(process.execPath,
         [join(ROOT, 'tools', 'make-deploy.mjs'), '--out', out], { encoding: 'utf8' });
@@ -1687,7 +1588,7 @@ console.log('\n=== deploy build ===');
     const plain = join(out, 'sun-studio-v' + build + '-plain', 'index.html');
     if (!exists(plain)) return false;
     const h = readFileSync(plain, 'utf8');
-    return /const MAPTILER_KEY = '';/.test(h) && /const PROXY_URL = '';/.test(h) &&
+    return /const PROXY_URL = '';/.test(h) && !/MAPTILER_KEY/.test(h) &&
            !exists(join(out, 'sun-studio-v' + build + '-plain', 'tile-proxy.php'));
   })());
 }
