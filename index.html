@@ -1032,6 +1032,11 @@ body.embed{--topbar-h:44px}
               <label for="d-radius">Sun path radius &mdash; <span id="v-radius" class="num">1.0&times;</span></label>
               <input type="range" id="d-radius" min="0.5" max="2.2" step="0.05" value="1">
             </div>
+            <div class="row col" id="row-chart">
+              <label for="d-chart">Chart clarity &mdash; <span id="v-chart" class="num">50%</span></label>
+              <input type="range" id="d-chart" min="0" max="1" step="0.05" value="0.5">
+              <p class="hint">Raise this to read the flattened chart over aerial imagery: it darkens the disc behind the chart and strengthens the arcs.</p>
+            </div>
           </div>
         </section>
 
@@ -2354,7 +2359,7 @@ const Mercator = (() => {
  * running build can be identified at a glance — a stale download that looks
  * almost right is otherwise very hard to tell apart from the current one.
  */
-const BUILD = '1.8';
+const BUILD = '1.9';
 
 const MAPTILER_KEY = '';
 
@@ -2645,6 +2650,15 @@ function lineFromPoints(points, color, opacity = 1, width = 1){
 }
 
 /**
+ * Line opacity, boosted by the chart-clarity slider.
+ *
+ * Only in stereographic mode: the flattened chart is normally read against an
+ * aerial basemap, where the 0.4-0.5 opacities that look right over the plain
+ * ground plane all but vanish. The 3D dome is left exactly as it was.
+ */
+const ink = (base) => isStereo() ? Math.min(1, base * (1 + 0.9 * State.disp.chart)) : base;
+
+/**
  * Rebuild the whole sun-path diagram for the current site.
  * Cheap enough (a few thousand solar-position evaluations) to run on every
  * location change, which is what makes the tool feel live.
@@ -2671,7 +2685,7 @@ function buildSunPath(){
       const isWarm = doy > 80 && doy < 266;
       const col = SUN_COLORS.winter.clone().lerp(SUN_COLORS.summer, isWarm ? 0.35 + w : 0.12);
       const solstice = (m === 6 || m === 12);
-      sunPathGroup.add(lineFromPoints(pts, col, solstice ? 0.95 : 0.5));
+      sunPathGroup.add(lineFromPoints(pts, col, ink(solstice ? 0.95 : 0.5)));
       if (solstice){
         const lab = makeLabel(m === 6 ? '21 Jun' : '21 Dec', { size: 38, color: '#' + col.getHexString(), scale: R * 0.027 });
         lab.position.copy(pts[Math.floor(pts.length / 2)]).multiplyScalar(1.045);
@@ -2687,12 +2701,12 @@ function buildSunPath(){
       let above = false;
       for (let doy = 1; doy <= 366; doy += 3){
         const p = SolarCore.position(site, Math.min(doy, 365), h * 60, dst);
-        if (p.altitude < -0.35) { if (above && pts.length > 2) { sunPathGroup.add(lineFromPoints(pts, SUN_COLORS.analemma, 0.42)); } pts.length = 0; above = false; continue; }
+        if (p.altitude < -0.35) { if (above && pts.length > 2) { sunPathGroup.add(lineFromPoints(pts, SUN_COLORS.analemma, ink(0.42))); } pts.length = 0; above = false; continue; }
         above = true;
         pts.push(domePoint(p.altitude, p.azimuth, R));
       }
       if (pts.length > 2){
-        sunPathGroup.add(lineFromPoints(pts, SUN_COLORS.analemma, 0.42));
+        sunPathGroup.add(lineFromPoints(pts, SUN_COLORS.analemma, ink(0.42)));
         const noonish = SolarCore.position(site, 172, h * 60, dst);
         if (noonish.altitude > 3){
           const lab = makeLabel(String(h).padStart(2,'0'), { size: 34, color: THEME.hourLabel, scale: R * 0.021 });
@@ -2719,7 +2733,7 @@ function buildSunPath(){
     for (let alt = 15; alt < 90; alt += 15){
       const pts = [];
       for (let a = 0; a <= 360; a += 4) pts.push(domePoint(alt, a, R));
-      sunPathGroup.add(lineFromPoints(pts, THEME.ring, 0.55));
+      sunPathGroup.add(lineFromPoints(pts, THEME.ring, ink(0.55)));
       const lab = makeLabel(alt + '°', { size: 30, color: THEME.ringLabel, scale: R * 0.019 });
       lab.position.copy(domePoint(alt, 90, R));
       if (!isStereo()) lab.position.multiplyScalar(1.02); else lab.position.x += R * 0.03;
@@ -2727,17 +2741,28 @@ function buildSunPath(){
     }
   }
 
-  /* --- backing plate, so the flattened chart reads over a basemap --- */
+  /* --- backing plate, so the flattened chart reads over a basemap ---
+     Its opacity is the chart-clarity slider: 0 leaves the imagery almost
+     untouched, 1 covers it with an all but solid disc under the chart lines.
+     The model still reads over it — the plate sits below building height. */
   if (isStereo()){
     const plate = new THREE.Mesh(
-      new THREE.CircleGeometry(R, 96),
+      // Slightly wider than the chart, so the compass letters at R*1.075 sit on
+      // the backdrop too rather than on the imagery just outside it.
+      new THREE.CircleGeometry(R * 1.12, 96),
       new THREE.MeshBasicMaterial({
         color: THEME.name === 'light' ? 0xffffff : 0x0b1016,
-        transparent: true, opacity: 0.2, depthWrite: false, fog: false,
+        transparent: true, opacity: 0.06 + 0.9 * State.disp.chart,
+        depthWrite: false, fog: false,
       }));
+    plate.name = 'stereoPlate';
     plate.rotation.x = -Math.PI / 2;
     plate.position.y = STEREO_Y - 0.05;
-    plate.renderOrder = -1;
+    // The basemap sits lower, so back-to-front sorting already draws the plate
+    // over it. Staying at the default order keeps the plate *under* the shadow
+    // catcher (order 1), so building shadows still read inside the chart disc —
+    // which is the whole point of looking at a site from above.
+    plate.renderOrder = 0;
     sunPathGroup.add(plate);
   }
 
@@ -2749,12 +2774,12 @@ function buildCompass(R){
   if (!State.disp.compass) return;
   const ringPts = [];
   for (let a = 0; a <= 360; a += 2) ringPts.push(domePoint(0, a, R));
-  compassGroup.add(lineFromPoints(ringPts, THEME.compass, 0.85));
+  compassGroup.add(lineFromPoints(ringPts, THEME.compass, ink(0.85)));
 
   for (let a = 0; a < 360; a += 10){
     const inner = (a % 90 === 0) ? 0.9 : (a % 30 === 0 ? 0.945 : 0.968);
     const p0 = domePoint(0, a, R * inner), p1 = domePoint(0, a, R);
-    compassGroup.add(lineFromPoints([p0, p1], a % 90 === 0 ? THEME.tickMajor : THEME.tickMinor, a % 90 === 0 ? 0.95 : 0.6));
+    compassGroup.add(lineFromPoints([p0, p1], a % 90 === 0 ? THEME.tickMajor : THEME.tickMinor, ink(a % 90 === 0 ? 0.95 : 0.6)));
   }
   const cardinals = [['N',0,THEME.cardinalN],['E',90,THEME.cardinal],['S',180,THEME.cardinal],['W',270,THEME.cardinal]];
   for (const [t, a, c] of cardinals){
@@ -3133,7 +3158,7 @@ const State = {
   northRot: 0,              // project north rotation, degrees clockwise
   weather: null,            // parsed EPW or null (clear-sky fallback)
   disp: { arcs:true, analemma:true, today:true, compass:true, rings:true,
-          shadow:true, grid:true, dome:false, radius:1,
+          shadow:true, grid:true, dome:false, radius:1, chart:0.5,
           projection:'3d', autoStereo:true },
   analysis: { mode:'inst', period:'year', unit:'kwh', gridSize:1.5, offset:0.02,
               density:1, groundRefl:0.2, useGround:true, shade:true,
@@ -4132,6 +4157,8 @@ function refresh(force = false){
   const now = performance.now();
   if (force || now - statusThrottle > 110){ statusThrottle = now; updateStatusBar(); }
   Selects.syncAll();
+  // The clarity slider only does anything to the flattened chart
+  $('row-chart').style.display = isStereo() ? '' : 'none';
   if (State.disp.today) rebuildTodayArc();
 }
 
@@ -4788,6 +4815,12 @@ on('d-radius', 'input', (e) => {
   rebuildAll();
 });
 
+on('d-chart', 'input', (e) => {
+  State.disp.chart = +e.target.value;
+  $('v-chart').textContent = Math.round(State.disp.chart * 100) + '%';
+  rebuildAll();
+});
+
 /* --- model --------------------------------------------------------------- */
 on('i-sample', 'change', (e) => loadSample(e.target.value));
 on('b-obj', 'click', () => $('f-obj').click());
@@ -5397,6 +5430,35 @@ function init(){
     resolveMapKey, MAPTILER_KEY_STORE, sourceAttribution, PROXY_URL, PROXY_ATTRIBUTION,
     loadPlaces, savePlace, removePlace, renderPlaces, PLACES_KEY,
     requestRender, BUILD,
+    /** How prominent the flattened chart is drawn — the clarity slider. */
+    chartProbe: () => {
+      const plate = sunPathGroup.getObjectByName('stereoPlate');
+      // Where the disc lands on screen, so a test can sample pixels that are
+      // inside the chart but clear of the model in the middle.
+      let screen = null;
+      if (plate){
+        const cnv = renderer.domElement;
+        const w = cnv.clientWidth, h = cnv.clientHeight;
+        const toPx = (v) => {
+          const p = v.clone().project(camera);
+          return { x: (p.x * 0.5 + 0.5) * w, y: (1 - (p.y * 0.5 + 0.5)) * h };
+        };
+        const c = toPx(plate.position);
+        const rim = toPx(new THREE.Vector3(sunPathRadius, plate.position.y, 0));
+        screen = { cx: c.x, cy: c.y, r: Math.hypot(rim.x - c.x, rim.y - c.y), w, h };
+      }
+      const lines = [];
+      sunPathGroup.traverse(o => { if (o.isLine) lines.push(o.material.opacity); });
+      compassGroup.traverse(o => { if (o.isLine) lines.push(o.material.opacity); });
+      return {
+        plateOpacity: plate ? plate.material.opacity : null,
+        minLineOpacity: lines.length ? Math.min(...lines) : null,
+        lineCount: lines.length,
+        rowVisible: $('row-chart').style.display !== 'none',
+        value: State.disp.chart,
+        screen,
+      };
+    },
     /** Shadow frustum vs what actually receives shadows. */
     shadowProbe: () => ({
       ext: sunLight.shadow.camera.right,

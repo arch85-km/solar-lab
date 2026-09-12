@@ -10,6 +10,7 @@
  * TMY3 EPW's own measured Global Horizontal Radiation.
  */
 import { createServer } from 'node:http';
+import { deflateSync } from 'node:zlib';
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, dirname, extname, normalize } from 'node:path';
@@ -69,19 +70,57 @@ await ctx.route('**://cdn.jsdelivr.net/**', async (route) => {
                         headers: { 'access-control-allow-origin': '*' }, body: await readFile(file, 'utf8') });
 });
 
-// Synthetic map tiles: a solid colour plus the z/x/y burnt in, so orientation
-// and count can be asserted without hitting OpenStreetMap's servers.
+/**
+ * A synthetic 256 px map tile: pale, faintly checkered, like aerial imagery.
+ *
+ * Full tile size matters. The app draws each tile at its natural size, so a 1x1
+ * stub leaves the stitched map almost entirely background colour — and then any
+ * check that reads pixels "over a basemap" is really reading empty ground.
+ */
+function paleTile(){
+  const S = 256;
+  const rows = Buffer.alloc(S * (S * 3 + 1));
+  let o = 0;
+  for (let y = 0; y < S; y++){
+    rows[o++] = 0;                                   // no per-row filter
+    for (let x = 0; x < S; x++){
+      const v = ((x >> 5) + (y >> 5)) % 2 ? 214 : 226;
+      rows[o++] = v; rows[o++] = v - 4; rows[o++] = v - 12;
+    }
+  }
+  const chunk = (type, data) => {
+    const len = Buffer.alloc(4); len.writeUInt32BE(data.length);
+    const body = Buffer.concat([Buffer.from(type, 'ascii'), data]);
+    const crc = Buffer.alloc(4); crc.writeUInt32BE(crc32(body));
+    return Buffer.concat([len, body, crc]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(S, 0); ihdr.writeUInt32BE(S, 4);
+  ihdr[8] = 8; ihdr[9] = 2;                          // 8-bit RGB
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', ihdr), chunk('IDAT', deflateSync(rows)), chunk('IEND', Buffer.alloc(0)),
+  ]);
+}
+function crc32(buf){
+  let c = ~0;
+  for (const b of buf){
+    c ^= b;
+    for (let k = 0; k < 8; k++) c = (c >>> 1) ^ (0xedb88320 & -(c & 1));
+  }
+  return (~c) >>> 0;
+}
+const TILE_PNG = paleTile();
+
+// Synthetic map tiles, so orientation and count can be asserted without hitting
+// OpenStreetMap's servers.
 let tileRequests = [];
 await ctx.route('**://tile.openstreetmap.org/**', async (route) => {
   const m = new URL(route.request().url()).pathname.match(/^\/(\d+)\/(\d+)\/(\d+)\.png$/);
   if (!m) return route.fulfill({ status: 404, body: '' });
   tileRequests.push({ z: +m[1], x: +m[2], y: +m[3] });
-  // 1x1 opaque PNG is enough; the test asserts requests and geometry, not pixels
-  const png = Buffer.from(
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
-    'base64');
   await route.fulfill({ status: 200, contentType: 'image/png',
-                        headers: { 'access-control-allow-origin': '*' }, body: png });
+                        headers: { 'access-control-allow-origin': '*' }, body: TILE_PNG });
 });
 
 let geocodeRequests = 0;
@@ -759,19 +798,13 @@ let maptilerStatus = 200;
 await ctx.route('**://api.maptiler.com/**', async (route) => {
   maptilerUrls.push(route.request().url());
   if (maptilerStatus !== 200) return route.fulfill({ status: maptilerStatus, body: 'denied' });
-  const png = Buffer.from(
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
-    'base64');
   await route.fulfill({ status: 200, contentType: 'image/png',
-                        headers: { 'access-control-allow-origin': '*' }, body: png });
+                        headers: { 'access-control-allow-origin': '*' }, body: TILE_PNG });
 });
 await ctx.route('**://tiles.example.org/**', async (route) => {
   maptilerUrls.push(route.request().url());
-  const png = Buffer.from(
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
-    'base64');
   await route.fulfill({ status: 200, contentType: 'image/png',
-                        headers: { 'access-control-allow-origin': '*' }, body: png });
+                        headers: { 'access-control-allow-origin': '*' }, body: TILE_PNG });
 });
 
 // Key priority: URL parameter, then this browser's stored key, then the constant
@@ -965,11 +998,8 @@ await page.evaluate(() => {
   const proxied = [];
   await proxCtx.route('**/tile-proxy.php*', async (route) => {
     proxied.push(route.request().url());
-    const png = Buffer.from(
-      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
-      'base64');
     await route.fulfill({ status: 200, contentType: 'image/png',
-                          headers: { 'access-control-allow-origin': '*' }, body: png });
+                          headers: { 'access-control-allow-origin': '*' }, body: TILE_PNG });
   });
   // Serve the app with PROXY_URL filled in, as a deployment would
   const src = (await readFile(join(ROOT, 'index.html'), 'utf8'))
@@ -1163,6 +1193,95 @@ const optOut = await page.evaluate(async () => {
   return p;
 });
 check('the auto-flatten toggle can be switched off', optOut === '3d', 'stayed ' + optOut);
+
+/* ---------------------------------------------------- chart clarity slider --- */
+// Over aerial imagery the flattened chart vanished: the 0.42-0.55 opacities that
+// suit the plain ground plane have nothing to read against. One slider raises
+// both the backdrop disc and the line ink, and must leave the 3D dome alone.
+const clarity = await page.evaluate(async () => {
+  const A = window.__SUNAPP;
+  const set = (v) => {
+    const s = document.getElementById('d-chart');
+    s.value = String(v);
+    s.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+  A.setProjection('3d');
+  const dome25 = A.chartProbe();
+  set(0.6);
+  const dome60 = A.chartProbe();
+  set(0.25);
+  A.setProjection('stereo');
+  set(0);
+  const low = A.chartProbe();
+  set(1);
+  const high = A.chartProbe();
+  const readout = document.getElementById('v-chart').textContent;
+  set(0.25);
+  return { dome25, dome60, low, high, readout };
+});
+check('the clarity slider is offered only where it does something',
+      clarity.dome25.rowVisible === false && clarity.low.rowVisible === true,
+      '3D hidden, stereographic shown');
+check('the backdrop goes from all but invisible to all but solid',
+      clarity.low.plateOpacity < 0.1 && clarity.high.plateOpacity > 0.9,
+      'plate ' + clarity.low.plateOpacity.toFixed(2) + ' → ' + clarity.high.plateOpacity.toFixed(2));
+check('the faintest chart lines are strengthened with it',
+      clarity.high.minLineOpacity > clarity.low.minLineOpacity + 0.3 &&
+      clarity.high.minLineOpacity <= 1,
+      'faintest line ' + clarity.low.minLineOpacity.toFixed(2) + ' → ' +
+      clarity.high.minLineOpacity.toFixed(2) + ' over ' + clarity.high.lineCount + ' lines');
+check('the 3D dome is unaffected by it',
+      clarity.dome25.plateOpacity === null &&
+      clarity.dome25.minLineOpacity === clarity.dome60.minLineOpacity,
+      'dome faintest line ' + clarity.dome25.minLineOpacity.toFixed(2) + ' at both settings');
+check('the slider reads out as a percentage', clarity.readout === '100%', clarity.readout);
+
+// The point of the control is pixels, not material properties: looking straight
+// down on a basemap, turning it up must actually replace the imagery behind the
+// chart with a flat backdrop.
+const clarityPx = await page.evaluate(async () => {
+  const A = window.__SUNAPP;
+  A.State.basemap.extent = 400;
+  await A.Basemap.loadTiles('osm');
+  A.setProjection('stereo');
+  A.orbitTo(0, 88);                       // straight down on the chart
+  const cnv = document.querySelector('#viewport canvas');
+  const scratch = document.createElement('canvas');
+  const g = scratch.getContext('2d');
+  const sample = async (v) => {
+    const s = document.getElementById('d-chart');
+    s.value = String(v);
+    s.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise(r => requestAnimationFrame(r));
+    await new Promise(r => requestAnimationFrame(r));
+    const sc = A.chartProbe().screen;
+    scratch.width = sc.w; scratch.height = sc.h;
+    g.drawImage(cnv, 0, 0, sc.w, sc.h);
+    // Four patches at 55% of the chart radius: inside the disc, outside the
+    // model in the middle, so what is measured is chart against imagery.
+    const lum = [];
+    for (const deg of [45, 135, 225, 315]){
+      const a = deg * Math.PI / 180;
+      const px = Math.round(sc.cx + Math.cos(a) * sc.r * 0.55) - 6;
+      const py = Math.round(sc.cy + Math.sin(a) * sc.r * 0.55) - 6;
+      const d = g.getImageData(px, py, 12, 12).data;
+      for (let i = 0; i < d.length; i += 4)
+        lum.push(d[i] * 0.299 + d[i+1] * 0.587 + d[i+2] * 0.114);
+    }
+    return { mean: lum.reduce((x, y) => x + y, 0) / lum.length, n: lum.length };
+  };
+  const low = await sample(0);
+  const high = await sample(1);
+  const s = document.getElementById('d-chart');
+  s.value = '0.25';
+  s.dispatchEvent(new Event('input', { bubbles: true }));
+  A.Basemap.clear();
+  return { low, high };
+});
+check('turning it up visibly replaces the imagery behind the chart',
+      clarityPx.low.mean - clarityPx.high.mean > 60,
+      'mean luminance ' + clarityPx.low.mean.toFixed(0) + ' → ' + clarityPx.high.mean.toFixed(0) +
+      ' over ' + clarityPx.high.n + ' px');
 
 /* ------------------------------------------------------------ place search --- */
 console.log('\n=== place search ===');
@@ -1510,6 +1629,67 @@ for (const s of sizes){
   const overflow = await page.evaluate(() =>
     document.documentElement.scrollWidth - document.documentElement.clientWidth);
   check('no horizontal overflow at ' + s.w + '×' + s.h, overflow <= 1, 'overflow ' + overflow + 'px');
+}
+
+/* ----------------------------------------------------------- deploy build --- */
+// The key must never be in the page the public downloads. The build script is
+// what guarantees that, so it is checked here with a fake key: the page it emits
+// must not contain the key anywhere, only the PHP proxy may.
+console.log('\n=== deploy build ===');
+{
+  const { execFileSync } = await import('node:child_process');
+  const { mkdtempSync, readFileSync, existsSync: exists } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const FAKE = 'TESTKEY_NOT_A_REAL_MAPTILER_KEY';
+  const out = mkdtempSync(join(tmpdir(), 'sunstudio-deploy-'));
+  const build = readFileSync(join(ROOT, 'index.html'), 'utf8').match(/const BUILD = '([^']+)';/)[1];
+
+  let ranOk = true, stdout = '';
+  try {
+    stdout = execFileSync(process.execPath,
+      [join(ROOT, 'tools', 'make-deploy.mjs'), '--key', FAKE, '--out', out],
+      { encoding: 'utf8' });
+  } catch (e) { ranOk = false; stdout = String(e.stdout || e.message); }
+
+  const dir = join(out, 'sun-studio-v' + build + '-proxy');
+  const pageFile = join(dir, 'index.html');
+  const phpFile = join(dir, 'tile-proxy.php');
+  check('the build script emits a page and a proxy, stamped with the source version',
+        ranOk && exists(pageFile) && exists(phpFile), 'sun-studio-v' + build + '-proxy');
+  if (exists(pageFile) && exists(phpFile)){
+    const html = readFileSync(pageFile, 'utf8');
+    const php = readFileSync(phpFile, 'utf8');
+    check('the emitted page contains no key at all',
+          !html.includes(FAKE) && /const MAPTILER_KEY = '';/.test(html));
+    check('it points at the proxy by relative path, so it works in any folder',
+          /const PROXY_URL = 'tile-proxy\.php\?z=\{z\}&x=\{x\}&y=\{y\}&s=\{style\}';/.test(html));
+    check('the key goes into the PHP file, which servers execute rather than serve',
+          php.includes("$MAPTILER_KEY = '" + FAKE + "';"));
+  }
+
+  // The single-file variant is still available, but it is the one that exposes
+  // the key — so it must say so rather than emit quietly.
+  let warned = '';
+  try {
+    warned = execFileSync(process.execPath,
+      [join(ROOT, 'tools', 'make-deploy.mjs'), '--key', FAKE, '--key-in-page', '--out', out],
+      { encoding: 'utf8' });
+  } catch (e) { warned = String(e.stdout || e.message); }
+  const inPage = join(out, 'sun-studio-v' + build + '-key-in-page', 'index.html');
+  check('the single-file variant warns that the key is readable',
+        exists(inPage) && readFileSync(inPage, 'utf8').includes(FAKE) &&
+        /readable|Allowed origins/i.test(warned));
+  check('a build with no key emits neither a proxy nor a key', (() => {
+    try {
+      execFileSync(process.execPath,
+        [join(ROOT, 'tools', 'make-deploy.mjs'), '--out', out], { encoding: 'utf8' });
+    } catch (e) { return false; }
+    const plain = join(out, 'sun-studio-v' + build + '-plain', 'index.html');
+    if (!exists(plain)) return false;
+    const h = readFileSync(plain, 'utf8');
+    return /const MAPTILER_KEY = '';/.test(h) && /const PROXY_URL = '';/.test(h) &&
+           !exists(join(out, 'sun-studio-v' + build + '-plain', 'tile-proxy.php'));
+  })());
 }
 
 /* ------------------------------------------------------------------ done --- */

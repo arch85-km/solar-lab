@@ -64,6 +64,14 @@ function host_of(?string $url): string {
 $self = strtolower((string)($_SERVER['HTTP_HOST'] ?? ''));
 $from = host_of($_SERVER['HTTP_ORIGIN'] ?? null) ?: host_of($_SERVER['HTTP_REFERER'] ?? null);
 
+// Follow the scheme the page was actually served over, including behind a proxy
+// or load balancer. Guessing https breaks the CORS header on an http site, and
+// the tiles then fail to reach the canvas for no visible reason.
+$fwd = strtolower((string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? ''));
+$secure = $fwd !== '' ? $fwd === 'https'
+        : (!empty($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) !== 'off');
+$scheme = $secure ? 'https' : 'http';
+
 // The app and this script sit in the same directory, so the browser always
 // sends a same-host Origin or Referer. A request without one is not from the
 // page, and is refused rather than quietly allowed — otherwise this becomes an
@@ -115,7 +123,7 @@ curl_setopt_array($ch, [
     CURLOPT_CONNECTTIMEOUT => 5,
     CURLOPT_TIMEOUT        => 12,
     CURLOPT_FOLLOWLOCATION => false,
-    CURLOPT_USERAGENT      => 'SunStudio-tile-proxy/1.0 (+https://' . $self . ')',
+    CURLOPT_USERAGENT      => 'SunStudio-tile-proxy/1.0 (+' . $scheme . '://' . $self . ')',
 ]);
 $body = curl_exec($ch);
 $status = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
@@ -138,6 +146,6 @@ header('Content-Type: ' . $type);
 header('Content-Length: ' . strlen((string)$body));
 header('Cache-Control: public, max-age=' . $BROWSER_CACHE_SECONDS);
 // The app draws tiles into a canvas, which needs CORS even same-origin-ish
-header('Access-Control-Allow-Origin: https://' . $self);
+header('Access-Control-Allow-Origin: ' . $scheme . '://' . $self);
 header('X-Content-Type-Options: nosniff');
 echo $body;

@@ -42,7 +42,9 @@ Below: the first-load state (London, clear-sky model) and the phone layout.
 ## Putting it on a WordPress page
 
 The app is one self-contained file. `three.js` is loaded from a CDN, so the page needs
-internet access — which any live WordPress site has.
+internet access — which any live WordPress site has. If you want MapTiler imagery with
+the key kept off the page, build the two-file pair first (see *Keeping the key out of the
+page entirely* below) and upload both files into the same folder.
 
 ### Option 1 — iframe (recommended)
 
@@ -142,28 +144,39 @@ origins* in MapTiler Cloud to your domain and a copied key is useless elsewhere.
 Two ways to supply it:
 
 - **Paste it into the app** — saved in that browser only, good for your own machine.
-- **Bake it into your deployed copy** — set `const MAPTILER_KEY = '…'` near the top of
-  `index.html` and every visitor gets imagery without typing anything. The copy in this
-  repository is deliberately empty: a key committed to git is in every clone permanently,
-  and rotating it later would not remove it.
+- **Bake it into your deployed copy** — `node tools/make-deploy.mjs --key YOUR_KEY
+  --key-in-page` writes a single file with the key in it, and every visitor gets imagery
+  without typing anything. The copy in this repository is deliberately empty: a key
+  committed to git is in every clone permanently, and rotating it later would not remove
+  it — which is why the key goes in at build time and `deploy/` is gitignored.
 
 `?maptiler=YOUR_KEY` on the URL overrides both, which is handy for a one-off demo.
 
 #### Keeping the key out of the page entirely
 
 Either of the above leaves the key readable in the page source. That is normal and the key
-is read-only, but if you would rather it never reached the browser, use the proxy — it is
-one extra file in the same folder:
+is read-only, but if you would rather it never reached the browser, build the proxy pair —
+two files in one folder, and no credential in the page at all:
 
-1. Upload `server/tile-proxy.php` next to the HTML file.
-2. Open it and set `$MAPTILER_KEY` — that is the only edit.
-3. In the HTML, set `const PROXY_URL = 'tile-proxy.php?z={z}&x={x}&y={y}&s={style}'`.
+```bash
+node tools/make-deploy.mjs --key YOUR_MAPTILER_KEY
+```
 
-Leave `MAPTILER_KEY` empty. A **Site imagery** source then appears and becomes the
-default, the key panel is replaced by "Held on the server", and there is no credential in
-the page at all — so nothing to restrict by domain either. The proxy only answers requests
-from pages on its own host, checks the tile coordinates, allows only known styles and
-rate-limits per visitor, so it cannot be turned into an open proxy.
+That writes `deploy/sun-studio-v<version>-proxy/` containing `index.html` (with **no key
+in it**) and `tile-proxy.php` (with the key). Upload both into the same folder, keeping
+those names. `PROXY_URL` is a relative path, so the pair works in any directory on any
+domain — renaming or moving them is fine as long as they stay together.
+
+The script refuses to write the page if the key has leaked into it, which is the one thing
+worth automating here. `--key-in-page` builds the older single file instead, key included,
+for a server without PHP; `--out DIR` changes where it writes. `deploy/` is gitignored.
+
+In the proxy build a **Site imagery** source appears and becomes the default, the key
+panel is replaced by "Held on the server", and there is nothing to restrict by domain —
+in fact **do not** set *Allowed origins* on a key used this way: the proxy fetches tiles
+server-side and sends no browser origin, so the restriction would block it. It only
+answers requests from pages on its own host, checks the tile coordinates, allows only
+known styles and rate-limits per visitor, so it cannot be turned into an open proxy.
 
 If tiles fail, the style name is the usual culprit — the *Style name* field is editable so
 you can match a style that exists in your account.
@@ -176,6 +189,13 @@ centre, following radius = R·tan((90−altitude)/2). Leaving top view restores 
 *Flatten automatically in top view* switch in Sun Path Display turns that behaviour off,
 and the *Projection* control forces either mode in any view. The shadow-casting sun always
 uses the true 3D position, so shadows are identical in both modes.
+
+**Chart clarity** — the flattened chart is normally read over aerial imagery, which is
+busy enough to swallow it. The *Chart clarity* slider in Sun Path Display puts a backdrop
+disc under the chart and strengthens the arcs together, from barely-there to an almost
+solid plate; it appears only in the flattened view, since that is the only place it does
+anything. Building shadows still read through it, and the default setting is already
+legible over satellite imagery.
 
 ![Stereographic chart in top view](docs/screenshot-stereographic.png)
 
@@ -282,7 +302,7 @@ It is clearly labelled as synthetic; it is not real climate.
 
 ## Validation
 
-`npm test` runs 141 headless checks. Every number below is produced by that suite, not
+`npm test` runs 153 headless checks. Every number below is produced by that suite, not
 asserted by hand.
 
 | Check | Result |
@@ -376,7 +396,7 @@ rebuilds live on every change, with no "apply" step.
 ```bash
 npm install          # playwright, for the test suite only
 npm run vendor       # fetch three.js and the validation EPW
-npm test             # 141 headless checks, screenshots and sample export sheets
+npm test             # 153 headless checks, screenshots and sample export sheets
 npm run serve        # serve the folder at http://localhost:8080
 ```
 
@@ -392,6 +412,8 @@ Screenshots land in `tests/screenshots/`.
 
 ```
 index.html            the entire app — this is the deliverable
+tools/make-deploy.mjs builds the files to upload, keeping the map key out of the page
+server/tile-proxy.php optional tile proxy, holds the key server-side
 tests/verify.mjs      headless verification and screenshots
 tests/fetch-vendor.mjs downloads three.js from the npm registry
 tests/assets/         downloaded on demand (Chicago O'Hare TMY3, for validation)
