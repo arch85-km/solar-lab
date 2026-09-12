@@ -863,7 +863,7 @@ body.embed{--topbar-h:44px}
               <select id="i-basemap">
                 <option value="none">None</option>
                 <option value="osm">OpenStreetMap</option>
-                <option value="custom">Custom XYZ tiles</option>
+                <option value="osm3d">OpenStreetMap + 3D buildings</option>
                 <option value="image">Site image</option>
               </select>
             </div>
@@ -888,16 +888,9 @@ body.embed{--topbar-h:44px}
               <p class="hint">Tiles come through <b>tile-proxy.php</b> on this site, which holds the key. Nothing secret is in this page, so there is nothing to restrict by domain &mdash; the proxy only answers requests from pages on its own host.</p>
             </div>
 
-            <div id="bm-custom" style="display:none">
-              <div class="row col">
-                <label for="i-bm-url">Tile URL template</label>
-                <input type="text" id="i-bm-url" placeholder="https://…/{z}/{x}/{y}.png?key=…" spellcheck="false">
-              </div>
-              <div class="row col">
-                <label for="i-bm-attrib">Attribution required by that provider</label>
-                <input type="text" id="i-bm-attrib" placeholder="© Provider © OpenStreetMap contributors">
-              </div>
-              <p class="hint">Any XYZ raster service &mdash; Mapbox, Esri, a university WMS. You are responsible for that provider's terms, and the attribution you type here is shown on screen and in exports.</p>
+            <div id="bm-3d" style="display:none">
+              <p class="hint">The street map, plus the surrounding buildings as volumes: footprints and heights from OpenStreetMap via the <b>Overpass API</b> &mdash; no key, no account. Heights come from <code>height</code> or <code>building:levels</code> where they are mapped; anything untagged is drawn at 8&nbsp;m. They cast shadows, and whether they shade the analysis is a switch in <b>Solar Radiation Analysis</b>.</p>
+              <p class="hint" id="bm-3d-note"></p>
             </div>
 
             <div id="bm-tiles" style="display:none">
@@ -984,6 +977,11 @@ body.embed{--topbar-h:44px}
             </div>
             <label class="sw"><input type="checkbox" id="d-autostereo" checked><span class="track"></span><span class="t">Flatten automatically in top view</span></label>
             <p class="hint">Stereographic is the classic printed sun-path chart: the horizon is the outer circle, the zenith the centre, radius = R&middot;tan((90&minus;altitude)/2).</p>
+            <div class="row" style="margin-top:9px">
+              <button class="btn sm grow" id="b-chart-place">Place on site&hellip;</button>
+              <button class="btn sm ghost" id="b-chart-centre">Centre</button>
+            </div>
+            <p class="hint" id="chart-at-note">The chart sits on the model centre. Press <b>Place on site</b> and click the spot you want it over &mdash; a courtyard, a roof, a street corner.</p>
             <label class="sw" style="margin-top:9px"><input type="checkbox" id="d-arcs" checked><span class="track"></span><span class="t">Monthly sun-path arcs</span></label>
             <label class="sw"><input type="checkbox" id="d-analemma" checked><span class="track"></span><span class="t">Hourly analemmas</span></label>
             <label class="sw"><input type="checkbox" id="d-today" checked><span class="track"></span><span class="t">Highlight today&rsquo;s arc</span></label>
@@ -999,7 +997,7 @@ body.embed{--topbar-h:44px}
             <div class="row col" id="row-chart">
               <label for="d-chart">Chart line weight &mdash; <span id="v-chart" class="num">1.0&times;</span></label>
               <input type="range" id="d-chart" min="0.5" max="2.5" step="0.1" value="1">
-              <p class="hint">How heavily the flattened chart is drawn. Every line carries a casing of its own, so it reads over aerial imagery with nothing laid behind it &mdash; the site stays visible between the lines.</p>
+              <p class="hint">How heavily the sun paths are drawn. The fine grid stays a hairline and the arcs carry a thin casing, so the chart reads over a map with nothing laid behind it &mdash; the site stays visible between the lines.</p>
             </div>
           </div>
         </section>
@@ -1131,6 +1129,7 @@ body.embed{--topbar-h:44px}
             </div>
             <label class="sw"><input type="checkbox" id="i-useground" checked><span class="track"></span><span class="t">Include ground-reflected</span></label>
             <label class="sw"><input type="checkbox" id="i-ctx" checked><span class="track"></span><span class="t">Surfaces shade each other</span></label>
+            <label class="sw"><input type="checkbox" id="i-ctx-osm" checked><span class="track"></span><span class="t">OpenStreetMap context shades the analysis</span></label>
 
             <button class="btn primary wide" id="b-run" style="margin-top:11px">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3.6 20 12 6 20.4z"/></svg>
@@ -2102,14 +2101,14 @@ const THEMES = {
     ring: 0x3d4b5a, ringLabel: '#5d6e80',
     compass: 0x5a6a7c, tickMajor: 0x8f9fb0, tickMinor: 0x4d5b6b,
     cardinalN: '#ff9a6b', cardinal: '#a9b8c7', hourLabel: '#8ea3b7',
-    // The flattened chart is read over aerial imagery, so its contrast cannot
-    // come from the background: every line carries a casing of its own. Dark
-    // presentation means light ink on a dark casing.
+    // The flattened chart draws in the dome's own colours — same greys, same
+    // seasonal arcs — with a faint casing so it survives a busy basemap. Only
+    // the casing and the label halo are particular to the flat view.
     chart: {
-      grid: 0xaab8c8, hour: 0xb9c7d5, ring: 0x9fb0c2,
-      casing: 0x080c12, casingAlpha: 0.85,
-      label: '#eaf1f8', labelHalo: 'rgba(6,10,16,0.92)',
-      cardinal: '#ffd9c4', cardinalN: '#ffa678',
+      grid: 0x5a6a7c, hour: 0x6d8398, ring: 0x3d4b5a,
+      casing: 0x0a0f16, casingAlpha: 0.30,
+      label: '#eaf1f8', labelHalo: 'rgba(8,12,18,0.92)',
+      cardinal: '#a9b8c7', cardinalN: '#ff9a6b',
     },
     sheetBg: '#0d1117', sheetPanel: '#151b23', sheetLine: '#2a3441',
     sheetText: '#e8eef5', sheetDim: '#9aa8b8', sheetFaint: '#6b7887', sheetAccent: '#ffb340',
@@ -2128,10 +2127,10 @@ const THEMES = {
     compass: 0x94a0ac, tickMajor: 0x5a6673, tickMinor: 0xafb8c2,
     cardinalN: '#c2410c', cardinal: '#5a6673', hourLabel: '#68737f',
     chart: {
-      grid: 0x55606d, hour: 0x46515e, ring: 0x5d6875,
-      casing: 0xffffff, casingAlpha: 0.9,
+      grid: 0x94a0ac, hour: 0x8b97a5, ring: 0xb4bdc8,
+      casing: 0xffffff, casingAlpha: 0.38,
       label: '#16202b', labelHalo: 'rgba(255,255,255,0.94)',
-      cardinal: '#25303c', cardinalN: '#b03a08',
+      cardinal: '#5a6673', cardinalN: '#c2410c',
     },
     sheetBg: '#ffffff', sheetPanel: '#f3f5f8', sheetLine: '#d4dae2',
     sheetText: '#111a24', sheetDim: '#4a5765', sheetFaint: '#7b8794', sheetAccent: '#b45309',
@@ -2220,7 +2219,10 @@ scene.add(shadowCatcher);
 
 /** Size the catcher to the model's neighbourhood; returns its half-extent. */
 function fitShadowCatcher(){
-  const half = Math.max(State.modelRadius * 3.2, 60);
+  // The context ring can be far wider than the model; a frustum sized to the
+  // model alone would cut its shadows off with a straight edge, which is the
+  // banding this had in v1.7.
+  const half = Math.max(State.modelRadius * 3.2, OsmBuildings.info.shadowRadius * 1.15, 60);
   shadowCatcher.scale.set(half * 2, half * 2, 1);
   return half;
 }
@@ -2251,15 +2253,21 @@ function makeLabel(text, { size = 46, color = '#cfd9e4', weight = 600, scale = 1
   // `halo` strokes the glyphs in the opposite tone before filling them, so a
   // label stays readable over aerial imagery instead of relying on the
   // background behind it. Same trick a map uses for place names.
+  // Drawn at 2x and mipmapped. A label sprite is almost always minified on
+  // screen, and an unmipmapped texture samples one texel per pixel there, which
+  // is what left the numbers with dirty edges.
+  const SS = 2;
   const pad = Math.round(size * 0.28), cnv = document.createElement('canvas'), ctx = cnv.getContext('2d');
-  ctx.font = weight + ' ' + size + 'px Inter, system-ui, sans-serif';
+  const font = (px) => weight + ' ' + px + 'px Inter, system-ui, sans-serif';
+  ctx.font = font(size);
   const w = Math.ceil(ctx.measureText(text).width) + pad * 2, h = size + pad * 2;
-  cnv.width = w; cnv.height = h;
-  ctx.font = weight + ' ' + size + 'px Inter, system-ui, sans-serif';
+  cnv.width = w * SS; cnv.height = h * SS;
+  ctx.scale(SS, SS);
+  ctx.font = font(size);
   ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
   if (halo){
     ctx.strokeStyle = halo;
-    ctx.lineWidth = Math.max(3, size * 0.20);
+    ctx.lineWidth = Math.max(2.5, size * 0.16);
     ctx.lineJoin = 'round';
     ctx.miterLimit = 2;
     ctx.strokeText(text, w / 2, h / 2);
@@ -2267,7 +2275,10 @@ function makeLabel(text, { size = 46, color = '#cfd9e4', weight = 600, scale = 1
   ctx.fillStyle = color;
   ctx.fillText(text, w / 2, h / 2);
   const tex = new THREE.CanvasTexture(cnv);
-  tex.minFilter = THREE.LinearFilter;
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
   if ('colorSpace' in tex) tex.colorSpace = THREE.SRGBColorSpace;
   const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false }));
   spr.scale.set(w / size * scale, h / size * scale, 1);
@@ -2349,7 +2360,7 @@ const Mercator = (() => {
  * running build can be identified at a glance — a stale download that looks
  * almost right is otherwise very hard to tell apart from the current one.
  */
-const BUILD = '2.0';
+const BUILD = '2.1';
 
 /**
  * Aerial imagery through a tile proxy on your own server.
@@ -2392,15 +2403,14 @@ const TILE_SOURCES = {
               'on the server, and that PHP can reach the tile service.',
     viaProxy: true,
   },
-  custom: {
-    label: 'Custom tiles',
-    url: (x, y, z) => (State.basemap.customUrl || '')
-      .replace(/\{z\}/g, z).replace(/\{x\}/g, x).replace(/\{y\}/g, y)
-      .replace(/\{s\}/g, 'a'),
-    attribution: () => State.basemap.customAttrib || '',
-    maxZoom: 22,
-    failHint: 'No tiles loaded from that template. Check the URL, any credentials it ' +
-              'carries, and that the service allows requests from this page.',
+  // Same tiles as 'osm'; the difference is the extruded buildings that come
+  // with it, which loadBasemapTiles() fetches once the ground is down.
+  osm3d: {
+    label: 'OpenStreetMap + 3D buildings',
+    url: (x, y, z) => 'https://tile.openstreetmap.org/' + z + '/' + x + '/' + y + '.png',
+    attribution: '© OpenStreetMap contributors',
+    maxZoom: 19,
+    buildings: true,
   },
 };
 const sourceAttribution = (src) =>
@@ -2421,6 +2431,7 @@ const Basemap = (() => {
     if (gridHelper) gridHelper.visible = State.disp.grid;
     ground.visible = true;
     sunLight.shadow.needsUpdate = true;
+    restyleChart();
     requestRender();
     updateAttribution();
   }
@@ -2459,6 +2470,9 @@ const Basemap = (() => {
     // surfaces competing for depth on whatever GPU happens to be in use.
     ground.visible = false;
     sunLight.shadow.needsUpdate = true;
+    // The flattened chart draws its casing and labels against what is behind
+    // it, so arriving or leaving imagery changes how it must be drawn.
+    restyleChart();
     requestRender();
     updateAttribution();
     return mesh;
@@ -2558,6 +2572,229 @@ const Basemap = (() => {
   };
 })();
 
+/* ============================================================================
+ *  OpenStreetMap 3D buildings — the city around the site, as volumes
+ *
+ *  OpenStreetMap carries building footprints with `height` or `building:levels`
+ *  tags, which the Overpass API will hand over for a bounding box with no key
+ *  and no account. Extruded, that is the "3D map" a sun study actually needs:
+ *  for overshadowing it is the neighbours that matter, not the roof texture.
+ *
+ *  Two deliberate choices:
+ *
+ *    - the volumes live in their own group at scene level, NOT in modelGroup,
+ *      because modelGroup is rotated to project north while OSM data — like the
+ *      basemap — is geographic and must stay put;
+ *    - they never receive analysis points. They are occluders, and only when
+ *      "OSM context shades the analysis" is on. Your model is what is measured.
+ *
+ *  Data © OpenStreetMap contributors, ODbL. Heights in OSM are patchy: where a
+ *  building says nothing, it is drawn at 8 m, and the panel says how many were
+ *  guessed so nobody mistakes a default for a survey.
+ * ========================================================================== */
+const contextGroup = new THREE.Group();
+scene.add(contextGroup);
+
+const OsmBuildings = (() => {
+  const ENDPOINT = 'https://overpass-api.de/api/interpreter';
+  const MAX_BUILDINGS = 1200;
+  const MAX_RADIUS = 600;          // metres; Overpass is a shared free service
+  // Only the near ring casts shadows. The shadow map is a fixed 2048 texels, so
+  // a frustum stretched over 600 m of city would blur the model's own shadows;
+  // and a block 200 m away only reaches the site when the sun is under ~10°.
+  const SHADOW_RADIUS = 160;
+  const DEFAULT_H = 8;             // two storeys, when OSM says nothing
+  const LEVEL_H = 3.2;
+
+  const state = { count: 0, guessed: 0, radius: 0, shadowRadius: 0, note: '', tris: null };
+  let meshes = [];
+
+  /** Metres of height from OSM tags, and whether it had to be guessed. */
+  function heightOf(tags){
+    const t = tags || {};
+    const h = parseFloat(String(t.height || t['building:height'] || '').replace(/[^0-9.]/g, ''));
+    if (isFinite(h) && h >= 2) return { h: Math.min(h, 400), guessed: false };
+    const lv = parseFloat(t['building:levels']);
+    if (isFinite(lv) && lv >= 1) return { h: Math.min(lv * LEVEL_H, 400), guessed: false };
+    return { h: DEFAULT_H, guessed: true };
+  }
+  function baseOf(tags){
+    const t = tags || {};
+    const m = parseFloat(String(t.min_height || '').replace(/[^0-9.]/g, ''));
+    if (isFinite(m) && m > 0) return Math.min(m, 300);
+    const lv = parseFloat(t['building:min_level']);
+    return (isFinite(lv) && lv > 0) ? Math.min(lv * LEVEL_H, 300) : 0;
+  }
+
+  /**
+   * Local metres from latitude/longitude, using the same Web Mercator maths the
+   * basemap georeferences with, so volumes land on their own tiles.
+   */
+  function projector(lat0, lon0){
+    const Z = 20, mpp = Mercator.metresPerPixel(lat0, Z);
+    const c = Mercator.project(lon0, lat0, Z);
+    return (lat, lon) => {
+      const p = Mercator.project(lon, lat, Z);
+      return { x: (p.x - c.x) * mpp, z: (p.y - c.y) * mpp };
+    };
+  }
+
+  /** Outer rings from an Overpass "out geom" response, in local metres. */
+  function ringsFrom(elements, toLocal){
+    const rings = [];
+    for (const el of elements || []){
+      const parts = [];
+      if (el.type === 'way' && el.geometry) parts.push(el.geometry);
+      else if (el.type === 'relation' && el.members){
+        for (const m of el.members)
+          if (m.role === 'outer' && m.geometry) parts.push(m.geometry);
+      }
+      for (const g of parts){
+        const pts = [];
+        for (const p of g){
+          if (!p || !isFinite(p.lat) || !isFinite(p.lon)) continue;   // gaps happen
+          const q = toLocal(p.lat, p.lon);
+          if (!pts.length || Math.hypot(q.x - pts[pts.length-1].x, q.z - pts[pts.length-1].z) > 0.05)
+            pts.push(q);
+        }
+        if (pts.length > 2 &&
+            Math.hypot(pts[0].x - pts[pts.length-1].x, pts[0].z - pts[pts.length-1].z) < 0.5)
+          pts.pop();                                                  // drop the repeated closing node
+        if (pts.length < 3) continue;
+        let area2 = 0;
+        for (let i = 0; i < pts.length; i++){
+          const a = pts[i], b = pts[(i + 1) % pts.length];
+          area2 += a.x * b.z - b.x * a.z;
+        }
+        const area = Math.abs(area2) / 2;
+        if (area < 8) continue;                                        // sheds and noise
+        if (area2 > 0) pts.reverse();                                  // one winding for all
+        rings.push({ pts, area, tags: el.tags });
+      }
+    }
+    return rings;
+  }
+
+  /**
+   * Two merged geometries — the near ring, which casts shadows, and the rest,
+   * which does not — plus one triangle array for the tracer, which sees all of
+   * it because rays are exact and have no frustum to fall out of.
+   */
+  function build(rings){
+    const near = [], far = [];
+    let guessed = 0;
+    for (const r of rings){
+      const c = r.pts.reduce((a, p) => ({ x: a.x + p.x / r.pts.length, z: a.z + p.z / r.pts.length }),
+                             { x: 0, z: 0 });
+      const verts = Math.hypot(c.x, c.z) <= SHADOW_RADIUS ? near : far;
+      const { h, guessed: g } = heightOf(r.tags);
+      if (g) guessed++;
+      const y0 = baseOf(r.tags), y1 = Math.max(y0 + 2, h);
+      const n = r.pts.length;
+      // walls
+      for (let i = 0; i < n; i++){
+        const a = r.pts[i], b = r.pts[(i + 1) % n];
+        verts.push(a.x, y0, a.z,  b.x, y0, b.z,  b.x, y1, b.z);
+        verts.push(a.x, y0, a.z,  b.x, y1, b.z,  a.x, y1, a.z);
+      }
+      // roof, triangulated from the footprint
+      const contour = r.pts.map(p => new THREE.Vector2(p.x, p.z));
+      let faces = [];
+      try { faces = THREE.ShapeUtils.triangulateShape(contour, []); } catch (e) { faces = []; }
+      for (const f of faces){
+        const a = contour[f[0]], b = contour[f[1]], c2 = contour[f[2]];
+        verts.push(a.x, y1, a.y,  c2.x, y1, c2.y,  b.x, y1, b.y);
+      }
+    }
+    const out = [];
+    for (const [verts, casts] of [[near, true], [far, false]]){
+      if (!verts.length) continue;
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3));
+      geo.computeVertexNormals();
+      const m = new THREE.Mesh(geo, contextMat());
+      m.castShadow = casts;
+      m.receiveShadow = true;
+      m.userData.noAnalysis = true;      // belt and braces: never a sensor surface
+      out.push(m);
+    }
+    const tris = new Float32Array(near.length + far.length);
+    tris.set(near, 0); tris.set(far, near.length);
+    return { meshes: out, tris, guessed, nearCount: near.length / 9 };
+  }
+
+  function clear(){
+    for (const m of meshes){
+      contextGroup.remove(m);
+      m.geometry.dispose();
+      m.material.dispose();
+    }
+    meshes = [];
+    state.count = 0; state.guessed = 0; state.radius = 0; state.shadowRadius = 0;
+    state.note = ''; state.tris = null;
+    State.bvhDirty = true;
+    requestRender();
+  }
+
+  /** Fetch and extrude the buildings around the current site. */
+  async function load(){
+    const { lat, lon } = State.site;
+    const radius = clamp(State.basemap.extent / 2, 120, MAX_RADIUS);
+    const dLat = radius / 111320;
+    const dLon = radius / (111320 * Math.max(Math.cos(lat * D2R), 0.05));
+    const bbox = [lat - dLat, lon - dLon, lat + dLat, lon + dLon].map(v => v.toFixed(6)).join(',');
+    const query = '[out:json][timeout:25];(way["building"](' + bbox +
+                  ');relation["building"](' + bbox + ');); out geom;';
+
+    let json;
+    try {
+      const res = await fetch(ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'data=' + encodeURIComponent(query),
+      });
+      if (!res.ok) throw new Error('Overpass replied ' + res.status);
+      json = await res.json();
+    } catch (err){
+      throw new Error('Could not fetch building data from OpenStreetMap (' + err.message +
+                      '). The map itself is still loaded — this only affects the 3D volumes.');
+    }
+
+    const toLocal = projector(lat, lon);
+    let rings = ringsFrom(json.elements, toLocal);
+    const found = rings.length;
+    if (!found) throw new Error('OpenStreetMap has no building footprints mapped around this ' +
+                                'point. Try a larger site extent, or a city centre.');
+    let capped = false;
+    if (rings.length > MAX_BUILDINGS){
+      rings.sort((a, b) => b.area - a.area);
+      rings = rings.slice(0, MAX_BUILDINGS);
+      capped = true;
+    }
+
+    clear();
+    const built = build(rings);
+    meshes = built.meshes;
+    for (const m of meshes) contextGroup.add(m);
+    state.count = rings.length;
+    state.guessed = built.guessed;
+    state.radius = radius;
+    state.shadowRadius = Math.min(radius, SHADOW_RADIUS);
+    state.tris = built.tris;
+    state.note = fmtNum(rings.length) + ' buildings within ' + radius.toFixed(0) + ' m' +
+                 (built.guessed ? ' · ' + built.guessed + ' without a height tag, drawn at 8 m' : '') +
+                 (capped ? ' · capped at ' + MAX_BUILDINGS : '');
+    State.bvhDirty = true;
+    refresh(true);                       // re-fits the shadow frustum to the new ring
+    requestRender();
+    return { count: rings.length, found, radius, guessed: built.guessed,
+             triangles: built.tris.length / 9 };
+  }
+
+  return { load, clear, info: state, get meshes(){ return meshes; },
+           ENDPOINT, MAX_BUILDINGS, SHADOW_RADIUS };
+})();
+
 /** Show the basemap credit in the viewport; exports repeat it in the footer. */
 function updateAttribution(){
   const el = $('vp-attrib');
@@ -2607,10 +2844,17 @@ function domePoint(altDeg, azDeg, r = sunPathRadius){
 const STEREO_Y = 0.12;            // just clear of the ground and any basemap
 const isStereo = () => State.disp.projection === 'stereo';
 
-function lineFromPoints(points, color, opacity = 1, width = 1){
+function lineFromPoints(points, color, opacity = 1, width = 1, over = false){
   const geo = new THREE.BufferGeometry().setFromPoints(points);
-  const mat = new THREE.LineBasicMaterial({ color, transparent: opacity < 1, opacity, linewidth: width });
-  return new THREE.Line(geo, mat);
+  const mat = new THREE.LineBasicMaterial({
+    color, transparent: opacity < 1, opacity, linewidth: width,
+    // `over` is the flattened chart: draw across the map and the massing, like
+    // the ribbons, rather than being occluded by them.
+    depthTest: !over, depthWrite: !over, fog: !over,
+  });
+  const line = new THREE.Line(geo, mat);
+  if (over) line.renderOrder = CHART_ORDER.hair;
+  return line;
 }
 
 /**
@@ -2624,17 +2868,117 @@ function lineFromPoints(points, color, opacity = 1, width = 1){
  * from the line itself rather than from whatever is behind it, so nothing has
  * to be laid over the site to make the chart readable.
  */
-const CHART_W = {
-  grid: 0.0047, tick: 0.0056, rim: 0.0073,
-  hour: 0.0053, arc: 0.0086, solstice: 0.0120, today: 0.0133,
-};
+const CHART_W = { arc: 0.0060, solstice: 0.0082, today: 0.0090 };
 // Calibrated against the default top-view framing, where the chart spans most
-// of the viewport: the ink of a grid line lands at about 1.4 px and a solstice
-// arc at 3.6 px, with a 1 px casing either side. Sub-pixel ink was the flaw in
-// the first attempt — the casing was all you could see.
-const CASING_EXTRA = 0.0060;
+// of the viewport: a month arc lands near 2 px and a solstice near 3, with a
+// crisp outline either side. The first attempt was twice this with a casing at
+// 0.85 alpha over every line, which read as a black web on a street map.
+const CASING_EXTRA = 0.0022;
+
+/** Is the chart sitting on a map, or on the theme's own ground? */
+const overBasemap = () => !!(Basemap && Basemap.mesh);
+
+/**
+ * The flattened chart's palette when it is drawn on a map.
+ *
+ * Map tiles are pale in both presentations — a street map does not have a dark
+ * mode — so this is where matching the interface and reading clearly pull apart.
+ * Off a map the chart uses the dome's own greys and looks like the dome seen
+ * from above. On a map it switches to print ink: the same hairline widths, but
+ * dark lines with a whisper of a white halo, which is how a chart is drawn over
+ * a photograph. Nothing is laid behind it either way.
+ */
+const MAP_CHART = {
+  grid: 0x39475a, hour: 0x44566b, ring: 0x2f3b4a,
+  casing: 0xffffff, casingAlpha: 0.72, casingExtra: 0.0010,
+  label: '#16202b', labelHalo: 'rgba(255,255,255,0.95)',
+  // The dark theme's warm/cool arcs are tuned for a dark ground and wash out on
+  // pale tiles, so the arcs take the light theme's stronger pair.
+  sun: { summer: 0xd97706, winter: 0x1d6fbf, today: 0xb45309, analemma: 0x44566b },
+};
+/** Seasonal arc colours for the current background. */
+function chartSunColors(){
+  if (!(isStereo() && overBasemap())) return SUN_COLORS;
+  return {
+    summer: new THREE.Color(MAP_CHART.sun.summer),
+    winter: new THREE.Color(MAP_CHART.sun.winter),
+    today: new THREE.Color(MAP_CHART.sun.today),
+    analemma: new THREE.Color(MAP_CHART.sun.analemma),
+  };
+}
+
+/**
+ * Where the diagram sits on the ground.
+ *
+ * A drawing offset and nothing more: the sun positions, the shadows and the
+ * analysis all come from the site's latitude and longitude, so moving the chart
+ * over a particular courtyard changes what you can read off it, never the
+ * numbers. The shadow-casting light is deliberately left where it is.
+ */
+function applyChartOffset(){
+  const a = State.disp.chartAt;
+  sunPathGroup.position.set(a.x, 0, a.z);
+  compassGroup.position.set(a.x, 0, a.z);
+}
+
+/** Move the diagram, update the readout, and keep the sun marker with it. */
+function setChartAt(x, z){
+  State.disp.chartAt = { x, z };
+  applyChartOffset();
+  const note = $('chart-at-note');
+  if (note){
+    const d = Math.hypot(x, z);
+    note.innerHTML = d < 0.5
+      ? 'The chart sits on the model centre. Press <b>Place on site</b> and click the spot you want it over &mdash; a courtyard, a roof, a street corner.'
+      : 'Chart centre offset ' + Math.abs(z).toFixed(0) + ' m ' + (z < 0 ? 'N' : 'S') +
+        ', ' + Math.abs(x).toFixed(0) + ' m ' + (x < 0 ? 'W' : 'E') +
+        ' &mdash; a drawing offset only: sun positions, shadows and the analysis are unchanged.';
+  }
+  refresh(true);
+  requestRender();
+}
+
+/** Redraw the flattened chart after the ground under it changes. */
+function restyleChart(){
+  if (!isStereo()) return;
+  todayArc = null;
+  buildSunPath();
+}
+
+/**
+ * The casing follows what is *behind* the chart rather than the theme.
+ *
+ * Without a basemap the ground is the theme's own, so the casing is the theme's
+ * own and the chart looks exactly like the dome seen from above — thin lines in
+ * the dome's greys. Load a map and the ground becomes pale whichever
+ * presentation is on, so the casing flips to a pale one: the same hairlines then
+ * read over streets and roofs without being thickened or backed by anything.
+ */
+function chartCasing(){
+  const c = THEME.chart;
+  // Only the arcs are cased now, so the outline can be crisp rather than a
+  // translucent haze — a solid thin edge reads sharper at these widths.
+  return overBasemap()
+    ? { color: MAP_CHART.casing, alpha: 0.9 }
+    : { color: c.casing, alpha: 0.75 };
+}
+
+/** The grid recedes behind the sun paths, as it does on a printed chart. */
+const CHART_INK = (key) =>
+  CHART_HAIRLINE.has(key) ? (overBasemap() ? 0.85 : 0.6) : 1;
 /** Casings first, then every ink stroke, or one line's casing hides another's ink. */
-const CHART_ORDER = { casing: 810, ink: 820 };
+const CHART_ORDER = { casing: 810, hair: 815, ink: 820 };
+
+/**
+ * The fine grid is drawn as GL hairlines rather than ribbons.
+ *
+ * A ribbon narrower than a pixel cannot be rasterised cleanly — some pixels get
+ * covered and some do not, which is what made the grid look ragged. A
+ * THREE.Line is exactly one pixel and fully antialiased, so it stays crisp at
+ * any zoom. Ribbons are kept for the sun paths, where the weight is wanted and
+ * the width is several pixels, well clear of that limit.
+ */
+const CHART_HAIRLINE = new Set(['grid', 'tick', 'rim', 'hour']);
 
 /**
  * A flat polyline as a triangle strip in the ground plane.
@@ -2689,21 +3033,38 @@ function addChartLine(group, points, color, weightKey, opacity3d = 1){
     group.add(lineFromPoints(points, color, opacity3d));
     return;
   }
+  if (CHART_HAIRLINE.has(weightKey)){
+    const hair = lineFromPoints(points, color, CHART_INK(weightKey), 1, true);
+    hair.name = 'chartHair';
+    group.add(hair);
+    return;
+  }
   const k = sunPathRadius * State.disp.chart;
   const w = CHART_W[weightKey] * k;
-  const c = THEME.chart;
-  group.add(ribbonFromPoints(points, c.casing, w + CASING_EXTRA * k, c.casingAlpha, CHART_ORDER.casing));
-  const ink = ribbonFromPoints(points, color, w, 1, CHART_ORDER.ink);
+  const cas = chartCasing();
+  group.add(ribbonFromPoints(points, cas.color, w + CASING_EXTRA * k, cas.alpha, CHART_ORDER.casing));
+  const ink = ribbonFromPoints(points, color, w, CHART_INK(weightKey), CHART_ORDER.ink);
   ink.name = 'chartInk';
   group.add(ink);
 }
 
+/**
+ * Label ink for the flattened chart, following the background like the casing:
+ * dark on a pale halo over a map, the theme's own the rest of the time.
+ */
+function chartLabelInk(){
+  return overBasemap()
+    ? { color: MAP_CHART.label, halo: MAP_CHART.labelHalo }
+    : { color: THEME.chart.label, halo: THEME.chart.labelHalo };
+}
+
 /** A label placed on the chart, haloed so it survives a busy basemap. */
 function addChartLabel(group, text, pos, { size = 34, color, weight = 600, scale }){
+  const li = isStereo() ? chartLabelInk() : null;
   const lab = makeLabel(text, {
     size, weight, scale,
-    color: color || (isStereo() ? THEME.chart.label : '#cfd9e4'),
-    halo: isStereo() ? THEME.chart.labelHalo : null,
+    color: color || (li ? li.color : '#cfd9e4'),
+    halo: li ? li.halo : null,
   });
   lab.position.copy(pos);
   group.add(lab);
@@ -2718,9 +3079,12 @@ function addChartLabel(group, text, pos, { size = 34, color, weight = 600, scale
 function buildSunPath(){
   disposeGroup(sunPathGroup);
   disposeGroup(compassGroup);
+  applyChartOffset();
   const site = State.site, dst = State.dstHours;
   const R = sunPathRadius;
   const flat = isStereo();
+  const onMap = flat && overBasemap();
+  const SUN = chartSunColors();
 
   /* --- monthly arcs (21st of each month) --- */
   if (State.disp.arcs){
@@ -2736,23 +3100,34 @@ function buildSunPath(){
       // Colour by season: June solstice warm, December solstice cool
       const w = Math.abs(Math.cos((doy - 172) / 365 * TWO_PI)) * 0.5 + 0.25;
       const isWarm = doy > 80 && doy < 266;
-      const col = SUN_COLORS.winter.clone().lerp(SUN_COLORS.summer, isWarm ? 0.35 + w : 0.12);
+      const col = SUN.winter.clone().lerp(SUN.summer, isWarm ? 0.35 + w : 0.12);
       const solstice = (m === 6 || m === 12);
       addChartLine(sunPathGroup, pts, col, solstice ? 'solstice' : 'arc', solstice ? 0.95 : 0.5);
       if (solstice){
-        // Just off the arc rather than on it, as a printed chart does
-        const at = pts[Math.floor(pts.length / 2)].clone().multiplyScalar(flat ? 1.06 : 1.045);
+        // A quarter along the arc, off the line itself: the middle is where the
+        // hour labels crowd around noon.
+        const at = pts[Math.floor(pts.length * (flat ? 0.26 : 0.5))].clone()
+          .multiplyScalar(flat ? 1.06 : 1.045);
         if (flat) at.y = STEREO_Y;
         addChartLabel(sunPathGroup, m === 6 ? '21 Jun' : '21 Dec', at,
                       { size: 38, color: '#' + col.getHexString(), weight: 700,
-                        scale: R * (flat ? 0.036 : 0.027) });
+                        scale: R * (flat ? 0.031 : 0.027) });
       }
     }
   }
 
   /* --- hourly analemmas --- */
+  // Hours crowd together around noon on a flattened chart, so labels are
+  // decluttered by distance rather than dropped by rule.
+  const placedLabels = [];
+  const roomForLabel = (p) => {
+    const min = R * 0.075;
+    if (placedLabels.some(q => p.distanceTo(q) < min)) return false;
+    placedLabels.push(p.clone());
+    return true;
+  };
   if (State.disp.analemma){
-    const hourCol = flat ? THEME.chart.hour : SUN_COLORS.analemma;
+    const hourCol = onMap ? MAP_CHART.hour : (flat ? THEME.chart.hour : SUN_COLORS.analemma);
     for (let h = 0; h < 24; h++){
       const pts = [];
       let above = false;
@@ -2773,9 +3148,10 @@ function buildSunPath(){
         if (noonish.altitude > (flat ? 8 : 3)){
           const at = domePoint(noonish.altitude, noonish.azimuth, R).multiplyScalar(flat ? 1.075 : 1.06);
           if (flat) at.y = STEREO_Y;
+          if (flat && !roomForLabel(at)) continue;
           addChartLabel(sunPathGroup, String(h).padStart(2, '0') + (flat ? 'h' : ''), at,
-                        { size: 34, color: flat ? THEME.chart.label : THEME.hourLabel,
-                          weight: flat ? 700 : 600, scale: R * (flat ? 0.030 : 0.021) });
+                        { size: 34, color: flat ? null : THEME.hourLabel,
+                          weight: flat ? 700 : 600, scale: R * (flat ? 0.026 : 0.021) });
         }
       }
     }
@@ -2789,13 +3165,13 @@ function buildSunPath(){
       if (p.altitude < -0.35) continue;
       pts.push(domePoint(Math.max(p.altitude, 0), p.azimuth, R));
     }
-    addChartLine(sunPathGroup, pts, SUN_COLORS.today, 'today', 1);
+    addChartLine(sunPathGroup, pts, SUN.today, 'today', 1);
   }
 
   /* --- altitude rings: every 10° flattened, as on a printed chart --- */
   if (State.disp.rings){
     const step = flat ? 10 : 15;
-    const ringCol = flat ? THEME.chart.ring : THEME.ring;
+    const ringCol = onMap ? MAP_CHART.ring : (flat ? THEME.chart.ring : THEME.ring);
     for (let alt = step; alt < 90; alt += step){
       const pts = [];
       for (let a = 0; a <= 360; a += 4) pts.push(domePoint(alt, a, R));
@@ -2803,10 +3179,10 @@ function buildSunPath(){
       // Up the north centre line when flat, which is where the printed chart
       // puts them; beside the dome otherwise.
       const at = domePoint(alt, flat ? 0 : 90, R);
-      if (flat) at.x += R * 0.022; else at.multiplyScalar(1.02);
+      if (flat) at.x += R * 0.038; else at.multiplyScalar(1.02);
       addChartLabel(sunPathGroup, alt + '°', at,
-                    { size: 30, color: flat ? THEME.chart.label : THEME.ringLabel,
-                      weight: flat ? 700 : 600, scale: R * (flat ? 0.028 : 0.019) });
+                    { size: 30, color: flat ? null : THEME.ringLabel,
+                      weight: flat ? 700 : 600, scale: R * (flat ? 0.024 : 0.019) });
     }
   }
 
@@ -2817,7 +3193,8 @@ function buildSunPath(){
 function buildCompass(R){
   if (!State.disp.compass) return;
   const flat = isStereo();
-  const gridCol = flat ? THEME.chart.grid : THEME.compass;
+  const onMap = flat && overBasemap();
+  const gridCol = onMap ? MAP_CHART.grid : (flat ? THEME.chart.grid : THEME.compass);
 
   const ringPts = [];
   for (let a = 0; a <= 360; a += 2) ringPts.push(domePoint(0, a, R));
@@ -2827,7 +3204,7 @@ function buildCompass(R){
     const inner = (a % 90 === 0) ? 0.9 : (a % 30 === 0 ? 0.945 : 0.968);
     const p0 = domePoint(0, a, R * inner), p1 = domePoint(0, a, R);
     addChartLine(compassGroup, [p0, p1],
-                 flat ? THEME.chart.grid : (a % 90 === 0 ? THEME.tickMajor : THEME.tickMinor),
+                 flat ? gridCol : (a % 90 === 0 ? THEME.tickMajor : THEME.tickMinor),
                  a % 90 === 0 ? 'tick' : 'grid', a % 90 === 0 ? 0.95 : 0.6);
   }
 
@@ -2836,26 +3213,27 @@ function buildCompass(R){
   // the rim. Those are what let you read a bearing off the chart at all.
   if (flat){
     for (let a = 0; a < 360; a += 30){
-      addChartLine(compassGroup, [domePoint(88, a, R), domePoint(0, a, R)],
-                   THEME.chart.grid, 'grid');
+      addChartLine(compassGroup, [domePoint(88, a, R), domePoint(0, a, R)], gridCol, 'grid');
       if (a % 90 === 0) continue;                       // N/E/S/W are lettered
       const at = domePoint(0, a, R * 1.075);
       at.y = STEREO_Y;
       addChartLabel(compassGroup, String(a).padStart(3, '0') + '°', at,
-                    { size: 28, color: THEME.chart.label, weight: 700, scale: R * 0.026 });
+                    { size: 28, weight: 700, scale: R * 0.022 });
     }
   }
 
+  // Flattened, only north keeps a colour of its own; the rest take the chart's
+  // adaptive ink so they read on the map as well as on the theme's ground.
   const cardinals = flat
-    ? [['N', 0, THEME.chart.cardinalN], ['E', 90, THEME.chart.cardinal],
-       ['S', 180, THEME.chart.cardinal], ['W', 270, THEME.chart.cardinal]]
+    ? [['N', 0, onMap ? '#b03a08' : THEME.chart.cardinalN],
+       ['E', 90, null], ['S', 180, null], ['W', 270, null]]
     : [['N', 0, THEME.cardinalN], ['E', 90, THEME.cardinal],
        ['S', 180, THEME.cardinal], ['W', 270, THEME.cardinal]];
   for (const [t, a, c] of cardinals){
     const at = domePoint(0, a, R * (flat ? 1.13 : 1.075));
     at.y = flat ? STEREO_Y : R * 0.028;
     addChartLabel(compassGroup, t, at, { size: 52, color: c, weight: 700,
-                                        scale: R * (flat ? 0.052 : 0.038) });
+                                        scale: R * (flat ? 0.046 : 0.038) });
   }
 }
 
@@ -2895,15 +3273,16 @@ function updateSunVisuals(sun){
   const pos = domePoint(Math.max(sun.altitude, 0), sun.azimuth, R);
   const up = sun.altitude > -0.5;
 
+  const at = State.disp.chartAt;
   sunMarker.visible = up;
   sunRay.visible = up && State.disp.arcs && !isStereo();
-  sunMarker.position.copy(pos);
+  sunMarker.position.copy(pos).add(new THREE.Vector3(at.x, 0, at.z));
   const s = R * 0.032;
   sunMarker.getObjectByName('core').scale.setScalar(s);
   sunMarker.getObjectByName('glow').scale.setScalar(s * 9);
 
   const rp = sunRay.geometry.attributes.position;
-  rp.setXYZ(0, 0, 0, 0); rp.setXYZ(1, pos.x, pos.y, pos.z);
+  rp.setXYZ(0, at.x, 0, at.z); rp.setXYZ(1, pos.x + at.x, pos.y, pos.z + at.z);
   rp.needsUpdate = true;
   sunRay.geometry.computeBoundingSphere();
 
@@ -3049,6 +3428,21 @@ function collectTriangles(){
     area += b.clone().sub(a).cross(c.clone().sub(a)).length() * 0.5;
   }
   return { tris, count: tris.length / 9, area, bbox };
+}
+
+/**
+ * Triangles the tracer must test against: the model, plus the OpenStreetMap
+ * context when "OSM context shades the analysis" is on. The sensor grid is
+ * built from State.model.tris alone, which is what keeps the context an
+ * occluder rather than a measured surface.
+ */
+function occluderTriangles(){
+  const ctx = OsmBuildings.info.tris;
+  if (!State.analysis.osmShade || !ctx || !ctx.length) return State.model.tris;
+  const out = new Float32Array(State.model.tris.length + ctx.length);
+  out.set(State.model.tris, 0);
+  out.set(ctx, State.model.tris.length);
+  return out;
 }
 
 /** Recompute cached model metrics, frame the sun-path dome around the model. */
@@ -3227,14 +3621,14 @@ const State = {
   northRot: 0,              // project north rotation, degrees clockwise
   weather: null,            // parsed EPW or null (clear-sky fallback)
   disp: { arcs:true, analemma:true, today:true, compass:true, rings:true,
-          shadow:true, grid:true, dome:false, radius:1, chart:1,
+          shadow:true, grid:true, dome:false, radius:1, chart:1, chartAt:{ x:0, z:0 },
           projection:'3d', autoStereo:true },
   analysis: { mode:'inst', period:'year', unit:'kwh', gridSize:1.5, offset:0.02,
               density:1, groundRefl:0.2, useGround:true, shade:true,
-              hourFrom:0, hourTo:24, from:null, to:null },
+              hourFrom:0, hourTo:24, from:null, to:null, osmShade:true },
   legend: { scheme:'ladybug', mode:'auto', min:0, max:1000 },
   basemap: { source:'none', extent:400, opacity:1, imageWidth:200,
-             style:'satellite', customUrl:'', customAttrib:'' },
+             style:'satellite' },
   model: { tris:new Float32Array(0), count:0, area:0, bbox:new THREE.Box3() },
   modelHeight: 24, modelRadius: 24,
   objName: null,
@@ -3546,9 +3940,11 @@ async function runAnalysis(){
       toast('Grid size was coarsened automatically to stay under ' + fmtNum(MAX_SENSORS) +
             ' analysis points.', 'info');
 
-    /* 3 — BVH */
+    /* 3 — BVH over everything that can block a ray: the model, and the OSM
+           context when it is switched on. Sensors come from the model alone, so
+           the context shades without ever being measured. */
     if (State.bvhDirty){
-      Tracer.build(State.model.tris);
+      Tracer.build(occluderTriangles());
       State.bvhDirty = false;
     }
     setProgress(0.32, fmtNum(sensors.count) + ' points × ' + fmtNum(sources.count) + ' sky directions…');
@@ -3923,6 +4319,10 @@ function exportCSV(){
     '# Analysis,' + r.unitLong + ',' + r.period + ',unit,' + r.unit,
     '# Sky,' + (State.analysis.density === 2 ? 'Reinhart 577' : 'Tregenza 145') +
       ',ground reflectance,' + State.analysis.groundRefl,
+    '# Context,' + (OsmBuildings.info.count
+      ? OsmBuildings.info.count + ' OpenStreetMap buildings,shading the analysis,' +
+        (State.analysis.osmShade ? 'yes' : 'no')
+      : 'none loaded,shading the analysis,n/a'),
     'x_m,y_m,z_m,nx,ny,nz,area_m2,orientation,value_' + r.unit.replace(/[^\w]/g,'_') + ',direct_component',
   ];
   for (let i = 0; i < r.sensors.count; i++){
@@ -4244,7 +4644,7 @@ function rebuildTodayArc(){
   if (pts.length < 2){ todayArc = null; return; }
   // A group, because flattened it is a cased ribbon pair rather than one line
   todayArc = new THREE.Group();
-  addChartLine(todayArc, pts, SUN_COLORS.today, 'today', 1);
+  addChartLine(todayArc, pts, chartSunColors().today, 'today', 1);
   todayArc.userData = { doy: State.doy, key: State.siteKey };
   sunPathGroup.add(todayArc);
 }
@@ -4603,38 +5003,38 @@ on('i-place-name', 'keydown', (e) => { if (e.key === 'Enter'){ e.preventDefault(
 /* --- basemap ------------------------------------------------------------- */
 function syncBasemapUI(){
   const src = State.basemap.source;
-  const tiled = src === 'osm' || src === 'custom' || src === 'proxy';
+  const tiled = src === 'osm' || src === 'osm3d' || src === 'proxy';
   $('bm-tiles').style.display = tiled ? '' : 'none';
   $('bm-proxy').style.display = src === 'proxy' ? '' : 'none';
-  $('bm-custom').style.display = src === 'custom' ? '' : 'none';
+  $('bm-3d').style.display = src === 'osm3d' ? '' : 'none';
   $('bm-image').style.display = src === 'image' ? '' : 'none';
   $('bm-opacity-row').style.display = src === 'none' ? 'none' : '';
   $('bm-note').textContent = Basemap.info.note || '';
+  $('bm-3d-note').textContent = OsmBuildings.info.note || '';
+  $('bm-3d-note').style.display = OsmBuildings.info.note ? '' : 'none';
 }
 
 on('i-basemap', 'change', (e) => {
   State.basemap.source = e.target.value;
   if (State.basemap.source === 'none') Basemap.clear();
+  // The volumes belong to one source only; leaving it takes them with it
+  if (State.basemap.source !== 'osm3d') OsmBuildings.clear();
   syncBasemapUI();
   // Only auto-load when there is enough to load with
-  if (State.basemap.source === 'osm') loadBasemapTiles();
+  if (State.basemap.source === 'osm' || State.basemap.source === 'osm3d') loadBasemapTiles();
 });
 
 on('i-bm-stylepreset2', 'change', (e) => {
   State.basemap.style = e.target.value;
   if (State.basemap.source === 'proxy') loadBasemapTiles();
 });
-on('i-bm-url', 'change', (e) => {
-  State.basemap.customUrl = e.target.value.trim();
-  if (State.basemap.source === 'custom' && State.basemap.customUrl) loadBasemapTiles();
-});
-on('i-bm-attrib', 'change', (e) => { State.basemap.customAttrib = e.target.value.trim(); });
-
 on('i-bm-extent', 'input', (e) => {
   State.basemap.extent = +e.target.value;
   $('v-bm-extent').textContent = State.basemap.extent + ' m';
 });
-on('i-bm-extent', 'change', () => { if (State.basemap.source === 'osm') loadBasemapTiles(); });
+on('i-bm-extent', 'change', () => {
+  if (State.basemap.source === 'osm' || State.basemap.source === 'osm3d') loadBasemapTiles();
+});
 
 on('i-bm-opacity', 'input', (e) => {
   Basemap.setOpacity(+e.target.value);
@@ -4646,12 +5046,28 @@ async function loadBasemapTiles(){
   btn.disabled = true;
   $('bm-status').textContent = 'Loading tiles…';
   try {
-    const r = await Basemap.loadTiles(State.basemap.source === 'none' ? 'osm' : State.basemap.source);
+    const src = State.basemap.source === 'none' ? 'osm' : State.basemap.source;
+    const r = await Basemap.loadTiles(src);
     $('bm-status').textContent = r.tiles + ' tiles at zoom ' + r.zoom +
       (r.missing ? ' (' + r.missing + ' failed)' : '') + '.';
     syncBasemapUI();
     refresh(true);
     toast('Basemap loaded — ' + Basemap.info.note, 'ok');
+
+    // Volumes second, so a slow or blocked Overpass still leaves a working map
+    if (TILE_SOURCES[src] && TILE_SOURCES[src].buildings){
+      $('bm-3d-note').style.display = '';
+      $('bm-3d-note').textContent = 'Fetching building footprints from OpenStreetMap…';
+      try {
+        const b = await OsmBuildings.load();
+        syncBasemapUI();
+        refresh(true);
+        toast('3D context loaded — ' + OsmBuildings.info.note, 'ok', 5000);
+      } catch (err){
+        $('bm-3d-note').textContent = err.message;
+        toast(err.message, 'err', 8000);
+      }
+    }
   } catch (err){
     $('bm-status').textContent = err.message;
     toast(err.message, 'err', 7000);
@@ -4848,6 +5264,43 @@ on('d-radius', 'input', (e) => {
   $('v-radius').textContent = State.disp.radius.toFixed(2) + '×';
   refreshModelMetrics();
   rebuildAll();
+});
+
+/* --- placing the chart on the site ------------------------------------------
+   A one-shot pick: arm it, click the ground, done. The plane is y = 0, so the
+   hit is where the cursor meets the site rather than wherever the model
+   happens to be tall. */
+let placingChart = false;
+const chartPickRay = new THREE.Raycaster();
+const chartPickPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+
+function armChartPlacement(on){
+  placingChart = on;
+  $('b-chart-place').classList.toggle('on', on);
+  renderer.domElement.style.cursor = on ? 'crosshair' : '';
+  if (on) toast('Click the spot on the site where the chart should sit. Escape to cancel.', 'info', 6000);
+}
+
+renderer.domElement.addEventListener('pointerdown', (e) => {
+  if (!placingChart || e.button !== 0) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const r = renderer.domElement.getBoundingClientRect();
+  chartPickRay.setFromCamera(new THREE.Vector2(
+    ((e.clientX - r.left) / r.width) * 2 - 1,
+    -((e.clientY - r.top) / r.height) * 2 + 1), camera);
+  const hit = new THREE.Vector3();
+  if (chartPickRay.ray.intersectPlane(chartPickPlane, hit)) setChartAt(hit.x, hit.z);
+  armChartPlacement(false);
+}, true);
+
+on('b-chart-place', 'click', () => armChartPlacement(!placingChart));
+on('b-chart-centre', 'click', () => { armChartPlacement(false); setChartAt(0, 0); });
+addEventListener('keydown', (e) => { if (e.key === 'Escape' && placingChart) armChartPlacement(false); });
+
+on('i-ctx-osm', 'change', (e) => {
+  State.analysis.osmShade = e.target.checked;
+  State.bvhDirty = true;              // the occluder set itself changed
 });
 
 on('d-chart', 'input', (e) => {
@@ -5465,7 +5918,11 @@ function init(){
     Basemap, Mercator, TILE_SOURCES, loadBasemapTiles, pickPlace, runSearch, Selects,
     sourceAttribution, PROXY_URL, PROXY_ATTRIBUTION,
     loadPlaces, savePlace, removePlace, renderPlaces, PLACES_KEY,
-    requestRender, BUILD,
+    requestRender, BUILD, setChartAt, armChartPlacement,
+    OsmBuildings, occluderTriangles, contextGroup,
+    chartAt: () => ({ ...State.disp.chartAt,
+                      group: [sunPathGroup.position.x, sunPathGroup.position.z],
+                      marker: [sunMarker.position.x, sunMarker.position.z] }),
     /** How the chart is drawn, and where it lands on screen. */
     chartProbe: () => {
       const cnv = renderer.domElement;
@@ -5478,10 +5935,11 @@ function init(){
       // its lines as well as across them.
       const c = toPx(new THREE.Vector3(0, STEREO_Y, 0));
       const rim = toPx(new THREE.Vector3(sunPathRadius, STEREO_Y, 0));
-      const lines = [], casings = [], inks = [];
+      const lines = [], hairs = [], casings = [], inks = [];
       const scan = (g) => g.traverse(o => {
-        if (o.isLine) lines.push(o.material.opacity);
-        else if (o.isMesh && o.renderOrder === CHART_ORDER.casing) casings.push(o.renderOrder);
+        if (o.isLine){
+          (o.renderOrder === CHART_ORDER.hair ? hairs : lines).push(o.material.opacity);
+        } else if (o.isMesh && o.renderOrder === CHART_ORDER.casing) casings.push(o.renderOrder);
         else if (o.isMesh && o.renderOrder === CHART_ORDER.ink) inks.push(o.renderOrder);
       });
       scan(sunPathGroup); scan(compassGroup);
@@ -5489,10 +5947,11 @@ function init(){
         screen: { cx: c.x, cy: c.y, r: Math.hypot(rim.x - c.x, rim.y - c.y), w, h },
         lineCount: lines.length,
         minLineOpacity: lines.length ? Math.min(...lines) : null,
-        casings: casings.length, inks: inks.length,
+        hairs: hairs.length, casings: casings.length, inks: inks.length,
         casingsBeforeInk: casings.every(o => inks.every(i => o < i)),
         plate: !!sunPathGroup.getObjectByName('stereoPlate'),
         solsticeWidthM: CHART_W.solstice * sunPathRadius * State.disp.chart,
+        overBasemap: overBasemap(),
         rowVisible: $('row-chart').style.display !== 'none',
         value: State.disp.chart,
       };

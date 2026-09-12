@@ -24,7 +24,8 @@ Below: the first-load state (London, clear-sky model) and the phone layout.
 
 | | |
 |---|---|
-| **Site basemap** | Put the model on its real site: OpenStreetMap tiles, any XYZ tile service you can reach, or an image you upload scaled by its real-world width. Shadows fall across the map, and the required credit appears on screen and in exports. The app holds no map key of its own — aerial imagery goes through a small proxy on your own server, so nothing secret is in the page. |
+| **Site basemap** | Put the model on its real site: OpenStreetMap tiles, or an image you upload scaled by its real-world width. Shadows fall across the map, and the required credit appears on screen and in exports. The app holds no map key of its own — aerial imagery goes through a small proxy on your own server, so nothing secret is in the page. |
+| **3D city context** | **OpenStreetMap + 3D buildings** extrudes the surrounding footprints from their `height` and `building:levels` tags, fetched from the Overpass API with no key. They cast shadows, and a switch decides whether they shade the analysis — so you can show the same massing with and without its neighbours. |
 | **Saved locations** | Search a place, correct its time zone once, then save it by name — coordinates, time zone and elevation together — and it stays in the city list. |
 | **2D stereographic sun path** | The classic printed sun-path chart — horizon on the outer circle, zenith at the centre — laid flat on the site. Engages automatically in top view, or switch it on in any view. |
 | **Dark and light presentation** | The whole interface and the 3D scene switch together, live — dark for the studio and the lecture theatre, light for print, handouts and projectors that wash out. The choice is remembered, and exports default to whichever is on screen. |
@@ -128,12 +129,31 @@ the time zone is the one thing searching cannot work out, so it is worth keeping
 
 ![Saved locations in the city list](docs/screenshot-dropdown.png)
 
-### Aerial imagery, with the key on your server
+### The city in three dimensions
 
-The OpenStreetMap source needs no key and needs no setup, but it is a street map.
-**Custom XYZ tiles** takes any `{z}/{x}/{y}` raster service — Esri, a university WMS,
-anything you are licensed to use — with the attribution that provider requires typed in
-beside it.
+**OpenStreetMap + 3D buildings** loads the street map and then the buildings themselves.
+Footprints and heights come from OpenStreetMap through the [Overpass
+API](https://overpass-api.de/) — no key, no account — for a box around the site sized by
+the *Site extent* slider, capped at 600 m. Heights are read from the `height` tag, then
+`building:levels` × 3.2 m; anything untagged is drawn at 8 m and the panel says how many
+were guessed, so a default is never mistaken for a survey.
+
+Two things are deliberate. The volumes are **geographic**, so they do not turn with the
+project-north rotation — they stay lined up with their own tiles. And only the buildings
+within 160 m cast shadows: the shadow map is a fixed size, and stretching it over 600 m of
+city would blur your own model's shadows, while a block further out only reaches the site
+when the sun is under about 10°.
+
+**Do they shade the analysis?** That is a switch in *Solar Radiation Analysis* —
+*OpenStreetMap context shades the analysis*, on by default. With it on, the neighbours
+block sun in the W/m² results, which is the realistic urban case; with it off the numbers
+come from your model alone. Either way the context never gets analysis points of its own —
+only your model is measured — and the exported CSV records which way the switch was set.
+Comparing the two runs is a good exercise in itself.
+
+Building data © OpenStreetMap contributors, ODbL.
+
+### Aerial imagery, with the key on your server
 
 For MapTiler aerial imagery there is one route, and it deliberately does not involve the
 page holding a key: a key in a public HTML file is readable by anyone who views the
@@ -173,14 +193,26 @@ automatically in top view* switch in Sun Path Display turns that behaviour off, 
 *Projection* control forces either mode in any view. The shadow-casting sun always uses
 the true 3D position, so shadows are identical in both modes.
 
-Flattened, the chart is drawn the way a printed one is: every line has a real width in
-metres and carries a **casing** — a thin outline in the opposite tone — so it reads over
-aerial imagery without anything being laid behind it. The site stays visible between the
-lines, which is the whole point of putting the chart on the site. (WebGL ignores line
-width, so a chart drawn as plain lines is one pixel wide whatever you ask for; that is why
-this is a ribbon of geometry rather than a line.) The *Chart line weight* slider scales
-all of it from 0.5× to 2.5× for a projector, a handout or a dense aerial; it appears only
-in the flattened view, since that is the only place it does anything.
+Flattened, the chart is drawn the way a printed one is, and in two different ways on
+purpose. The fine grid — altitude rings, azimuth spokes, hour curves — is drawn as
+one-pixel GL lines, which stay crisp at any zoom. The sun paths carry real weight, so they
+are ribbons of geometry a few pixels wide with a thin **casing** in the opposite tone, the
+way a map draws a road over a photograph. (WebGL ignores line width, so a ribbon is the
+only way to get a line thicker than a pixel — but a ribbon *narrower* than a pixel cannot
+be rasterised cleanly, which is why the two are mixed rather than one or the other.)
+
+The palette follows what is behind the chart rather than the interface: off a map it uses
+the dome's own greys, and on a map — pale in both presentations, since street maps have no
+dark mode — it switches to print ink with a white halo. Nothing is ever laid behind the
+chart: the site stays visible between the lines. The *Chart line weight* slider scales the
+sun paths from 0.5× to 2.5× for a projector or a handout; it appears only in the flattened
+view, since that is the only place it does anything.
+
+**Place on site** — the chart normally sits on the model centre. Press *Place on site* in
+Sun Path Display and click the spot you want it over: a courtyard, a roof, a street corner.
+*Centre* puts it back. This is a drawing offset and nothing more — the sun positions, the
+shadows and the analysis all come from the site's latitude and longitude and do not move
+with it.
 
 ![Stereographic chart in top view](docs/screenshot-stereographic.png)
 
@@ -287,7 +319,7 @@ It is clearly labelled as synthetic; it is not real climate.
 
 ## Validation
 
-`npm test` runs 150 headless checks. Every number below is produced by that suite, not
+`npm test` runs 167 headless checks. Every number below is produced by that suite, not
 asserted by hand.
 
 | Check | Result |
@@ -381,7 +413,7 @@ rebuilds live on every change, with no "apply" step.
 ```bash
 npm install          # playwright, for the test suite only
 npm run vendor       # fetch three.js and the validation EPW
-npm test             # 150 headless checks, screenshots and sample export sheets
+npm test             # 167 headless checks, screenshots and sample export sheets
 npm run serve        # serve the folder at http://localhost:8080
 ```
 

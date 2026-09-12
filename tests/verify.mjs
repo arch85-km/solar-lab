@@ -790,16 +790,42 @@ const bmClear = await page.evaluate(() => {
 check('clearing the basemap removes it and its attribution',
       bmClear.mesh === null && bmClear.attrib === '');
 
-/* ----------------------------------------------------- other tile sources --- */
-console.log('\n=== custom tiles, and no key anywhere ===');
+/* ------------------------------------------- 3D buildings, and no key anywhere --- */
+console.log('\n=== OpenStreetMap 3D buildings ===');
 
-let tileUrls = [];
-await ctx.route('**://tiles.example.org/**', async (route) => {
-  tileUrls.push(route.request().url());
-  if (/\/nope\//.test(route.request().url()))
-    return route.fulfill({ status: 404, body: 'no such layer' });
-  await route.fulfill({ status: 200, contentType: 'image/png',
-                        headers: { 'access-control-allow-origin': '*' }, body: TILE_PNG });
+// Overpass is blocked from this sandbox (the egress proxy refuses
+// overpass-api.de:443), so the response is mocked in the documented
+// "out geom" shape: four blocks around the site — one with a height tag, one
+// with building:levels, one with nothing, and one as a multipolygon relation.
+let overpassQueries = [];
+let overpassStatus = 200;
+await ctx.route('**://overpass-api.de/**', async (route) => {
+  overpassQueries.push(decodeURIComponent(route.request().postData() || ''));
+  if (overpassStatus !== 200)
+    return route.fulfill({ status: overpassStatus, contentType: 'text/plain', body: 'busy' });
+  const q = overpassQueries[overpassQueries.length - 1];
+  const box = (q.match(/\(([-\d.]+),([-\d.]+),([-\d.]+),([-\d.]+)\)/) || []).slice(1).map(Number);
+  const lat0 = box.length === 4 ? (box[0] + box[2]) / 2 : 51.48;
+  const lon0 = box.length === 4 ? (box[1] + box[3]) / 2 : -0.45;
+  const m2deg = (m) => m / 111320;
+  const ring = (dx, dz, w, d) => {
+    const cx = lon0 + m2deg(dx) / Math.cos(lat0 * Math.PI / 180), cz = lat0 - m2deg(dz);
+    const hw = m2deg(w / 2) / Math.cos(lat0 * Math.PI / 180), hd = m2deg(d / 2);
+    return [{ lat: cz - hd, lon: cx - hw }, { lat: cz - hd, lon: cx + hw },
+            { lat: cz + hd, lon: cx + hw }, { lat: cz + hd, lon: cx - hw },
+            { lat: cz - hd, lon: cx - hw }];
+  };
+  const elements = [
+    { type: 'way', id: 1, tags: { building: 'yes', height: '24 m' }, geometry: ring(-45, -35, 30, 22) },
+    { type: 'way', id: 2, tags: { building: 'yes', 'building:levels': '6' }, geometry: ring(50, -20, 26, 26) },
+    { type: 'way', id: 3, tags: { building: 'residential' }, geometry: ring(-20, 60, 40, 18) },
+    { type: 'relation', id: 4, tags: { building: 'yes', height: '40' },
+      members: [{ type: 'way', role: 'outer', geometry: ring(60, 55, 28, 28) }] },
+    { type: 'way', id: 5, tags: { building: 'yes' }, geometry: ring(0, 0, 1, 1) },   // too small to matter
+  ];
+  await route.fulfill({ status: 200, contentType: 'application/json',
+                        headers: { 'access-control-allow-origin': '*' },
+                        body: JSON.stringify({ version: 0.6, elements }) });
 });
 
 // The MapTiler source and its key field are gone: a key in a public page is
@@ -818,49 +844,148 @@ await ctx.route('**://tiles.example.org/**', async (route) => {
     keyFields: document.querySelectorAll('input[type="password"]').length,
     saysReadable: /readable in the page source/i.test(document.body.textContent),
   }));
-  check('the basemap panel offers no key field and no key warning',
-        ui.keyFields === 0 && !ui.saysReadable && !ui.sources.includes('maptiler'),
+  check('the basemap panel offers no key field, and the custom template is gone',
+        ui.keyFields === 0 && !ui.saysReadable &&
+        !ui.sources.includes('maptiler') && !ui.sources.includes('custom') &&
+        ui.sources.includes('osm3d'),
         'sources: ' + ui.sources.join(', '));
 }
 
-tileUrls = [];
-const custom = await page.evaluate(async () => {
+overpassQueries = [];
+const osm3d = await page.evaluate(async () => {
   const A = window.__SUNAPP;
-  A.State.basemap.source = 'custom';
+  A.loadSample('demo');
   A.State.basemap.extent = 400;
-  A.State.basemap.customUrl = 'https://tiles.example.org/layer/{z}/{x}/{y}.png?tok=abc';
-  A.State.basemap.customAttrib = '© Example Imagery Ltd';
-  const r = await A.Basemap.loadTiles('custom');
-  const m = A.Basemap.mesh;
-  m.geometry.computeBoundingBox();
-  return { ...r, width: m.geometry.boundingBox.max.x - m.geometry.boundingBox.min.x,
-           attribution: A.Basemap.info.attribution,
-           onScreen: document.getElementById('vp-attrib').textContent };
+  A.State.basemap.source = 'osm3d';
+  await A.Basemap.loadTiles('osm3d');
+  const r = await A.OsmBuildings.load();
+  A.refresh(true);
+  return {
+    r,
+    note: A.OsmBuildings.info.note,
+    shadowRadius: A.OsmBuildings.info.shadowRadius,
+    meshes: A.OsmBuildings.meshes.length,
+    casts: A.OsmBuildings.meshes.map(m => m.castShadow),
+    rotated: A.contextGroup.rotation.y,
+    heights: (() => {
+      // Highest vertex of each building, read back from the merged geometry
+      const tris = A.OsmBuildings.info.tris, tops = [];
+      for (let i = 0; i < tris.length; i += 3) tops.push(tris[i + 1]);
+      return [...new Set(tops.map(v => +v.toFixed(2)))].sort((a, b) => a - b);
+    })(),
+    occluders: A.occluderTriangles().length / 9,
+    model: A.State.model.tris.length / 9,
+    shadow: A.shadowProbe(),
+  };
 });
-check('a custom template substitutes {z}/{x}/{y}',
-      /^https:\/\/tiles\.example\.org\/layer\/\d+\/\d+\/\d+\.png\?tok=abc$/.test(tileUrls[0] || ''),
-      tileUrls[0] || '(no request)');
-check('a custom source georeferences the same way as the OSM one',
-      custom.width >= 400 && custom.width < 400 * 3,
-      custom.width.toFixed(0) + ' m at zoom ' + custom.zoom);
-check('a custom source uses the attribution the user typed, verbatim',
-      custom.attribution === '© Example Imagery Ltd' && custom.onScreen === '© Example Imagery Ltd',
-      custom.onScreen);
+{
+  const q = overpassQueries[0] || '';
+  const box = (q.match(/\(([-\d.]+),([-\d.]+),([-\d.]+),([-\d.]+)\)/) || []).slice(1).map(Number);
+  const site = await page.evaluate(() => ({ ...window.__SUNAPP.State.site }));
+  const centred = box.length === 4 &&
+    Math.abs((box[0] + box[2]) / 2 - site.lat) < 1e-4 &&
+    Math.abs((box[1] + box[3]) / 2 - site.lon) < 1e-4;
+  const spanM = box.length === 4 ? (box[2] - box[0]) * 111320 : 0;
+  check('the query asks Overpass for buildings in a box centred on the site',
+        /\[out:json\]/.test(q) && /way\["building"\]/.test(q) &&
+        /relation\["building"\]/.test(q) && /out geom/.test(q) &&
+        centred && spanM > 200 && spanM < 1300,
+        'centred on the site, ' + spanM.toFixed(0) + ' m across');
+}
+check('ways and multipolygon relations both become volumes, tiny scraps do not',
+      osm3d.r.count === 4 && osm3d.r.found === 4,
+      osm3d.r.count + ' of ' + osm3d.r.found + ' footprints, ' + osm3d.r.triangles + ' triangles');
+check('heights come from height, then building:levels, then a stated default',
+      osm3d.heights.includes(24) && osm3d.heights.includes(19.2) &&
+      osm3d.heights.includes(40) && osm3d.heights.includes(8) && osm3d.r.guessed === 1,
+      'tops at ' + osm3d.heights.join(', ') + ' m; ' + osm3d.r.guessed + ' guessed');
+check('the panel says how many heights it had to guess', /without a height tag/.test(osm3d.note),
+      osm3d.note);
+check('the context is geographic, so it does not turn with project north',
+      osm3d.rotated === 0);
+check('only the near ring casts shadows, so the shadow map stays sharp',
+      osm3d.casts.filter(Boolean).length >= 1 && osm3d.shadowRadius <= 160,
+      osm3d.meshes + ' meshes, casting: ' + osm3d.casts.join('/') +
+      ', shadow ring ' + osm3d.shadowRadius + ' m');
+check('the shadow frustum grows to cover that ring',
+      osm3d.shadow.ext >= osm3d.shadowRadius && osm3d.shadow.ext < 260,
+      '±' + osm3d.shadow.ext.toFixed(0) + ' m for a ' + osm3d.shadowRadius + ' m ring');
+check('the context adds occluders without adding analysis surfaces',
+      osm3d.occluders > osm3d.model && osm3d.model > 0,
+      osm3d.model + ' model triangles, ' + osm3d.occluders + ' occluders');
 
-expectTileErrors = true;
-const failMsg = await page.evaluate(async () => {
+// Both ways, as asked: the switch decides whether the neighbours shade the run
+const shading = await page.evaluate(async () => {
   const A = window.__SUNAPP;
-  A.State.basemap.customUrl = 'https://tiles.example.org/nope/{z}/{x}/{y}.png';
-  try { await A.Basemap.loadTiles('custom'); return 'no error'; }
+  A.setAnalysis({ mode: 'inst', gridSize: 3, shade: true });
+  const mean = (r) => {
+    let v = 0, a = 0;
+    for (let i = 0; i < r.sensors.count; i++){ v += r.values[i] * r.sensors.areas[i]; a += r.sensors.areas[i]; }
+    return v / a;
+  };
+  const run = async (osmShade) => {
+    const cb = document.getElementById('i-ctx-osm');
+    cb.checked = osmShade;
+    cb.dispatchEvent(new Event('change', { bubbles: true }));
+    await A.runAnalysis();
+    const r = A.State.results;
+    return { mean: mean(r), count: r.sensors.count, occl: A.occluderTriangles().length / 9 };
+  };
+  const on = await run(true);
+  const off = await run(false);
+  return { on, off };
+});
+check('with the switch on, the neighbours take sunlight off the model',
+      shading.on.mean < shading.off.mean * 0.999,
+      'mean ' + shading.on.mean.toFixed(1) + ' W/m² shaded vs ' +
+      shading.off.mean.toFixed(1) + ' unshaded');
+check('either way the analysis measures the model alone, never the context',
+      shading.on.count === shading.off.count && shading.on.occl > shading.off.occl,
+      shading.on.count + ' points both times');
+
+const ctxCsv = await page.evaluate(async () => {
+  const A = window.__SUNAPP;
+  let captured = '';
+  const real = URL.createObjectURL;
+  URL.createObjectURL = (blob) => { captured = blob; return real.call(URL, blob); };
+  A.Selects.closeOpen();
+  document.getElementById('b-csv').click();
+  await new Promise(r => setTimeout(r, 300));
+  URL.createObjectURL = real;
+  const text = captured && captured.text ? await captured.text() : '';
+  return text.split('\n').find(l => l.startsWith('# Context')) || '(no context line)';
+});
+check('the export records whether the context was shading the run',
+      /# Context,4 OpenStreetMap buildings,shading the analysis,no/.test(ctxCsv), ctxCsv);
+
+// A blocked or busy Overpass must leave the map working and say what happened
+overpassStatus = 503;
+expectTileErrors = true;                 // the browser logs the failed request
+const denied = await page.evaluate(async () => {
+  try { await window.__SUNAPP.OsmBuildings.load(); return 'no error'; }
   catch (e) { return e.message; }
 });
 await page.waitForTimeout(150);
 expectTileErrors = false;
-check('a configured source that returns nothing blames the configuration, not the connection',
-      /template|URL|credentials/i.test(failMsg) && !/check the connection/i.test(failMsg),
-      failMsg.slice(0, 90) + '…');
+overpassStatus = 200;
+check('an Overpass failure blames the building fetch, not the connection',
+      /building data/i.test(denied) && /map itself is still loaded/i.test(denied),
+      denied.slice(0, 90) + '…');
 
-await page.evaluate(() => { window.__SUNAPP.Basemap.clear(); window.__SUNAPP.State.basemap.source = 'none'; });
+const cleared = await page.evaluate(() => {
+  const A = window.__SUNAPP;
+  A.OsmBuildings.clear();
+  A.Basemap.clear();
+  A.State.basemap.source = 'none';
+  A.refresh(true);
+  return { meshes: A.OsmBuildings.meshes.length, tris: A.OsmBuildings.info.tris,
+           occl: A.occluderTriangles().length / 9, model: A.State.model.tris.length / 9,
+           ext: A.shadowProbe().ext };
+});
+check('leaving the source takes the volumes and their occluders with it',
+      cleared.meshes === 0 && cleared.tris === null &&
+      cleared.occl === cleared.model && cleared.ext < 200,
+      cleared.occl + ' occluders, frustum ±' + cleared.ext.toFixed(0) + ' m');
 
 // The proxy exists so the key can leave the page entirely. Verified on a
 // separate load with PROXY_URL patched in, since the committed file has none.
@@ -1092,21 +1217,24 @@ const chart = await page.evaluate(async () => {
   set(1);
   return { dome, domeHeavy, flat, thin, thick, readout };
 });
-check('the flattened chart is drawn as cased ribbons, not hairlines',
-      chart.flat.inks > 40 && chart.flat.casings === chart.flat.inks && chart.flat.lineCount === 0,
-      chart.flat.inks + ' strokes, each with a casing');
+check('the sun paths are cased ribbons and the fine grid is GL hairlines',
+      chart.flat.inks >= 12 && chart.flat.casings === chart.flat.inks &&
+      chart.flat.hairs > 30 && chart.flat.lineCount === 0,
+      chart.flat.inks + ' cased arcs, ' + chart.flat.hairs + ' hairlines');
 check('nothing is drawn behind the chart',
       chart.flat.plate === false);
 check('every casing is painted before every ink stroke',
       chart.flat.casingsBeforeInk);
-check('the weight slider scales the strokes',
+check('the weight slider scales the arcs',
       chart.thick.solsticeWidthM > chart.thin.solsticeWidthM * 4.5 &&
       chart.thin.solsticeWidthM > 0,
       'solstice arc ' + chart.thin.solsticeWidthM.toFixed(2) + ' m → ' +
       chart.thick.solsticeWidthM.toFixed(2) + ' m');
+check('no ribbon is ever drawn narrower than a pixel, which is what looked ragged',
+      chart.thin.solsticeWidthM / 2 > 0.05, chart.thin.solsticeWidthM.toFixed(3) + ' m at 0.5×');
 check('the slider reads out as a multiplier', chart.readout === '2.5×', chart.readout);
 check('the 3D dome still uses plain lines and ignores the slider',
-      chart.dome.lineCount > 40 && chart.dome.inks === 0 &&
+      chart.dome.lineCount > 40 && chart.dome.inks === 0 && chart.dome.hairs === 0 &&
       chart.dome.lineCount === chart.domeHeavy.lineCount &&
       chart.dome.minLineOpacity === chart.domeHeavy.minLineOpacity,
       chart.dome.lineCount + ' lines, faintest ' + chart.dome.minLineOpacity.toFixed(2) +
@@ -1181,9 +1309,97 @@ for (const theme of ['dark', 'light']){
         px.bareMedian.toFixed(0) + ' → ' + px.chartMedian.toFixed(0));
   check('in ' + theme + ' mode the chart lines carry real contrast over imagery',
         ratio(Math.max(0, px.bareMedian), Math.min(255, px.bareMedian - px.spread)) > 1 &&
-        px.spread > 70,
+        px.spread > 55,
         'luminance range across the scanline ' + px.spread.toFixed(0) + ' over ' + px.n + ' samples');
 }
+// The palette follows the background, not the theme: the map is pale in both
+// presentations, so on a map the chart switches to print ink.
+const adaptive = await page.evaluate(async () => {
+  const A = window.__SUNAPP;
+  A.setProjection('stereo');
+  const bare = A.chartProbe();
+  A.State.basemap.extent = 400;
+  await A.Basemap.loadTiles('osm');
+  const onMap = A.chartProbe();
+  A.Basemap.clear();
+  return { bare: bare.overBasemap, onMap: onMap.overBasemap,
+           rebuilt: onMap.hairs > 0 && onMap.inks > 0 };
+});
+check('loading a map restyles the chart for what is now behind it',
+      adaptive.bare === false && adaptive.onMap === true && adaptive.rebuilt);
+
+/* ------------------------------------------------------- placing the chart --- */
+// The chart can be dropped over a particular courtyard or roof. It is a drawing
+// offset: the sun, the shadows and the numbers must not move with it.
+const place = await page.evaluate(async () => {
+  const A = window.__SUNAPP;
+  A.setProjection('stereo');
+  A.setChartAt(0, 0);
+  A.setDoy(172); A.setMinutes(600);
+  A.setAnalysis({ mode: 'inst', gridSize: 3, shade: true });
+  const mean = (r) => {
+    let v = 0, a = 0;
+    for (let i = 0; i < r.sensors.count; i++){ v += r.values[i] * r.sensors.areas[i]; a += r.sensors.areas[i]; }
+    return v / a;
+  };
+  await A.runAnalysis();
+  const before = mean(A.State.results);
+  const sunBefore = A.SolarCore.position(A.State.site, 172, 600, A.State.dstHours);
+  const shadowBefore = A.shadowProbe();
+  A.setChartAt(18, -30);
+  const moved = A.chartAt();
+  await A.runAnalysis();
+  const after = mean(A.State.results);
+  const sunAfter = A.SolarCore.position(A.State.site, 172, 600, A.State.dstHours);
+  const shadowAfter = A.shadowProbe();
+  const note = document.getElementById('chart-at-note').textContent;
+  A.setChartAt(0, 0);
+  const centred = A.chartAt();
+  return {
+    moved, centred, note,
+    sunSame: sunBefore.altitude === sunAfter.altitude && sunBefore.azimuth === sunAfter.azimuth,
+    resultSame: Math.abs(before - after) < 1e-9,
+    lightSame: shadowBefore.lightDist === shadowAfter.lightDist,
+  };
+});
+check('the whole diagram moves together — chart, compass and sun marker',
+      place.moved.group[0] === 18 && place.moved.group[1] === -30 &&
+      Math.abs(place.moved.marker[0] - 18) < 200 && place.moved.marker[0] !== 0,
+      'group at ' + place.moved.group.join(', ') + ', marker offset applied');
+check('moving it changes nothing physical: same sun, same shadows, same numbers',
+      place.sunSame && place.resultSame && place.lightSame);
+check('the readout says where it is, and says it is a drawing offset',
+      /30 m N/.test(place.note) && /18 m E/.test(place.note) &&
+      /drawing offset/.test(place.note), place.note.slice(0, 80) + '…');
+check('Centre puts it back', place.centred.x === 0 && place.centred.z === 0);
+
+const pick = await page.evaluate(async () => {
+  const A = window.__SUNAPP;
+  A.orbitTo(0, 88);
+  const cnv = document.querySelector('#viewport canvas');
+  const r = cnv.getBoundingClientRect();
+  A.armChartPlacement(true);
+  const armed = document.getElementById('b-chart-place').classList.contains('on');
+  cnv.dispatchEvent(new PointerEvent('pointerdown', {
+    clientX: r.left + r.width * 0.35, clientY: r.top + r.height * 0.35,
+    bubbles: true, button: 0 }));
+  await new Promise(res => setTimeout(res, 120));
+  const after = A.chartAt();
+  const stillArmed = document.getElementById('b-chart-place').classList.contains('on');
+  // Escape must cancel without moving anything
+  A.setChartAt(0, 0);
+  A.armChartPlacement(true);
+  dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+  const cancelled = !document.getElementById('b-chart-place').classList.contains('on');
+  const home = A.chartAt();
+  return { armed, moved: after, stillArmed, cancelled, home };
+});
+check('clicking the site places the chart where the cursor met the ground',
+      pick.armed && Math.hypot(pick.moved.x, pick.moved.z) > 5 && !pick.stillArmed,
+      'placed at ' + pick.moved.x.toFixed(0) + ', ' + pick.moved.z.toFixed(0) + ' m');
+check('Escape cancels the placement without moving it',
+      pick.cancelled && pick.home.x === 0 && pick.home.z === 0);
+
 // Hand the app back exactly as it was found: the presentation checks further
 // down assert the default, and setUiTheme also writes the stored preference.
 await page.evaluate(() => {

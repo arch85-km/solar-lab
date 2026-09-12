@@ -145,6 +145,22 @@ Foundation and both are used under their published policies.
 No basemap is loaded by default, and the alternative **Site image** source uses a file you
 supply, involving no third party at all.
 
+## OpenStreetMap building data (Overpass API)
+
+The **OpenStreetMap + 3D buildings** basemap fetches building footprints and height tags
+from the **Overpass API** (`overpass-api.de`) and extrudes them.
+
+- The data is OpenStreetMap's, under the **Open Database License (ODbL) 1.0**, and carries
+  the same **"© OpenStreetMap contributors"** credit the app already shows on screen and in
+  exported sheets.
+- Overpass is a free, volunteer-run service with an
+  [API usage policy](https://dev.overpass-api.de/): it is for modest, occasional use. The
+  app makes **one request per load**, for a box capped at 600 m across, only when you pick
+  that source, and it never polls. Do not wire it into anything that loops.
+- Heights in OpenStreetMap are incomplete. Untagged buildings are drawn at 8 m and the
+  panel says how many were guessed; the volumes are context for a sun study, not survey
+  data.
+
 ## MapTiler and other tile services
 
 The basemap can also use **MapTiler** aerial imagery or any XYZ raster service. The app
