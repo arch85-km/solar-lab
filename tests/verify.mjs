@@ -1408,43 +1408,56 @@ const site = await page.evaluate(async () => {
   return { turned, back, raw, used };
 });
 const rot40 = -40 * Math.PI / 180;
-check('project north turns the whole site — model, map and 3D context together',
-      near(site.turned.model, rot40, 0.1) && near(site.turned.map, rot40, 0.1) &&
-      near(site.turned.ctx, rot40, 0.1),
-      'all three at ' + (site.turned.map * 180 / Math.PI).toFixed(0) + '°');
-check('the sun path stays geographic while the site turns under it',
+check('project north turns the building',
+      near(site.turned.model, rot40, 0.1),
+      'model at ' + (site.turned.model * 180 / Math.PI).toFixed(0) + '°');
+check('the map, the 3D context and the sun path are geographic and stay put',
+      site.turned.map === 0 && site.turned.ctx === 0 &&
       site.turned.chart === 0 && site.turned.compass === 0);
-check('the context the tracer sees turns with the context on screen',
-      Math.abs(site.used[0] - (site.raw[0] * Math.cos(rot40) + site.raw[1] * Math.sin(rot40))) < 0.01 &&
-      Math.abs(site.used[0] - site.raw[0]) > 1,
-      'first context vertex ' + site.raw[0].toFixed(1) + ' → ' + site.used[0].toFixed(1) + ' m');
-check('reset brings the map and the context back, not just the model',
-      site.back.model === 0 && site.back.map === 0 && site.back.ctx === 0);
+check('the context the tracer sees is the context on screen, unturned',
+      Math.abs(site.used[0] - site.raw[0]) < 1e-6,
+      'first context vertex ' + site.raw[0].toFixed(1) + ' m either way');
+check('reset puts the building back on true north', site.back.model === 0);
 
 // The same reset, reachable without opening a panel
+// The compass resets the *view* — a different thing from project north, which
+// turns the building. Both exist because both are asked for.
 const roseBefore = await page.evaluate(() => {
   const A = window.__SUNAPP;
+  A.setProjection('3d');
+  A.orbitTo(125, 35);                       // looking from the south-east
   const sl = document.getElementById('i-north');
   sl.value = '25'; sl.dispatchEvent(new Event('input', { bubbles: true }));
   const rose = document.getElementById('vp-compass');
-  return { rot: A.State.northRot, marked: rose.classList.contains('turned'),
-           clickable: getComputedStyle(rose).pointerEvents };
+  return { heading: A.cameraHeading(), north: A.State.northRot,
+           elev: A.cameraProbe(), clickable: getComputedStyle(rose).pointerEvents };
 });
-// A real click on the overlay, because an SVG element has no .click() method —
-// which is also why this has to be driven through the mouse to mean anything.
+// A real click on the overlay: an SVG element has no .click() method, so a
+// synthetic one would pass against a control no user could operate.
 await page.click('#vp-compass');
-await page.waitForTimeout(200);
-let roseReset = await page.evaluate(() => {
+await page.waitForTimeout(250);
+const roseAfter = await page.evaluate(() => {
+  const A = window.__SUNAPP;
   const rose = document.getElementById('vp-compass');
-  return { before: null, after: window.__SUNAPP.State.northRot,
-           marked: rose.classList.contains('turned'), tip: rose.getAttribute('title') };
+  const out = { heading: A.cameraHeading(), north: A.State.northRot,
+                dist: A.cameraProbe().dist, tip: rose.getAttribute('title'),
+                marked: rose.classList.contains('turned') };
+  document.getElementById('b-north-reset').click();
+  return out;
 });
-roseReset.before = roseBefore;   // stitched together for one readable check
-check('clicking the compass on the map resets project north too',
-      roseReset.before.rot === 25 && roseReset.before.marked &&
-      roseReset.before.clickable !== 'none' && roseReset.after === 0 && !roseReset.marked,
-      '25° → ' + roseReset.after + '° from the viewport');
-check('the compass says what clicking it does', /reset/i.test(roseReset.tip || ''), roseReset.tip);
+// orbitTo places the camera at that azimuth, so it looks back the other way
+check('clicking the compass swings the view round to face north',
+      roseBefore.clickable !== 'none' &&
+      Math.min(roseBefore.heading, 360 - roseBefore.heading) > 30 &&
+      (roseAfter.heading < 1 || roseAfter.heading > 359),
+      'heading ' + roseBefore.heading + '° → ' + roseAfter.heading + '°');
+check('it keeps the camera where it was, only turning it',
+      Math.abs(roseAfter.dist - roseBefore.elev.dist) < 0.5,
+      'distance ' + roseAfter.dist.toFixed(0) + ' m, unchanged');
+check('facing the view north leaves project north alone — they are separate controls',
+      roseAfter.north === 25, 'building still at ' + roseAfter.north + '°');
+check('the compass says what clicking it does',
+      /look north|Looking north/i.test(roseAfter.tip || ''), roseAfter.tip);
 
 check('the viewport compass shows project north while it is turned',
       /P 30°/.test(rose.turned) && !/P /.test(rose.back),
@@ -1722,6 +1735,42 @@ check('each one can be moved on its own without disturbing the others',
       'assembly spans ' + many.spanAfter.toFixed(0) + ' m after moving the second');
 check('clicking a chip points the scale and placement controls at that model',
       many.active[0] === true && many.active[1] === false && many.scaleShown === 1);
+const objRot = await page.evaluate((t) => {
+  const A = window.__SUNAPP;
+  A.loadSample('demo');
+  A.setChartAt(0, 0);
+  A.importOBJ(t, 'slab.obj');                 // 30 x 8 in plan: turning shows
+  const span = () => {
+    const b = A.State.model.bbox;
+    return { x: +(b.max.x - b.min.x).toFixed(1), z: +(b.max.z - b.min.z).toFixed(1),
+             cx: +((b.max.x + b.min.x) / 2).toFixed(1), cz: +((b.max.z + b.min.z) / 2).toFixed(1) };
+  };
+  const before = span();
+  const sl = document.getElementById('i-objrot');
+  sl.value = '90'; sl.dispatchEvent(new Event('input', { bubbles: true }));
+  const turned = span();
+  const readout = document.getElementById('v-objrot').textContent;
+  const stored = A.objItems()[0].rot;
+  document.getElementById('b-objrot-reset').click();
+  const back = span();
+  const rowShown = document.getElementById('row-objrot').style.display !== 'none';
+  A.loadSample('demo');
+  return { before, turned, back, readout, stored, rowShown,
+           rowHidden: document.getElementById('row-objrot').style.display === 'none' };
+}, ['v 0 0 0','v 30 0 0','v 30 0 8','v 0 0 8','v 0 10 0','v 30 10 0','v 30 10 8','v 0 10 8',
+    'f 1 4 3 2','f 5 6 7 8','f 1 2 6 5','f 2 3 7 6','f 3 4 8 7','f 4 1 5 8',''].join('\n'));
+check('an imported model can be turned in plan',
+      objRot.before.x === 30 && objRot.before.z === 8 &&
+      Math.abs(objRot.turned.x - 8) < 0.1 && Math.abs(objRot.turned.z - 30) < 0.1 &&
+      objRot.readout === '90°' && objRot.stored === 90 && objRot.rowShown,
+      '30 × 8 m → ' + objRot.turned.x + ' × ' + objRot.turned.z + ' m at 90°');
+check('it turns about its own centre, so it does not swing off the site',
+      Math.abs(objRot.turned.cx - objRot.before.cx) < 0.1 &&
+      Math.abs(objRot.turned.cz - objRot.before.cz) < 0.1,
+      'centre held at ' + objRot.turned.cx + ', ' + objRot.turned.cz + ' m');
+check('Reset returns it to the orientation it was imported in',
+      objRot.back.x === 30 && objRot.back.z === 8 && objRot.rowHidden);
+
 check('removing one leaves the rest loaded',
       many.left.length === 1 && many.left[0] === 'block-a.obj', many.left.join(', '));
 

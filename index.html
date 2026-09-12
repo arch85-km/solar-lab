@@ -1086,6 +1086,13 @@ body.embed{--topbar-h:44px}
             </div>
             <label class="sw"><input type="checkbox" id="i-drop" checked><span class="track"></span><span class="t">Drop model to ground</span></label>
             <label class="sw"><input type="checkbox" id="i-center" checked><span class="track"></span><span class="t">Centre under the sun path</span></label>
+            <div class="row col" id="row-objrot" style="display:none">
+              <div class="lbl-row">
+                <label for="i-objrot">Model rotation <span id="obj-which-rot" class="num"></span> &mdash; <span id="v-objrot" class="num">0&deg;</span></label>
+                <button type="button" class="btn xs ghost" id="b-objrot-reset" title="Back to as imported">Reset</button>
+              </div>
+              <input type="range" id="i-objrot" min="-180" max="180" step="1" value="0">
+            </div>
             <div class="row col" id="row-objplace" style="display:none">
               <div class="row" style="margin:0">
                 <button type="button" class="btn sm grow" id="b-obj-place">Place model&hellip;</button>
@@ -2256,17 +2263,12 @@ function fitShadowCatcher(){
 // GridHelper bakes its colours into vertex data, so a theme change rebuilds it.
 let gridHelper = null;
 function makeGrid(visible = true){
-  // Keep whatever site rotation the old grid carried. Reading State here would
-  // be a temporal-dead-zone error: this runs while the module is still being
-  // evaluated, long before State exists.
-  const rot = gridHelper ? gridHelper.rotation.y : 0;
   if (gridHelper){ scene.remove(gridHelper); gridHelper.geometry.dispose(); gridHelper.material.dispose(); }
   gridHelper = new THREE.GridHelper(200, 40, THEME.gridMajor, THEME.gridMinor);
   gridHelper.material.opacity = THEME.gridOpacity;
   gridHelper.material.transparent = true;
   gridHelper.position.y = -0.04;
   gridHelper.visible = visible;
-  gridHelper.rotation.y = rot;                     // survives a theme rebuild
   scene.add(gridHelper);
 }
 makeGrid();
@@ -2398,7 +2400,7 @@ const Mercator = (() => {
  * running build can be identified at a glance — a stale download that looks
  * almost right is otherwise very hard to tell apart from the current one.
  */
-const BUILD = '2.5';
+const BUILD = '2.6';
 
 /**
  * Aerial imagery through a tile proxy on your own server.
@@ -3488,36 +3490,22 @@ function occluderTriangles(){
   if (!State.analysis.osmShade || !ctx || !ctx.length) return State.model.tris;
   const out = new Float32Array(State.model.tris.length + ctx.length);
   out.set(State.model.tris, 0);
-  // The context is stored in the world space it was built in; project north
-  // turns the group that draws it, so the copy the tracer sees must turn too or
-  // the shadows on screen and the shading in the numbers stop agreeing.
-  const a = -State.northRot * D2R, c = Math.cos(a), sn = Math.sin(a);
-  const base = State.model.tris.length;
-  for (let i = 0; i < ctx.length; i += 3){
-    const x = ctx[i], z = ctx[i + 2];
-    out[base + i]     = x * c + z * sn;
-    out[base + i + 1] = ctx[i + 1];
-    out[base + i + 2] = -x * sn + z * c;
-  }
+  // The context is geographic and never turns, so its triangles go in as built.
+  out.set(ctx, State.model.tris.length);
   return out;
 }
 
 /**
- * Project north turns the whole site, not only the model.
+ * Project north turns the building, and only the building.
  *
- * The sun path stays geographic — it is the sky, and the sky does not rotate —
- * while the model, the map under it, the OpenStreetMap context and the survey
- * grid turn together as one site. Turning only the model left the building
- * crossways to its own basemap, and made the rotation (and its reset) invisible
- * whenever the massing was small or hidden under the chart.
+ * The sun path is the sky and the basemap is the ground: both are geographic
+ * and stay put. This is the "my drawing's north is X° off true north" control —
+ * it turns the design model to sit correctly on its own site. Resetting the
+ * *view* to north-up is a different thing entirely, and lives on the compass.
  */
 function applyNorthRotation(){
-  const a = -State.northRot * D2R;
-  modelGroup.rotation.y = a;
-  basemapGroup.rotation.y = a;
-  contextGroup.rotation.y = a;
-  if (gridHelper) gridHelper.rotation.y = a;
-  State.bvhDirty = true;          // the context occluders moved with it
+  modelGroup.rotation.y = -State.northRot * D2R;
+  State.bvhDirty = true;
   sunLight.shadow.needsUpdate = true;
 }
 
@@ -3690,7 +3678,7 @@ function importOBJ(text, name){
     modelGroup.add(objAssembly);
   }
   objAssembly.add(g);
-  objItems.push({ name, root: g, scale: 1, at: { x: 0, z: 0 } });
+  objItems.push({ name, root: g, scale: 1, rot: 0, at: { x: 0, z: 0 } });
   objActive = objItems.length - 1;
   State.objName = objItems.map(i => i.name).join(', ');
 
@@ -3718,7 +3706,7 @@ function renderObjChips(){
     box.appendChild(chip);
   });
   const many = objItems.length > 0;
-  for (const id of ['row-objscale', 'row-objplace']){
+  for (const id of ['row-objscale', 'row-objrot', 'row-objplace']){
     const row = document.getElementById(id);
     if (row) row.style.display = many ? '' : 'none';
   }
@@ -3734,8 +3722,15 @@ function syncObjControls(){
     sl.value = String(it.scale);
     document.getElementById('v-objscale').textContent = it.scale.toFixed(2) + '×';
   }
-  const which = document.getElementById('obj-which');
-  if (which) which.textContent = objItems.length > 1 ? it.name : '';
+  const rot = document.getElementById('i-objrot');
+  if (rot){
+    rot.value = String(it.rot || 0);
+    document.getElementById('v-objrot').textContent = (it.rot || 0) + '°';
+  }
+  for (const id of ['obj-which', 'obj-which-rot']){
+    const el = document.getElementById(id);
+    if (el) el.textContent = objItems.length > 1 ? it.name : '';
+  }
   updateObjAtNote();
 }
 
@@ -3772,10 +3767,19 @@ function placeObj(){
   // single model by hand would move nothing at all.
   for (const it of objItems){
     const g = it.root;
-    g.rotation.set(0, 0, 0);
-    g.position.set(0, 0, 0);
-    if (zUp) g.rotation.x = -Math.PI / 2;
+    g.rotation.order = 'YXZ';          // Y applied last: a plan rotation
     g.scale.setScalar(unit * it.scale);
+    g.position.set(0, 0, 0);
+    // A model turns about its own centre, not about the file's origin, which
+    // may be anywhere. Measure where the centre sits unturned, then again
+    // turned, and move the group by the difference.
+    g.rotation.set(zUp ? -Math.PI / 2 : 0, 0, 0);
+    g.updateMatrixWorld(true);
+    const c0 = new THREE.Box3().setFromObject(g).getCenter(new THREE.Vector3());
+    g.rotation.y = (it.rot || 0) * D2R;
+    g.updateMatrixWorld(true);
+    const c1 = new THREE.Box3().setFromObject(g).getCenter(new THREE.Vector3());
+    g.position.set(c0.x - c1.x, 0, c0.z - c1.z);
     g.updateMatrixWorld(true);
   }
 
@@ -3793,7 +3797,7 @@ function placeObj(){
   }
   if (document.getElementById('i-drop').checked) off.y = -bb.min.y;
   objAssembly.position.copy(off);
-  for (const it of objItems) it.root.position.set(it.at.x, 0, it.at.z);
+  for (const it of objItems) it.root.position.x += it.at.x, it.root.position.z += it.at.z;
   objAssembly.updateMatrixWorld(true);
 
   clearResults();
@@ -4504,10 +4508,12 @@ function updateCompassOverlay(){
     '</g>' +
     '<text x="50" y="96" text-anchor="middle" font-size="9" font-weight="700" fill="#6fb2ff" font-family="Inter,sans-serif">' +
       'P ' + pn + '°</text>' : '';
-  svg.classList.toggle('turned', !!pn);
-  svg.setAttribute('title', pn
-    ? 'Project north turned ' + pn + '° — click to reset the site to true north'
-    : 'Project north — click to reset to true north');
+  // The glow says the *view* is off north, which is what clicking fixes
+  const offNorth = Math.abs(((heading % 360) + 540) % 360 - 180) < 179;
+  svg.classList.toggle('turned', offNorth);
+  svg.setAttribute('title', (offNorth ? 'View is ' + Math.round(((heading % 360) + 360) % 360) +
+    '° off north — click to look north' : 'Looking north') +
+    (pn ? ' · building turned ' + pn + '° from true north' : ''));
   svg.innerHTML =
     '<circle cx="50" cy="50" r="34" fill="rgba(13,17,23,.6)" stroke="rgba(120,140,160,.45)" stroke-width="1.5"/>' +
     '<g transform="rotate(' + rot.toFixed(2) + ' 50 50)">' +
@@ -4927,14 +4933,33 @@ function resetNorth(){
   if (!State.northRot) return;
   $('i-north').value = 0;
   $('i-north').dispatchEvent(new Event('input', { bubbles: true }));
-  toast('Project north reset — the site is back on true north.', 'ok', 3500);
+  toast('Project north reset — the building is back on true north.', 'ok', 3500);
 }
 on('b-north-reset', 'click', resetNorth);
-// The same reset from the map itself: the compass is where you are looking when
-// you notice the site is turned, and opening a panel to undo it is a detour.
-on('vp-compass', 'click', resetNorth);
+
+/**
+ * Swing the camera round to look north, keeping its height and distance.
+ *
+ * Separate from project north on purpose: that turns the building, this turns
+ * the view. It is the click every map gives you when the compass is off north,
+ * which is where you are looking when you notice.
+ */
+function faceNorth(){
+  const off = camera.position.clone().sub(controls.target);
+  const d = off.length();
+  if (d < 1e-6) return;
+  const elev = Math.asin(clamp(off.y / d, -1, 1));
+  // +Z, looking towards −Z: north at the top of the screen
+  camera.position.set(controls.target.x,
+                      controls.target.y + Math.sin(elev) * d,
+                      controls.target.z + Math.cos(elev) * d);
+  controls.update();
+  updateCompassOverlay();
+  requestRender();
+}
+on('vp-compass', 'click', faceNorth);
 on('vp-compass', 'keydown', (e) => {
-  if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); resetNorth(); }
+  if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); faceNorth(); }
 });
 
 on('i-north', 'input', (e) => {
@@ -5597,6 +5622,18 @@ on('b-objscale-reset', 'click', () => {
   $('i-objscale').value = 1;
   $('i-objscale').dispatchEvent(new Event('input', { bubbles: true }));
 });
+on('i-objrot', 'input', (e) => {
+  const it = objItems[objActive];
+  if (!it) return;
+  it.rot = +e.target.value;
+  $('v-objrot').textContent = it.rot + '°';
+  placeObj();
+  refresh(true);
+});
+on('b-objrot-reset', 'click', () => {
+  $('i-objrot').value = 0;
+  $('i-objrot').dispatchEvent(new Event('input', { bubbles: true }));
+});
 ['i-units', 'i-objup', 'i-drop', 'i-center'].forEach(id =>
   on(id, 'change', () => { if (objItems.length) placeObj(); }));
 on('b-obj', 'click', () => $('f-obj').click());
@@ -6252,8 +6289,13 @@ function init(){
     requestRender, BUILD, setChartAt, armChartPlacement,
     OsmBuildings, occluderTriangles, contextGroup, importOBJ, placeObj,
     placeModelAt, armPlacement, basemapGroup,
-    objItems: () => objItems.map((i, n) => ({ name: i.name, scale: i.scale,
+    objItems: () => objItems.map((i, n) => ({ name: i.name, scale: i.scale, rot: i.rot,
                                               at: { ...i.at }, active: n === objActive })),
+    faceNorth, cameraHeading: () => {
+      const d = new THREE.Vector3();
+      camera.getWorldDirection(d);
+      return +(((Math.atan2(d.x, -d.z) * R2D) % 360 + 360) % 360).toFixed(2);
+    },
     modelGroup, sunPathGroup, compassGroup, frameModel,
     /** Where the camera is pointing, for the "views follow the chart" checks. */
     cameraProbe: () => ({

@@ -240,11 +240,13 @@ the sun; the view cube jumps to plan or elevation views.
 
 **Sun & Site** — pick a preset city or type coordinates, set the time zone, elevation and
 project-north rotation, import an EPW, then scrub the date and time. **Project north turns
-the whole site** — the model, the basemap under it and the 3D context together — while the
-sun path stays geographic, because the sky does not rotate. There are two ways back to
-true north: *Reset* beside the slider, or **click the compass rose** in the top-right of
-the map view — it carries a blue **P** mark and a glow while north is turned, and resetting
-from there saves opening the panel. The quick buttons
+the building** — the map and the sun path are geographic and stay put — and *Reset* beside
+the slider puts it back on true north; the viewport compass carries a blue **P** mark while
+it is turned.
+
+**Facing the view north** is a different control, and lives where you notice you need it:
+**click the compass rose** in the top-right of the map view and the camera swings round to
+look north, keeping its height and distance. It glows whenever the view is off north. The quick buttons
 jump to the June solstice, an equinox and the December solstice.
 
 **Imported models** — import as many OBJ files as you like; they load as one assembly and
@@ -253,8 +255,9 @@ scale* and *Place model…* act on the selected one; *Model units*, *OBJ up axis
 ground* and *Centre under the sun path* act on the assembly, and all of them re-place what
 is already loaded rather than being read once at import.
 
-Imports arrive **under the sun path**, wherever you have placed it, and *Place model…* then
-drops the selected one anywhere on the site (*Centre* returns it). Relative positions
+Imports arrive **under the sun path**, wherever you have placed it. *Place model…* drops the
+selected one anywhere on the site (*Centre* returns it) and *Model rotation* turns it in
+plan, −180° to 180°, about its own centre rather than the file's origin. Relative positions
 between files are preserved: the assembly's datum is measured from the files as exported,
 before any manual offsets. Swapping the model also rebuilds the shadow map, so the previous
 massing's shadows do not linger on the ground.
@@ -342,7 +345,7 @@ It is clearly labelled as synthetic; it is not real climate.
 
 ## Validation
 
-`npm test` runs 198 headless checks. Every number below is produced by that suite, not
+`npm test` runs 203 headless checks. Every number below is produced by that suite, not
 asserted by hand.
 
 | Check | Result |
@@ -436,7 +439,7 @@ rebuilds live on every change, with no "apply" step.
 ```bash
 npm install          # playwright, for the test suite only
 npm run vendor       # fetch three.js and the validation EPW
-npm test             # 198 headless checks, screenshots and sample export sheets
+npm test             # 203 headless checks, screenshots and sample export sheets
 npm run serve        # serve the folder at http://localhost:8080
 ```
 
