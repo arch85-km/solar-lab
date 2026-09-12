@@ -870,11 +870,18 @@ body.embed{--topbar-h:44px}
             </div>
 
             <div id="bm-keyed" style="display:none">
-              <div class="row col">
+              <div class="row col" id="bm-key-set" style="display:none">
+                <label>MapTiler API key</label>
+                <div class="chip info">
+                  <span class="cname">Configured &mdash; not shown here</span>
+                  <button class="btn sm ghost" id="b-bm-key-replace">Replace</button>
+                </div>
+              </div>
+              <div class="row col" id="bm-key-entry" style="display:none">
                 <label for="i-bm-key">MapTiler API key</label>
                 <div class="row" style="margin:0">
                   <input type="password" id="i-bm-key" class="grow" placeholder="Paste your key" autocomplete="off">
-                  <button class="btn sm" id="b-bm-key-show" title="Show or hide the key">Show</button>
+                  <button class="btn sm" id="b-bm-key-clear" title="Forget the key stored in this browser">Clear</button>
                 </div>
               </div>
               <div class="grid2">
@@ -893,7 +900,7 @@ body.embed{--topbar-h:44px}
                   <input type="text" id="i-bm-style" value="satellite" spellcheck="false">
                 </div>
               </div>
-              <p class="hint warn">Your key is visible to anyone who views this page &mdash; that is normal for map keys and they are read-only, but the requests count against <b>your</b> quota. Restrict it to your domain under <b>Allowed HTTP origins</b> in MapTiler Cloud before publishing.</p>
+              <p class="hint warn">The key is never displayed here, so it stays off screenshots and projectors &mdash; but it is still readable in the page source, as any browser map key must be. It is read-only, so nobody can alter your maps; the requests do count against <b>your</b> quota. Restrict it to your domain under <b>Allowed HTTP origins</b> in MapTiler Cloud.</p>
               <p class="hint">If tiles fail, the style name is the usual culprit &mdash; edit it above to match a style in your account.</p>
             </div>
 
@@ -4404,6 +4411,11 @@ on('i-place-name', 'keydown', (e) => { if (e.key === 'Enter'){ e.preventDefault(
 /* --- basemap ------------------------------------------------------------- */
 function syncBasemapUI(){
   const src = State.basemap.source;
+  // Show that a key exists without ever putting its value in the DOM: this gets
+  // projected in lectures, and a key on screen is a key in every photo of it.
+  const haveKey = !!resolveMapKey();
+  $('bm-key-set').style.display = (src === 'maptiler' && haveKey && !keyEntryOpen) ? '' : 'none';
+  $('bm-key-entry').style.display = (src === 'maptiler' && (!haveKey || keyEntryOpen)) ? '' : 'none';
   const tiled = src === 'osm' || src === 'maptiler' || src === 'custom';
   $('bm-tiles').style.display = tiled ? '' : 'none';
   $('bm-keyed').style.display = src === 'maptiler' ? '' : 'none';
@@ -4422,17 +4434,25 @@ on('i-basemap', 'change', (e) => {
   else if (State.basemap.source === 'maptiler' && resolveMapKey()) loadBasemapTiles();
 });
 
+let keyEntryOpen = false;
 on('i-bm-key', 'change', (e) => {
   const k = e.target.value.trim();
   try { if (k) localStorage.setItem(MAPTILER_KEY_STORE, k);
         else localStorage.removeItem(MAPTILER_KEY_STORE); } catch (err) { /* private mode */ }
-  if (State.basemap.source === 'maptiler' && k) loadBasemapTiles();
+  e.target.value = '';                     // do not leave it sitting in the field
+  keyEntryOpen = false;
+  syncBasemapUI();
+  if (State.basemap.source === 'maptiler' && resolveMapKey()) loadBasemapTiles();
 });
-on('b-bm-key-show', 'click', () => {
-  const f = $('i-bm-key');
-  const hidden = f.type === 'password';
-  f.type = hidden ? 'text' : 'password';
-  $('b-bm-key-show').textContent = hidden ? 'Hide' : 'Show';
+on('b-bm-key-replace', 'click', () => { keyEntryOpen = true; syncBasemapUI(); $('i-bm-key').focus(); });
+on('b-bm-key-clear', 'click', () => {
+  try { localStorage.removeItem(MAPTILER_KEY_STORE); } catch (err) { /* private mode */ }
+  $('i-bm-key').value = '';
+  keyEntryOpen = false;
+  syncBasemapUI();
+  toast(resolveMapKey()
+    ? 'Cleared the key saved in this browser; the one built into this copy is still in use.'
+    : 'Key cleared from this browser.', 'info', 5000);
 });
 on('i-bm-stylepreset', 'change', (e) => {
   State.basemap.style = e.target.value;
@@ -5239,7 +5259,6 @@ function init(){
   setUiTheme(stored === 'light' ? 'light' : 'dark', { persist: false });
 
   $('v-bm-extent').textContent = State.basemap.extent + ' m';
-  $('i-bm-key').value = resolveMapKey();
   syncBasemapUI();
 
   loadSample('demo');
@@ -5262,6 +5281,19 @@ function init(){
     resolveMapKey, MAPTILER_KEY_STORE, sourceAttribution,
     loadPlaces, savePlace, removePlace, renderPlaces, PLACES_KEY,
     requestRender,
+    /** Place the camera at an azimuth/elevation for orbit-sweep diagnostics. */
+    orbitTo(azDeg, elevDeg){
+      const d = camera.position.distanceTo(controls.target);
+      const a = azDeg * D2R, e = clamp(elevDeg, 0.5, 89) * D2R;
+      camera.position.set(
+        controls.target.x + Math.sin(a) * Math.cos(e) * d,
+        controls.target.y + Math.sin(e) * d,
+        controls.target.z + Math.cos(a) * Math.cos(e) * d);
+      camera.lookAt(controls.target);
+      controls.update();
+      requestRender(400);
+      render();
+    },
     // Heights of the near-coplanar ground surfaces, so their separation can be
     // asserted rather than left to drift back into z-fighting range.
     groundLayers: () => ({

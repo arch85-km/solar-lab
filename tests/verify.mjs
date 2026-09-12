@@ -662,6 +662,39 @@ check('the grid is hidden while a basemap is shown',
       layers.gridVisible === false);
 check('the shadow map is refreshed on change, not rebuilt every frame',
       layers.shadowAuto === false);
+
+// Z-fighting is view-dependent: it appears at some camera angles and not others,
+// which is why it read as "happens when I orbit". Sweep low elevations, where
+// depth precision is worst, and look for the artefact's signature — near-black
+// pixels over a light basemap.
+const sweep = await page.evaluate(async () => {
+  const A = window.__SUNAPP;
+  const cnv = document.querySelector('#viewport canvas');
+  const scratch = document.createElement('canvas');
+  const sctx = scratch.getContext('2d');
+  let worst = { darkFrac: 0, az: 0, el: 0 };
+  for (const el of [4, 10, 20, 40]){
+    for (let az = 0; az < 360; az += 60){
+      A.orbitTo(az, el);
+      await new Promise(r => requestAnimationFrame(r));
+      await new Promise(r => requestAnimationFrame(r));
+      const w = 200, h = 120;
+      scratch.width = w; scratch.height = h;
+      sctx.drawImage(cnv, 0, 0, w, h);
+      const d = sctx.getImageData(0, 0, w, h).data;
+      let dark = 0;
+      for (let i = 0; i < d.length; i += 4)
+        if ((d[i] + d[i+1] + d[i+2]) / 3 < 14) dark++;
+      const darkFrac = dark / (w * h);
+      if (darkFrac > worst.darkFrac) worst = { darkFrac, az, el };
+    }
+  }
+  return worst;
+});
+check('no depth artefacts anywhere in an orbit sweep over a basemap',
+      sweep.darkFrac < 0.01,
+      'worst ' + (sweep.darkFrac * 100).toFixed(2) + '% dark at elevation ' +
+      sweep.el + '°, azimuth ' + sweep.az + '° (24 positions)');
 check('OpenStreetMap attribution is shown on screen',
       /OpenStreetMap contributors/.test(bm.attribution) && /OpenStreetMap contributors/.test(bm.onScreen),
       bm.onScreen);
@@ -842,6 +875,45 @@ check('the API key never appears in an exported CSV',
       leak.len > 0 && !leak.hasKey, leak.len + ' bytes exported, key present: ' + leak.hasKey);
 
 await page.evaluate(() => { window.__SUNAPP.Basemap.clear(); window.__SUNAPP.State.basemap.source = 'none'; });
+
+// A key on screen ends up in every screenshot and every projected lecture
+const keyUi = await page.evaluate(() => {
+  const A = window.__SUNAPP;
+  try { localStorage.setItem(A.MAPTILER_KEY_STORE, 'SECRET_KEY_9876'); } catch (e) {}
+  A.State.basemap.source = 'maptiler';
+  const sel = document.getElementById('i-basemap');
+  sel.value = 'maptiler';
+  sel.dispatchEvent(new Event('change', { bubbles: true }));
+  return {
+    resolves: A.resolveMapKey(),
+    setShown: document.getElementById('bm-key-set').style.display !== 'none',
+    entryShown: document.getElementById('bm-key-entry').style.display !== 'none',
+    fieldValue: document.getElementById('i-bm-key').value,
+    inMarkup: document.body.innerHTML.includes('SECRET_KEY_9876'),
+  };
+});
+check('a configured key is acknowledged but never rendered on screen',
+      keyUi.resolves === 'SECRET_KEY_9876' && keyUi.setShown && !keyUi.entryShown &&
+      keyUi.fieldValue === '' && !keyUi.inMarkup,
+      'shown as configured: ' + keyUi.setShown + ', key anywhere in the DOM: ' + keyUi.inMarkup);
+
+const keyReplace = await page.evaluate(() => {
+  document.getElementById('b-bm-key-replace').click();
+  return {
+    entryShown: document.getElementById('bm-key-entry').style.display !== 'none',
+    setShown: document.getElementById('bm-key-set').style.display !== 'none',
+    empty: document.getElementById('i-bm-key').value === '',
+  };
+});
+check('Replace opens an empty field rather than revealing the old key',
+      keyReplace.entryShown && !keyReplace.setShown && keyReplace.empty);
+
+await page.evaluate(() => {
+  const A = window.__SUNAPP;
+  try { localStorage.removeItem(A.MAPTILER_KEY_STORE); } catch (e) {}
+  A.State.basemap.source = 'none';
+  A.Basemap.clear();
+});
 
 /* ------------------------------------------------------- saved locations --- */
 console.log('\n=== saved locations ===');
