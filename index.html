@@ -1210,7 +1210,7 @@ body.embed{--topbar-h:44px}
 
   <!-- ================= STATUS BAR ================= -->
   <footer id="statusbar">
-    <div class="credit">&copy; Karam Al-Obaidi</div>
+    <div class="credit">&copy; Karam Al-Obaidi &middot; <span id="build-tag"></span></div>
     <div id="status-items"></div>
   </footer>
 </div>
@@ -2300,6 +2300,13 @@ const Mercator = (() => {
  * read-only — but usage counts against your quota, so restrict it to your domain
  * under "Allowed HTTP origins" in MapTiler Cloud before publishing.
  */
+/**
+ * Build stamp. Shown in the status bar and burned into exported sheets, so the
+ * running build can be identified at a glance — a stale download that looks
+ * almost right is otherwise very hard to tell apart from the current one.
+ */
+const BUILD = '1.7';
+
 const MAPTILER_KEY = '';
 const MAPTILER_KEY_STORE = 'sunpath.maptiler.v1';
 
@@ -3921,7 +3928,7 @@ function composeSheet(source, W, H, s){
   setFont(11, '600');
   g.fillStyle = T.sheetDim;
   g.textAlign = 'left';
-  const credit = '© Karam Al-Obaidi';
+  const credit = '© Karam Al-Obaidi · v' + BUILD;
   g.fillText(credit, pad, fy + Math.round(34 * s));
   const bmAttrib = Basemap.info.attribution;
   if (bmAttrib){
@@ -5246,6 +5253,8 @@ function init(){
   State.site = { lat: c.lat, lon: c.lon, tz: c.tz, el: c.el, name: c.n };
   $('i-lat').value = c.lat; $('i-lon').value = c.lon; $('i-tz').value = c.tz; $('i-elev').value = c.el;
 
+  $('build-tag').textContent = 'v' + BUILD;
+
   $('i-from').value = YEAR + '-01-01';
   $('i-to').value   = YEAR + '-12-31';
   State.analysis.from = 1; State.analysis.to = 365;
@@ -5280,7 +5289,7 @@ function init(){
     Basemap, Mercator, TILE_SOURCES, loadBasemapTiles, pickPlace, runSearch, Selects,
     resolveMapKey, MAPTILER_KEY_STORE, sourceAttribution,
     loadPlaces, savePlace, removePlace, renderPlaces, PLACES_KEY,
-    requestRender,
+    requestRender, BUILD,
     /** Place the camera at an azimuth/elevation for orbit-sweep diagnostics. */
     orbitTo(azDeg, elevDeg){
       const d = camera.position.distanceTo(controls.target);

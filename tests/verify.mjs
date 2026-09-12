@@ -128,6 +128,18 @@ const boot = await page.evaluate(() => {
 check('every panel section starts collapsed',
       boot.total > 0 && boot.open.length === 0,
       boot.total + ' sections, open: ' + (boot.open.join(', ') || 'none'));
+const stamp = await page.evaluate(() => ({
+  build: window.__SUNAPP.BUILD,
+  shown: (document.getElementById('build-tag') || {}).textContent,
+  credit: document.querySelector('#statusbar .credit').textContent,
+}));
+check('the build version is visible in the status bar',
+      !!stamp.build && stamp.shown === 'v' + stamp.build &&
+      stamp.credit.includes('Karam Al-Obaidi') && stamp.credit.includes('v' + stamp.build),
+      '"' + stamp.credit.trim() + '"');
+check('the old key Show button is gone',
+      await page.evaluate(() => !document.getElementById('b-bm-key-show')));
+
 check('app is titled Sun Studio',
       boot.title === 'Sun Studio' && boot.brand === 'Sun Studio',
       'title "' + boot.title + '", brand "' + boot.brand + '"');
@@ -399,7 +411,7 @@ const chrome = await page.evaluate(() => {
   };
 });
 check('author credit is present at the bottom left',
-      chrome.credit === '© Karam Al-Obaidi', String(chrome.credit));
+      /^© Karam Al-Obaidi/.test(chrome.credit), String(chrome.credit));
 check('status bar still renders after the footer was split',
       chrome.statusItems > 5 && /Chicago|London/.test(chrome.statusText),
       chrome.statusItems + ' readouts');
