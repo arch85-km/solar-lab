@@ -4,6 +4,7 @@
   "private": true,
   "description": "Interactive 3D sun path and solar radiation analysis for architectural design teaching",
   "author": "Karam Al-Obaidi",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "vendor": "node tests/fetch-vendor.mjs",

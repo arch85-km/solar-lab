@@ -990,30 +990,27 @@ out geom;</div>
 
 
     <h3>Licence</h3>
-    <p>Four licences apply, and the file header of the application states all four. They cover
-      different things and ask for different things.</p>
+    <p>© Karam Al-Obaidi. The code is licensed <b>MIT</b>; the accompanying material — this page,
+      the documentation, the screenshots and the exercises — is
+      <b><a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a></b>.
+      Both permit any use, including commercial, and ask only that you credit the author:
+      <span class="sl-mono">Solar Analysis Lab © 2026 Karam Al-Obaidi, licensed under CC BY 4.0</span>.
+      The tool loads <a href="https://threejs.org" target="_blank" rel="noopener">three.js</a>
+      (also MIT) from jsDelivr at runtime rather than bundling it, so none of it is redistributed
+      with the file; if you self-host it instead, its notice must travel with your copy.</p>
 
-    <div class="sl-tbl"><table>
-      <thead><tr><th>What</th><th>Licence</th><th>What it permits and asks</th></tr></thead>
-      <tbody>
-        <tr><td><b>The code</b> — <span class="sl-mono">index.html</span> and everything that builds it</td><td class="sl-p">MIT</td><td>Any use, including commercial: use, copy, modify, merge, publish, distribute, sublicense and sell. It asks only that the copyright notice and the permission notice travel with any substantial portion. Keeping the header comment in the file satisfies it.</td></tr>
-        <tr><td><b>The accompanying material</b> — documentation, this page, screenshots, exercises</td><td class="sl-p">CC BY 4.0</td><td>Share and adapt for any purpose, including commercial, with attribution: credit the author, link the licence, and indicate if you changed anything.</td></tr>
-        <tr><td><b>three.js</b> — loaded from jsDelivr at runtime</td><td class="sl-p">MIT</td><td>© 2010–2026 three.js authors. The app contains no three.js code and only fetches it, so nothing is redistributed; if you self-host it instead, its notice must travel with your copy.</td></tr>
-        <tr><td><b>Radiance</b> — the Perez coefficients and the Tregenza/Reinhart construction, reimplemented in JavaScript</td><td class="sl-p">Radiance Software License v2.0</td><td>© 1990–2025 The Regents of the University of California, through Lawrence Berkeley National Laboratory. Redistribution in source or binary form must retain the copyright notice, the conditions and the disclaimer; the LBNL name may not be used to endorse derived products. The full notice is reproduced in the project's third-party notices.</td></tr>
-      </tbody>
-    </table></div>
+    <p>One further licence applies. The Perez sky coefficients and the Tregenza/Reinhart patch
+      construction are reimplemented from <b>Radiance</b>, under the Radiance Software License
+      v2.0, © 1990–2025 The Regents of the University of California, through Lawrence Berkeley
+      National Laboratory. It asks that the copyright notice, the conditions and the disclaimer
+      travel with any redistribution, and that the LBNL name not be used to endorse derived work;
+      the full notice is reproduced in the project's third-party notices. Screenshots that include
+      a basemap additionally carry © OpenStreetMap contributors under the Open Database License,
+      which the app displays on screen and repeats in the footer of every exported sheet.</p>
 
-    <p>Attribute the material as: <span class="sl-mono">Solar Analysis Lab © 2026 Karam
-      Al-Obaidi, licensed under CC BY 4.0</span>, with a link to
-      <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">the
-      licence deed</a>. Screenshots that include a basemap additionally carry
-      © OpenStreetMap contributors under the Open Database License, which the app displays on
-      screen and repeats in the footer of every exported sheet.</p>
-
-    <p><b>A model you make with the tool is yours.</b> None of these licences claims anything
-      over your geometry, your results, your CSV or the images you export. They govern the
-      software and the teaching material, not the work you do with them.</p>
-
+    <p>A model you make with the tool is <b>yours</b>. None of these licences claims anything over
+      your geometry, your results, your CSV or the images you export. They govern the software and
+      the teaching material, not the work you do with them.</p>
     <h3>How to cite</h3>
     <p>Cite it as software. Keeping the copyright notice in the file satisfies the licence; a
       citation is the scholarly act on top of that.</p>
@@ -1337,6 +1334,13 @@ out geom;</div>
         one of the two blocks or in the short "not a citable source" list. Nothing sits in a block
         on relevance alone — Perez et al. (1990), Bourgeois et al. (2008) and ASHRAE are outside
         both, with the reason given for each.</li>
+      <li><b>The licence was a table, and should not have been.</b> The brief asked that all four
+        licences appear and that each say what it permits and asks, which pulled the draft toward
+        a structure; but the same brief set prose as the format, and both sister pages use two
+        short paragraphs. It is now prose. All four licences survive, including the Radiance
+        notice — this tool has four where Construction Studio has three, because the Perez
+        coefficients and the Tregenza/Reinhart construction are reimplemented from Radiance. That
+        needed saying; it did not need a table.</li>
       <li><b>Licence, How to cite and References moved into the footer</b>, so the numbered
         sections end at the exercises. This matches the Daylight Lab and Construction Studio
         notes, and it reflects what those three are: apparatus for using and crediting the tool

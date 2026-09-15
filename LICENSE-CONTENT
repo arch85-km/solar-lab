@@ -11,7 +11,9 @@ WHAT THIS COVERS
     - docs/ and the screenshots in it
     - teaching exercises, handouts and worksheets distributed with the app
 
-  The source code is not covered here. It is under the MIT License; see LICENSE.
+  The source code is not covered here. index.html, tools/, server/ and tests/ are
+  under the MIT License; see LICENSE, which is kept as the plain MIT text with no
+  preamble so that GitHub and other tooling can identify it automatically.
   Where the two meet — a README that quotes code, say — the code samples stay MIT.
 
 WHAT YOU MAY DO

@@ -6044,7 +6044,11 @@ const Tour = (() => {
 
     spot().hidden = false;
     card().hidden = false;
-    // Let the panel finish its transition before measuring
+    // Let the panel finish its transition before measuring. The timer is the
+    // fallback for when no transition runs at all; the transitionend listener
+    // below is what makes this reliable, because a 240 ms timer can slip on a
+    // loaded machine and leave the card measured against a panel still sliding
+    // in — which puts it over the control it is pointing at.
     requestAnimationFrame(() => { place(); setTimeout(place, 240); });
   }
 
@@ -6069,6 +6073,16 @@ const Tour = (() => {
       else localStorage.removeItem(TOUR_KEY);
     } catch (e) { /* private mode: the preference simply will not stick */ }
   }
+
+  // A panel sliding in moves the element the tour is pointing at. Re-place when
+  // the transition actually ends rather than trusting the timer in show(): the
+  // timer is fine on an idle machine and late on a busy one, and when it is late
+  // the card is positioned against a stale rectangle. Attached once, and does
+  // nothing unless the tour is running.
+  document.querySelectorAll('.panel').forEach(p =>
+    p.addEventListener('transitionend', (e) => {
+      if (active && e.propertyName === 'transform') place();
+    }));
 
   function end(){
     active = false;

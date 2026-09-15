@@ -220,10 +220,23 @@ check('the old key Show button is gone',
   const content = await readFile(join(ROOT, 'LICENSE-CONTENT'), 'utf8');
   const readme = await readFile(join(ROOT, 'README.md'), 'utf8');
   check('code is MIT and the accompanying material is CC BY 4.0, said in all three places',
-        /MIT License/.test(lic) && /LICENSE-CONTENT/.test(lic) &&
+        /MIT License/.test(lic) &&
         /CC BY 4\.0/.test(content) &&
         /creativecommons\.org\/licenses\/by\/4\.0/.test(content) &&
         /The code is MIT/.test(readme) && /accompanying material is CC BY 4\.0/.test(readme));
+  // LICENSE must stay the plain MIT text. GitHub identifies a licence by matching
+  // the file against known templates; a scope preamble — however useful to a human
+  // — drops the match below threshold and the repo shows "Other" instead of "MIT".
+  // The scope statement lives in LICENSE-CONTENT and the README, which are free to
+  // say whatever they like. This guards a regression that actually happened.
+  const licBody = lic.trimStart();
+  check('LICENSE is the plain MIT text, so GitHub can identify it',
+        licBody.startsWith('MIT License\n') &&
+        /^MIT License\n+Copyright \(c\) \d{4}/.test(licBody) &&
+        !/CC BY|LICENSE-CONTENT|Applies to/.test(lic),
+        'first line "' + licBody.split('\n')[0] + '", ' + lic.split('\n').length + ' lines');
+  const pkg = JSON.parse(await readFile(join(ROOT, 'package.json'), 'utf8'));
+  check('package.json declares the code licence', pkg.license === 'MIT', pkg.license);
 }
 
 // Both halves of the brand, together: the name and the line under it. The tagline
@@ -2120,9 +2133,31 @@ console.log('\n=== guided tour ===');
         first.step + ' — "' + first.title + '"');
   check('Back is disabled on the first step', first.backDisabled === true);
 
-  // Walk the whole tour through the Next button
+  // Walk the whole tour through the Next button.
+  //
+  // Wait for the card to stop moving before measuring it. A step that opens a
+  // side panel places its card while the panel is still sliding, then re-places
+  // when the slide ends — so for about 200 ms the card genuinely does sit over
+  // the control it points at. That transient is not what these checks are about,
+  // and a fixed timeout raced it: on a loaded machine the measurement landed
+  // mid-slide and the run failed on whichever step happened to be slow.
+  const settle = async () => {
+    let prev = null;
+    for (let t = 0; t < 40; t++){                 // up to ~2 s
+      const r = await tp.evaluate(() => {
+        const c = document.getElementById('tour-card').getBoundingClientRect();
+        const s = document.getElementById('tour-spot').getBoundingClientRect();
+        return [c.left, c.top, c.width, c.height, s.left, s.top, s.width, s.height].join(',');
+      });
+      if (r === prev) return;
+      prev = r;
+      await tp.waitForTimeout(50);
+    }
+  };
+
   const seen = [];
   for (let i = 0; i < first.total; i++){
+    await settle();
     seen.push(await tp.evaluate(() => {
       const spot = document.getElementById('tour-spot');
       const card = document.getElementById('tour-card');
@@ -2151,7 +2186,6 @@ console.log('\n=== guided tour ===');
       };
     }));
     await tp.click('#tour-next');
-    await tp.waitForTimeout(320);
   }
   const offScreen = seen.filter(x => !x.onScreen).map(x => x.title);
   check('every tour card stays inside the viewport', offScreen.length === 0,
