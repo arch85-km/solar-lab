@@ -430,9 +430,13 @@ zenith cap     = 2π · (1 − cos(α/2))</div>
         equations 7 and 8 instead of the linear equation 6 used for every other bin:</p>
       <div class="sl-formula">c = exp( (Δ(x₃₀ + x₃₁·Z))^x₃₂ ) − x₃₃
 d = −exp( Δ(x₄₀ + x₄₁·Z) ) + x₄₂ + Δ·x₄₃</div>
-      <p>The air mass is the Kasten-style relative optical air mass the code identifies with
-        Radiance's <code>CalcAirMass()</code>:</p>
+      <p>The air mass is what the code calls a Kasten-style relative optical air mass, identified
+        with Radiance's <code>CalcAirMass()</code> rather than with any publication:</p>
       <div class="sl-formula">m = 1 / (cos Z + 0.15 · max(93.885 − Z°, 0.1)^−1.253)</div>
+      <p>Those coefficients are <b>Kasten's 1965 set</b>, not the 1989 Kasten &amp; Young revision
+        that is more often cited. The distinction matters if you compare this term against another
+        implementation, and section 13 sets it out. It is used only to compute the Perez brightness
+        parameter Δ, so its influence on a result is indirect.</p>
 
       <h4>Normalisation</h4>
       <p>Relative radiances mean nothing on their own, so the patch set is scaled to reproduce the
@@ -634,7 +638,73 @@ DNI = G_on · τ_b,   G_on = 1367 · (1 + 0.033 cos(2π·doy/365))</div>
 
   <!-- 07 -->
   <div class="sl-sec">
-    <div class="sl-sechead"><span class="sl-secnum">07</span><h2>Inputs you control</h2></div>
+    <div class="sl-sechead"><span class="sl-secnum">07</span><h2>Limitations</h2></div>
+    <div class="sl-secbody">
+      <p>Stated together, plainly, because a limitation spread across four sections is one a
+        reader can miss. Each is traceable to something the code does or does not do, and the
+        section named beside it carries the detail. Check a study against this list before citing
+        a number from it.</p>
+
+      <h3>Limitations of the physics</h3>
+      <div class="sl-tbl"><table>
+        <thead><tr><th>Limitation</th><th>What it means for a result</th><th class="sl-n">Detail in</th></tr></thead>
+        <tbody>
+          <tr><td><b>No interreflection at all</b></td><td>The largest one. A ray that meets a surface is blocked, never bounced. Every façade opposite yours takes light away and returns none, so results in courtyards, light wells, atria and urban canyons are <b>systematically low, in one direction</b>, by an amount the tool cannot estimate.</td><td class="sl-n">05, 09</td></tr>
+          <tr><td><b>No material properties</b></td><td>Sensors report the irradiance arriving, never what a surface does with it — no absorptance, reflectance, colour or emissivity. Any question whose answer depends on what a surface is made of is outside the tool.</td><td class="sl-n">05</td></tr>
+          <tr><td><b>Nothing is transparent</b></td><td>A window is a solid triangle that blocks the beam completely. Nothing about daylight indoors or solar gain through glass can be read from this tool.</td><td class="sl-n">05</td></tr>
+          <tr><td><b>Visibility is binary</b></td><td>No sun disc and no partial occlusion, so there is no penumbra. A sensor near a shadow edge can differ sharply from its neighbour. Read the field, never the point.</td><td class="sl-n">06d</td></tr>
+          <tr><td><b>Flat ground only</b></td><td>The ground is a plane at y = 0 with one uniform reflectance. There is no terrain model, so a sloping, sunken or elevated site is not represented unless you import it as geometry.</td><td class="sl-n">05</td></tr>
+          <tr><td><b>Ground reflectance is one number for the whole run</b></td><td>It cannot vary by month, so a winter cumulative figure for a site under snow is wrong in a direction the tool cannot correct.</td><td class="sl-n">05</td></tr>
+          <tr><td><b>Turbidity is not an input</b></td><td>Under a climate file it is only whatever is implicit in the measured DNI and DHI; under the fallback it is fixed by Hottel's 23 km atmosphere. There is no turbidity control anywhere in the interface.</td><td class="sl-n">03c, 05</td></tr>
+          <tr><td><b>Broadband only</b></td><td>No spectral calculation and no wavelength dependence.</td><td class="sl-n">05</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>Limitations of the inputs</h3>
+      <div class="sl-tbl"><table>
+        <thead><tr><th>Limitation</th><th>What it means for a result</th><th class="sl-n">Detail in</th></tr></thead>
+        <tbody>
+          <tr><td><b>With no EPW, every figure is a synthetic clear day</b></td><td>A fair-weather upper bound with no cloud in it. Legitimate for comparing two designs on the same day; <b>never</b> a climate result, a yield or a prediction.</td><td class="sl-n">03c</td></tr>
+          <tr><td><b>Context is an occluder, never a sensor</b></td><td>You cannot read a number off a neighbouring building, and the context contributes no measured area to any statistic.</td><td class="sl-n">05, 06c</td></tr>
+          <tr><td><b>OpenStreetMap heights are incomplete</b></td><td>Untagged buildings are drawn at a default 8 m. The panel reports how many were guessed, and that count should be read before relying on an overshadowing result.</td><td class="sl-n">08</td></tr>
+          <tr><td><b>Context is capped</b></td><td>1,200 buildings within 600 m. A denser or wider city is truncated, and the panel says so.</td><td class="sl-n">08</td></tr>
+          <tr><td><b>No vegetation</b></td><td>Overpass is queried for buildings alone. A tree modelled as a solid would shade the whole year identically, which no deciduous tree does.</td><td class="sl-n">05</td></tr>
+          <tr><td><b>A flat 365-day year</b></td><td>29 February is dropped from any EPW, and daylight saving is a constant offset rather than a seasonal rule.</td><td class="sl-n">04, 05</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>Limitations of the resolution</h3>
+      <div class="sl-tbl"><table>
+        <thead><tr><th>Limitation</th><th class="sl-n">Size</th><th>What it means for a result</th></tr></thead>
+        <tbody>
+          <tr><td>Mid-hour sampling of the sun</td><td class="sl-d">−0.19%</td><td>Systematic and small, but it is the floor on any annual total. Measured against the climate file's own global horizontal.</td></tr>
+          <tr><td>Sun-bin resolution over a period</td><td class="sl-d">2.5°</td><td>Cumulative shadow edges are quantised at roughly ten minutes of solar movement.</td></tr>
+          <tr><td>Sensor ceiling, above which the grid is coarsened</td><td class="sl-d">120,000</td><td>The tool backs the grid off rather than freeze, and reports that it did. If it fired, the grid size in your CSV is the one you asked for and not the one that ran.</td></tr>
+          <tr><td>Sky patches</td><td class="sl-d">145 / 577</td><td>Two densities only. A narrow gap of visible sky is the case where the coarser one reads differently.</td></tr>
+          <tr><td>Ray length cap</td><td class="sl-d">6 × model radius, min 500 m</td><td>Geometry beyond that distance cannot block anything. Generous for a building; worth knowing for a site model spanning kilometres.</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>Limitations of the validation</h3>
+      <p>The figures quoted in sections 02, 04 and 06 come from the tool's own suite, which drives
+        the shipped file in headless Chromium. <b>That establishes internal consistency and
+        agreement with closed-form geometry. It is not validation against an independent
+        reference.</b> There is no Radiance cross-run behind any number on this page, and no
+        comparison against measured site data. Section 09, which sets this tool beside Radiance
+        and Ladybug, is reasoning from what the code does rather than a measurement, and says so
+        where it begins.</p>
+      <p class="sl-note"><b>What the tool is for.</b> Teaching relationships and orders of
+        magnitude — how overshadowing moves with the season, why a device that works on one
+        orientation fails on another, what a real climate does to a symmetric geometry. For a
+        compliance submission, an energy model, or any figure a consultant will stake a
+        recommendation on, use a validated tool. The absence of interreflection alone is too
+        large for this one to serve that purpose.</p>
+    </div>
+  </div>
+
+  <!-- 08 -->
+  <div class="sl-sec">
+    <div class="sl-sechead"><span class="sl-secnum">08</span><h2>Inputs you control</h2></div>
     <div class="sl-secbody">
       <p>Every adjustable parameter, with the range the interface enforces and the value the tool
         opens with. Defaults describe the demo massing in London.</p>
@@ -761,9 +831,9 @@ out geom;</div>
     </div>
   </div>
 
-  <!-- 08 -->
+  <!-- 09 -->
   <div class="sl-sec">
-    <div class="sl-sechead"><span class="sl-secnum">08</span><h2>Compared with Ladybug and Radiance</h2></div>
+    <div class="sl-sechead"><span class="sl-secnum">09</span><h2>Compared with Ladybug and Radiance</h2></div>
     <div class="sl-secbody">
       <p class="sl-note"><b>Provenance of this section.</b> Everything else on this page is read
         from the source code. This section is not, and cannot be: the code says nothing about how
@@ -833,9 +903,9 @@ out geom;</div>
     </div>
   </div>
 
-  <!-- 09 -->
+  <!-- 10 -->
   <div class="sl-sec">
-    <div class="sl-sechead"><span class="sl-secnum">09</span><h2>Three exercises</h2></div>
+    <div class="sl-sechead"><span class="sl-secnum">10</span><h2>Three exercises</h2></div>
     <div class="sl-secbody">
       <p>Each isolates one variable and holds everything else fixed. Unless told otherwise, work
         in London at the default coordinates, grid size <code>1.0 m</code>, sky
@@ -906,9 +976,9 @@ out geom;</div>
     </div>
   </div>
 
-  <!-- 10 -->
+  <!-- 11 -->
   <div class="sl-sec">
-    <div class="sl-sechead"><span class="sl-secnum">10</span><h2>Licence</h2></div>
+    <div class="sl-sechead"><span class="sl-secnum">11</span><h2>Licence</h2></div>
     <div class="sl-secbody">
       <p>Four licences apply, and the file header of the application states all four. They cover
         different things and ask for different things.</p>
@@ -936,9 +1006,9 @@ out geom;</div>
     </div>
   </div>
 
-  <!-- 11 -->
+  <!-- 12 -->
   <div class="sl-sec">
-    <div class="sl-sechead"><span class="sl-secnum">11</span><h2>How to cite</h2></div>
+    <div class="sl-sechead"><span class="sl-secnum">12</span><h2>How to cite</h2></div>
     <div class="sl-secbody">
       <p>Cite it as software. Keeping the copyright notice in the file satisfies the licence; a
         citation is the scholarly act on top of that.</p>
@@ -975,161 +1045,250 @@ out geom;</div>
     </div>
   </div>
 
-  <!-- 12 -->
+  <!-- 13 -->
   <div class="sl-sec">
-    <div class="sl-sechead"><span class="sl-secnum">12</span><h2>References</h2></div>
+    <div class="sl-sechead"><span class="sl-secnum">13</span><h2>References</h2></div>
     <div class="sl-secbody">
-      <p>What the solar algorithm, the sky models and the ray test are drawn from, and what each
-        one contributes. These are the sources the code itself names; where it names none — the
-        colour ramps, the sample massing models and the default limits among them — none is listed
-        here either.</p>
-      <p class="sl-note"><b>Provenance of the citations.</b> The code names each source but not its
-        bibliographic detail: it says "Perez et al. 1993", not the journal and volume. That detail
-        was added from the published record.</p>
+      <p>Two blocks, separated by what the source code actually provides. <b>Block A</b> lists
+        sources the code names specifically enough to identify — a publication, a year, a named
+        software module. <b>Block B</b> lists methods the code names by name alone, with no year
+        and no publication; for those the bibliographic entry is supplied from the published
+        record and is an attribution rather than a citation. Nothing appears in either block that
+        the code does not name.</p>
+      <p class="sl-note"><b>How to read the evidence column.</b> Every entry quotes the words in
+        <span class="sl-mono">index.html</span> that put it there. If a source you expect is
+        absent, it is because the code never names it; the two lists after Block B say what those
+        are and why.</p>
+
+      <h3>Block A — sources the code names</h3>
 
       <ul class="sl-refs">
-        <li><span class="sl-chip is-in">cited in code</span><b>NOAA Solar Calculator</b>, NOAA
-          Global Monitoring Laboratory, after Meeus, J. (1998). <i>Astronomical Algorithms</i>,
-          2nd edn. Richmond, VA: Willmann-Bell. Chapters 25 and 28. — Solar position in its
-          low-precision form: Julian day, the orbital series, equation of time, declination and
-          NOAA's three-branch refraction fit. The code names the chapters, which is unusually
-          specific and makes the implementation checkable line by line. Verified against published
-          sunrise and sunset times to about one minute.</li>
+        <li><span class="sl-chip is-in">names it</span><b>Meeus, J. (1998).</b>
+          <i>Astronomical Algorithms</i>, 2nd edn. Richmond, VA: Willmann-Bell.
+          ISBN 978-0-943396-61-3. Chapters 25 and 28.<br>
+          <b>Code:</b> <span class="sl-mono">(Jean Meeus, "Astronomical Algorithms", 2nd ed.,
+          chapters 25 &amp; 28)</span> — the most specific citation in the file, naming edition
+          and chapters. Chapter 25 is solar coordinates, chapter 28 the equation of time; both are
+          implemented in <code>SolarCore.orbital()</code>. Used for every sun position the tool
+          computes.</li>
 
-        <li><span class="sl-chip is-in">cited in code</span>Perez, R., Seals, R. &amp; Michalsky, J.
-          (1993). 'All-weather model for sky luminance distribution — preliminary configuration and
-          validation', <i>Solar Energy</i>, 50(3), pp. 235–245.
-          <a href="https://doi.org/10.1016/0038-092X(93)90017-I" target="_blank" rel="noopener">doi:10.1016/0038-092X(93)90017-I</a>
-          — The all-weather sky, used whenever any sky is built. The full eight-bin,
-          twenty-coefficient table is present, including the alternative expressions for c and d
-          that apply to the <b>lowest</b>-clearness bin, ε ≤ 1.065, the overcast one. The
-          coefficients are published data from this paper's Table 1.</li>
+        <li><span class="sl-chip is-in">names it</span><b>NOAA Global Monitoring Laboratory
+          Solar Calculator.</b> National Oceanic and Atmospheric Administration, Boulder, CO.
+          <a href="https://gml.noaa.gov/grad/solcalc/" target="_blank" rel="noopener">gml.noaa.gov/grad/solcalc</a>.
+          A work of the US federal government, in the public domain in the United States.<br>
+          <b>Code:</b> <span class="sl-mono">Reference: NOAA Global Monitoring Laboratory solar
+          calculator</span>, and <span class="sl-mono">Atmospheric refraction correction
+          (NOAA)</span>. Supplies the low-precision arrangement of Meeus's algorithm and the
+          three-branch refraction fit quoted in section 02.</li>
 
-        <li><span class="sl-chip is-in">cited in code</span><b>Radiance</b> — Ward, G. J. (1994).
-          'The RADIANCE lighting simulation and rendering system', <i>Proceedings of the 21st
-          Annual Conference on Computer Graphics and Interactive Techniques (SIGGRAPH '94)</i>,
-          pp. 459–472.
+        <li><span class="sl-chip is-in">names it</span><b>Perez, R., Seals, R. &amp; Michalsky, J.
+          (1993).</b> 'All-weather model for sky luminance distribution — preliminary
+          configuration and validation', <i>Solar Energy</i>, 50(3), pp. 235–245.
+          <a href="https://doi.org/10.1016/0038-092X(93)90017-I" target="_blank" rel="noopener">doi:10.1016/0038-092X(93)90017-I</a><br>
+          <b>Code:</b> <span class="sl-mono">Perez — all-weather sky radiance distribution (Perez
+          et al. 1993)</span>, and <span class="sl-mono">gendaymtx.c (Perez 1993 Table 1)</span>.
+          The eight-bin, twenty-coefficient table is that paper's Table 1, and the code names the
+          table explicitly. Every sky the tool builds uses it.</li>
+
+        <li><span class="sl-chip is-in">names it</span><b>Hottel, H. C. (1976).</b> 'A simple
+          model for estimating the transmittance of direct solar radiation through clear
+          atmospheres', <i>Solar Energy</i>, 18, pp. 129–134.
+          <a href="https://doi.org/10.1016/0038-092X(76)90045-1" target="_blank" rel="noopener">doi:10.1016/0038-092X(76)90045-1</a><br>
+          <b>Code:</b> <span class="sl-mono">Beam transmittance: Hottel (1976) for the 23 km
+          visibility standard atmosphere</span>, and at the elevation clamp,
+          <span class="sl-mono">km, Hottel valid to 2.5 km</span>. Supplies a₀, a₁ and k in the
+          clear-sky fallback. Note that the <b>mid-latitude summer correction factors</b> the code
+          applies to those constants (0.97, 0.99, 1.02) are not attributed — see Unresolved
+          attributions.</li>
+
+        <li><span class="sl-chip is-in">names it</span><b>Liu, B. Y. H. &amp; Jordan, R. C.
+          (1960).</b> 'The interrelationship and characteristic distribution of direct, diffuse
+          and total solar radiation', <i>Solar Energy</i>, 4(3), pp. 1–19.
+          <a href="https://doi.org/10.1016/0038-092X(60)90062-1" target="_blank" rel="noopener">doi:10.1016/0038-092X(60)90062-1</a><br>
+          <b>Code:</b> <span class="sl-mono">diffuse: Liu &amp; Jordan (1960) correlation</span>.
+          Implemented as <code>τ_d = 0.271 − 0.294·τ_b</code>, the diffuse half of the clear-sky
+          fallback.</li>
+
+        <li><span class="sl-chip is-in">names it</span><b>Radiance</b> — the software, and two
+          specific files within it. Lawrence Berkeley National Laboratory.
+          <a href="https://github.com/LBNL-ETA/Radiance" target="_blank" rel="noopener">github.com/LBNL-ETA/Radiance</a>.
+          Radiance Software License v2.0, © 1990–2025 The Regents of the University of California.<br>
+          <b>Code:</b> <span class="sl-mono">Generated exactly as Radiance rh_init()
+          (gendaymtx.c)</span>, and <span class="sl-mono">Coefficient table and parameter
+          equations transcribed verbatim from Radiance gendaymtx.c (PerezCoeff / CalcPerezParam /
+          CalcRelLuminance)</span>, and <span class="sl-mono">Kasten-style relative optical air
+          mass used by Radiance CalcAirMass()</span>. The code names the source files and the
+          functions, not a paper. The canonical publication for the software is
+          <b>Ward, G. J. (1994)</b>, 'The RADIANCE lighting simulation and rendering system',
+          <i>Proceedings of SIGGRAPH '94</i>, pp. 459–472,
           <a href="https://doi.org/10.1145/192161.192286" target="_blank" rel="noopener">doi:10.1145/192161.192286</a>
-          — Named throughout, and at two specific points: the sky patch construction is generated
-          exactly as <code>rh_init()</code> does, and the Perez coefficient table and parameter
-          equations are transcribed from <code>gendaymtx.c</code> — <code>PerezCoeff</code>,
-          <code>CalcPerezParam</code> and <code>CalcRelLuminance</code>. This is the closest
-          correspondence in the tool and the reason the diffuse term should agree with Radiance.</li>
+          — supplied here, not cited by the code.</li>
 
-        <li><span class="sl-chip is-in">cited in code</span>Tregenza, P. R. (1987). 'Subdivision of
-          the sky hemisphere for luminance measurements', <i>Lighting Research &amp; Technology</i>,
-          19(1), pp. 13–14.
-          <a href="https://doi.org/10.1177/096032718701900103" target="_blank" rel="noopener">doi:10.1177/096032718701900103</a>
-          — The 145-patch subdivision, offered as the default sky density. The row structure
-          <code>[30,30,24,24,18,12,6]</code> with a zenith cap is his, and
-          <code>α = (π/2)/(7·MF + 0.5)</code> at MF:1 reproduces it exactly.</li>
-
-        <li><span class="sl-chip is-in">cited in code</span>Reinhart, C. F. &amp; Walkenhorst, O.
-          (2001). 'Validation of dynamic RADIANCE-based daylight simulations for a test office with
-          external blinds', <i>Energy and Buildings</i>, 33(7), pp. 683–697.
-          <a href="https://doi.org/10.1016/S0378-7788(01)00058-5" target="_blank" rel="noopener">doi:10.1016/S0378-7788(01)00058-5</a>
-          — Named in the code as the second half of "Reinhart/Tregenza". The MF:<i>n</i>
-          generalisation that subdivides Tregenza's patches, giving 577 at MF:2, is the Reinhart
-          scheme implemented in Radiance as <code>reinhart.cal</code>. The code names Reinhart
-          without a year, so this is the attribution of the scheme rather than of a line of code.</li>
-
-        <li><span class="sl-chip is-in">cited in code</span>Hottel, H. C. (1976). 'A simple model
-          for estimating the transmittance of direct solar radiation through clear atmospheres',
-          <i>Solar Energy</i>, 18(2), pp. 129–134.
-          <a href="https://doi.org/10.1016/0038-092X(76)90045-1" target="_blank" rel="noopener">doi:10.1016/0038-092X(76)90045-1</a>
-          — Beam transmittance in the clear-sky fallback, for the 23 km visibility standard
-          atmosphere. The code carries his a₀, a₁ and k constants with the mid-latitude summer
-          correction factors 0.97, 0.99 and 1.02, and clamps site elevation to 2.5 km because that
-          is where the fit holds.</li>
-
-        <li><span class="sl-chip is-in">cited in code</span>Liu, B. Y. H. &amp; Jordan, R. C. (1960).
-          'The interrelationship and characteristic distribution of direct, diffuse and total solar
-          radiation', <i>Solar Energy</i>, 4(3), pp. 1–19.
-          <a href="https://doi.org/10.1016/0038-092X(60)90062-1" target="_blank" rel="noopener">doi:10.1016/0038-092X(60)90062-1</a>
-          — The diffuse correlation paired with Hottel in the fallback, implemented as
-          <code>τ_d = 0.271 − 0.294·τ_b</code>.</li>
-
-        <li><span class="sl-chip is-part">inferred from name</span>Kasten, F. &amp; Young, A. T.
-          (1989). 'Revised optical air mass tables and approximation formula', <i>Applied Optics</i>,
-          28(22), pp. 4735–4738.
-          <a href="https://doi.org/10.1364/AO.28.004735" target="_blank" rel="noopener">doi:10.1364/AO.28.004735</a>
-          — The code calls its air mass "Kasten-style" and ties it to Radiance's
-          <code>CalcAirMass()</code> rather than to a paper. The implemented formula,
-          <code>1/(cos Z + 0.15(93.885 − Z)^−1.253)</code>, is the earlier Kasten (1965)
-          coefficient set rather than the 1989 revision, so the attribution is to the family, not
-          to this exact publication. Used only to compute Perez brightness Δ.</li>
-
-        <li><span class="sl-chip is-part">inferred from name</span>Möller, T. &amp; Trumbore, B.
-          (1997). 'Fast, minimum storage ray-triangle intersection', <i>Journal of Graphics
-          Tools</i>, 2(1), pp. 21–28.
-          <a href="https://doi.org/10.1080/10867651.1997.10487468" target="_blank" rel="noopener">doi:10.1080/10867651.1997.10487468</a>
-          — Named in a one-line comment as the ray–triangle test, used at every leaf of the
-          bounding-volume hierarchy. The code uses it in occlusion-only form: any hit within the
-          ray's maximum distance returns immediately and no barycentric result is kept.</li>
-
-        <li><span class="sl-chip is-in">cited in code</span><b>Ladybug Tools</b> —
+        <li><span class="sl-chip is-in">names it</span><b>Ladybug Tools</b> —
           <a href="https://www.ladybug.tools/" target="_blank" rel="noopener">ladybug.tools</a>,
-          specifically <code>ladybug/epw.py</code>. — Named twice, for two unrelated reasons. The
-          EPW field indices were verified against that module, which is why columns 13, 14 and 15
-          can be relied on. Separately, the default <b>Spectral</b> colour ramp is chosen because
-          it is the one students recognise from Ladybug in Grasshopper, and the code says so at the
-          definition. No Ladybug Tools code is included in the app.</li>
+          and specifically the module <code>ladybug/epw.py</code>. AGPL-3.0.<br>
+          <b>Code:</b> <span class="sl-mono">Field indices verified against ladybug/epw.py
+          (0-based)</span>, <span class="sl-mono">Methodology follows the Radiance / Ladybug Tools
+          chain</span>, and at the colour ramp, <span class="sl-mono">the ramp students will
+          recognise from Ladybug Tools in Grasshopper, and it is the default here for that
+          reason</span>. Two unrelated debts: the EPW column positions, and the default Spectral
+          palette. No Ladybug Tools code is included in the app.</li>
 
-        <li><span class="sl-chip is-in">cited in code</span><b>EnergyPlus Weather (EPW) format</b>,
-          US Department of Energy. — The hourly climate format the tool reads. The code documents
-          the LOCATION header layout and the data columns it uses, and states the hour convention
-          that EPW hour h describes the hour preceding h, which is the detail that decides whether
-          a result is an hour out.</li>
+        <li><span class="sl-chip is-in">names it</span><b>EnergyPlus Weather (EPW) file format.</b>
+          US Department of Energy, Building Technologies Office.
+          <a href="https://energyplus.net/weather" target="_blank" rel="noopener">energyplus.net/weather</a>.
+          The field layout is documented in the <i>EnergyPlus Auxiliary Programs</i> reference,
+          "Weather Converter Program".<br>
+          <b>Code:</b> <span class="sl-mono">EPW — EnergyPlus Weather file parser</span>, and
+          <span class="sl-mono">climate data … EnergyPlus EPW hourly DNI / DHI / GHI</span>. The
+          code names the format and documents the columns it reads; it names no DOE publication,
+          so the document title above is supplied.</li>
 
-        <li><span class="sl-chip is-in">cited in code</span><b>OpenStreetMap</b> and the
-          <b>Overpass API</b> — <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">openstreetmap.org/copyright</a>,
+        <li><span class="sl-chip is-in">names it</span><b>OpenStreetMap</b> and the
+          <b>Overpass API.</b> OpenStreetMap contributors; Overpass by Roland Olbricht and
+          contributors.
+          <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">openstreetmap.org/copyright</a> ·
           <a href="https://dev.overpass-api.de/" target="_blank" rel="noopener">dev.overpass-api.de</a>.
-          — Building footprints and height tags for the 3D context, and the basemap tiles and
-          Nominatim place search. Data is © OpenStreetMap contributors under the Open Database
-          License. Overpass is volunteer-run and for modest use, which is why the tool makes one
-          request per load, caps the box at 600 m and never polls.</li>
+          Map data under the Open Database License (ODbL) 1.0.<br>
+          <b>Code:</b> <span class="sl-mono">footprints and heights from OpenStreetMap via the
+          Overpass API — no key, no account</span>, the endpoint
+          <span class="sl-mono">https://overpass-api.de/api/interpreter</span>, and at the radius
+          cap, <span class="sl-mono">metres; Overpass is a shared free service</span>. Supplies
+          building footprints and height tags for the 3D context, and the basemap tiles.</li>
 
-        <li><span class="sl-chip is-in">cited in code</span><b>three.js</b> —
-          <a href="https://threejs.org" target="_blank" rel="noopener">threejs.org</a>, MIT
-          licensed, loaded from jsDelivr at runtime. — Rendering, the shadow map and the OBJ
-          loader. It takes no part in the irradiance calculation: the ray-tracing worker is
-          deliberately written without it and receives raw triangle data instead.</li>
+        <li><span class="sl-chip is-in">names it</span><b>Nominatim.</b> OpenStreetMap Foundation.
+          <a href="https://nominatim.org/" target="_blank" rel="noopener">nominatim.org</a>.<br>
+          <b>Code:</b> <span class="sl-mono">Geocoding by Nominatim / OpenStreetMap. Searches only
+          run when you press Search or Enter, to stay inside their usage policy</span>, and
+          <span class="sl-mono">Nominatim asks for no more than one request a second</span>.
+          Place search only; it takes no part in any calculation.</li>
+
+        <li><span class="sl-chip is-in">names it</span><b>three.js</b>, version 0.185.1 —
+          <a href="https://threejs.org" target="_blank" rel="noopener">threejs.org</a>. MIT
+          licensed, © 2010–2026 three.js authors. Loaded from jsDelivr at runtime.<br>
+          <b>Code:</b> named in the file header as the only runtime dependency, and imported by
+          the importmap. Rendering, the shadow map and the OBJ loader. It takes no part in the
+          irradiance calculation — the ray-tracing worker is written without it and receives raw
+          triangle data, which the worker's own header says is deliberate.</li>
+      </ul>
+
+      <h3>Block B — methods the code names by name only</h3>
+      <p>For each of these the code names a person or an algorithm and nothing more: no year, no
+        journal, no paper. The entry below is therefore an <b>attribution supplied from the
+        published record</b>, not a citation the code makes. Each is the publication the named
+        method is conventionally credited to, and where the code's implementation differs from
+        that publication it is said so.</p>
+
+      <ul class="sl-refs">
+        <li><span class="sl-chip is-part">name only</span><b>Tregenza, P. R. (1987).</b>
+          'Subdivision of the sky hemisphere for luminance measurements', <i>Lighting Research
+          &amp; Technology</i>, 19(1), pp. 13–14.
+          <a href="https://doi.org/10.1177/096032718701900103" target="_blank" rel="noopener">doi:10.1177/096032718701900103</a><br>
+          <b>Code says only:</b> <span class="sl-mono">Tregenza (145)</span> and
+          <span class="sl-mono">SkyDome — Reinhart/Tregenza sky subdivision</span>. The "(145)" is
+          a patch count, not a year. The code implements the 145-patch form — seven bands
+          <code>[30,30,24,24,18,12,6]</code> summing to 144, plus one zenith cap — which is the
+          subdivision as used in Radiance and the daylight-coefficient literature. The 1987 paper
+          itself describes a sky-scanning pattern, and the exact zone count quoted for it varies
+          between sources, so this is credited as the origin of the subdivision rather than as a
+          line-by-line implementation of that paper.</li>
+
+        <li><span class="sl-chip is-part">name only</span><b>Reinhart, C. F. &amp; Walkenhorst, O.
+          (2001).</b> 'Validation of dynamic RADIANCE-based daylight simulations for a test office
+          with external blinds', <i>Energy and Buildings</i>, 33(7), pp. 683–697.
+          <a href="https://doi.org/10.1016/S0378-7788(01)00058-5" target="_blank" rel="noopener">doi:10.1016/S0378-7788(01)00058-5</a><br>
+          <b>Code says only:</b> <span class="sl-mono">Reinhart (577)</span> and
+          <span class="sl-mono">Reinhart/Tregenza sky subdivision</span>. This is the paper in
+          which the refinement of Tregenza's subdivision for dynamic simulation was introduced,
+          and MF:2 → 577 patches is that scheme. The generalisation to arbitrary MF was later
+          formalised by Bourgeois, Reinhart &amp; Ward (2008) and implemented in Radiance as
+          <code>reinhart.cal</code> — see the list below, since the code names neither.</li>
+
+        <li><span class="sl-chip is-part">name only</span><b>Kasten, F. (1965).</b> 'A new table
+          and approximation formula for the relative optical air mass', <i>Archiv für Meteorologie,
+          Geophysik und Bioklimatologie, Serie B</i>, 14, pp. 206–223.
+          <a href="https://doi.org/10.1007/BF02248840" target="_blank" rel="noopener">doi:10.1007/BF02248840</a><br>
+          <b>Code says only:</b> <span class="sl-mono">Kasten-style relative optical air mass used
+          by Radiance CalcAirMass()</span> — a name, hedged with "-style", and a function.
+          <b>The 1965 paper is the right one, and it matters which.</b> The code implements
+          <code>1/(cos Z + 0.15(93.885 − Z)^−1.253)</code>, which is Kasten's 1965 coefficient set.
+          The widely cited revision — Kasten, F. &amp; Young, A. T. (1989), 'Revised optical air
+          mass tables and approximation formula', <i>Applied Optics</i>, 28(22), pp. 4735–4738,
+          <a href="https://doi.org/10.1364/AO.28.004735" target="_blank" rel="noopener">doi:10.1364/AO.28.004735</a>
+          — uses different constants and is <b>not</b> what is implemented. Used only to compute
+          the Perez brightness parameter Δ.</li>
+
+        <li><span class="sl-chip is-part">name only</span><b>Möller, T. &amp; Trumbore, B. (1997).</b>
+          'Fast, minimum storage ray-triangle intersection', <i>Journal of Graphics Tools</i>,
+          2(1), pp. 21–28.
+          <a href="https://doi.org/10.1080/10867651.1997.10487468" target="_blank" rel="noopener">doi:10.1080/10867651.1997.10487468</a><br>
+          <b>Code says only:</b> <span class="sl-mono">Moller-Trumbore, occlusion only (any hit
+          within maxT wins)</span> — a one-line comment above the function. The implementation is
+          the published algorithm reduced to its occlusion form: the barycentric coordinates are
+          computed and tested, but no intersection result is kept and the traversal returns on the
+          first hit. Used at every leaf of the bounding-volume hierarchy.</li>
+      </ul>
+
+      <h3>Named in the code, but not a citable source</h3>
+      <p>Listed for completeness, because each is named in <span class="sl-mono">index.html</span>
+        and a reader may look for it here.</p>
+      <ul class="sl-refs">
+        <li><b>Grasshopper</b> — named once, only to say which environment students will recognise
+          the default colour ramp from. Nothing is taken from it.</li>
+        <li><b>jsDelivr</b> — the CDN three.js is fetched from. A delivery mechanism, not a
+          source.</li>
+        <li><b>The Radiance Software License v2.0</b> and the <b>MIT License</b> — named in the
+          file header as licences. They govern reuse and are set out in section 11; they are not
+          methodological sources.</li>
       </ul>
 
       <h3>Possible references the author should verify</h3>
-      <p>Relevant to the methods but <b>not named anywhere in the code</b>, and therefore not cited
-        above. Listed because a reader may expect them.</p>
+      <p>Relevant to the methods, and <b>not named anywhere in the code</b> — therefore absent from
+        both blocks above. Listed because a reader may expect them, and because adding the name to
+        a source comment would move each one into Block A.</p>
       <ul class="sl-refs">
-        <li>Perez, R., Ineichen, P., Seals, R., Michalsky, J. &amp; Stewart, R. (1990). 'Modeling
-          daylight availability and irradiance components from direct and global irradiance',
-          <i>Solar Energy</i>, 44(5), pp. 271–289. — The companion paper to the 1993 sky model,
-          and the usual source for the clearness and brightness parameterisation. The code
-          implements ε and Δ but cites only the 1993 paper and <code>gendaymtx.c</code> for them.
-          Worth adding to the source comment if the parameterisation is regarded as coming from
-          here.</li>
-        <li>Bourgeois, D., Reinhart, C. F. &amp; Ward, G. (2008). 'Standard daylight coefficient
-          model for dynamic daylighting simulations', <i>Building Research &amp; Information</i>,
-          36(1), pp. 68–82. — Where the MF:<i>n</i> generalisation of the Tregenza subdivision was
-          formalised. The code implements it but names only "Reinhart".</li>
-        <li><b>ASHRAE</b> — <b>deliberately not cited.</b> Earlier versions of this app labelled
-          the clear-sky fallback "ASHRAE/Hottel", in the export header and in the interface. That
-          was wrong: the ASHRAE Handbook clear-sky model uses tabulated beam and diffuse optical
-          depths, and none of that is present. The implementation is Hottel 1976 with Liu &amp;
-          Jordan 1960, both cited above. The label has been corrected in version 1.0 and no ASHRAE
-          method is claimed.</li>
+        <li><b>Perez, R., Ineichen, P., Seals, R., Michalsky, J. &amp; Stewart, R. (1990).</b>
+          'Modeling daylight availability and irradiance components from direct and global
+          irradiance', <i>Solar Energy</i>, 44(5), pp. 271–289.
+          <a href="https://doi.org/10.1016/0038-092X(90)90055-H" target="_blank" rel="noopener">doi:10.1016/0038-092X(90)90055-H</a>
+          — the companion paper, and the usual source for the clearness ε and brightness Δ
+          parameterisation. The code computes both but cites only the 1993 paper and
+          <code>gendaymtx.c</code>.</li>
+        <li><b>Bourgeois, D., Reinhart, C. F. &amp; Ward, G. (2008).</b> 'Standard daylight
+          coefficient model for dynamic daylighting simulations', <i>Building Research &amp;
+          Information</i>, 36(1), pp. 68–82.
+          <a href="https://doi.org/10.1080/09613210701446325" target="_blank" rel="noopener">doi:10.1080/09613210701446325</a>
+          — where the MF:<i>n</i> generalisation the code implements was formalised. The code
+          implements it and names only "Reinhart".</li>
+        <li><b>ASHRAE</b> — <b>deliberately absent.</b> Until version 1.0 the export header and
+          the EPW panel both described the clear-sky fallback as "ASHRAE/Hottel". That was wrong:
+          the ASHRAE Handbook clear-sky model uses tabulated beam and diffuse optical depths, none
+          of which is present. The implementation is Hottel 1976 with Liu &amp; Jordan 1960, both
+          in Block A. The label has been corrected and no ASHRAE method is claimed anywhere.</li>
       </ul>
 
       <h3>Unresolved attributions</h3>
-      <p>One, and it is minor. The <b>mid-latitude summer correction factors</b> applied to
-        Hottel's constants — 0.97, 0.99 and 1.02 — are the values conventionally tabulated with
-        that correlation for four reference atmospheres, and they appear in the standard textbook
-        treatments. The code names no source for the specific set, and the primary publication for
-        the correction table could not be identified with confidence, so it is recorded here rather
-        than attributed to Hottel's paper itself.</p>
+      <p>One. The <b>mid-latitude summer correction factors</b> applied to Hottel's constants —
+        0.97, 0.99 and 1.02 — are the values conventionally tabulated alongside that correlation
+        for four reference atmospheres, and they appear in the standard textbook treatments of it.
+        The code names no source for the specific set, and the primary publication for the
+        correction table could not be identified with confidence from the sources available, so it
+        is recorded here rather than attributed to Hottel's own paper. It affects only the
+        clear-sky fallback.</p>
+
+      <h3>How these citations were assembled</h3>
+      <p>The code names each source but almost never its bibliographic detail: it says
+        "Perez et al. 1993", not the journal and volume. Titles, journals, volumes, issues, page
+        ranges and DOIs were therefore taken from the published record and checked against
+        indexing services rather than reproduced from memory. Two corrections came out of that
+        check and are recorded in the verification report: the air-mass citation was the wrong
+        paper, and several entries claimed the code cited a publication when it names only a
+        method.</p>
 
       <p class="sl-cite">These are where the tool's methods come from, not an authority for its
-        results. The figures in sections 02, 04 and 06 are measured by the tool's own suite against
-        closed-form geometry and its own climate input, not against any of these sources.</p>
+        results. The figures in sections 02, 04 and 06 are measured by the tool's own suite
+        against closed-form geometry and its own climate input, not against any of these
+        sources — see section 07.</p>
     </div>
   </div>
 
@@ -1137,60 +1296,96 @@ out geom;</div>
     <p>Everything on this page was extracted from the tool's source and from its verification
       suite, which drives the shipped file in headless Chromium. Where a figure is quoted it is
       measured, not estimated. Where the code did not make something clear it has been said so
-      rather than inferred — and section 08, which compares this tool with others, is marked as
+      rather than inferred — and section 09, which compares this tool with others, is marked as
       reasoning rather than as something read from the code.</p>
     <p>For a compliance submission, use Radiance through Ladybug and Honeybee, IESVE, or another
       validated tool. This one is built to teach relationships and orders of magnitude.</p>
 
     <h3>Verification report</h3>
-    <p>This page was re-read against <span class="sl-mono">index.html</span> after drafting, and
-      every constant, range, month boundary, formula and citation checked in both directions. The
-      pass changed the following.</p>
+    <p>This page has been through two passes against <span class="sl-mono">index.html</span>: a
+      first on drafting, and a second devoted entirely to citations and references, in which every
+      source was traced back to the words in the code that name it and every bibliographic detail
+      was checked against indexing services rather than reproduced from memory. Both passes are
+      recorded, because what the second one found is the reason the reference section is now built
+      the way it is.</p>
+
+    <h4>Second pass — citations and references</h4>
     <ul class="sl-refs">
-      <li><b>Two defects found in the application and fixed, not merely documented.</b> The CSV
-        export and the interface both described the clear-sky fallback as "ASHRAE/Hottel", a method
-        the code does not contain; both now name Hottel 1976 and Liu &amp; Jordan 1960. And the CSV
-        header did not record the grid size, so a figure taken from it could not be reproduced;
-        it now does. Section 11 was rewritten from "four of five settings" to all five, and ASHRAE
-        moved out of the reference list into the note above.</li>
+      <li><b>The wrong air-mass paper was cited, and it is the kind of error that propagates.</b>
+        The list gave Kasten &amp; Young (1989). The code implements
+        <code>1/(cos Z + 0.15(93.885 − Z)^−1.253)</code>, which is <b>Kasten (1965)</b>; the 1989
+        revision uses different constants and is not what runs. The entry now cites 1965, names
+        the 1989 paper explicitly as the one <em>not</em> implemented, and says why the
+        distinction matters.</li>
+      <li><b>Four entries claimed the code cited a publication when it names only a method.</b>
+        Tregenza, Reinhart, Kasten and Möller–Trumbore were all marked "cited in code". The code
+        names a person and, at most, a patch count — <span class="sl-mono">Tregenza (145)</span>,
+        <span class="sl-mono">Reinhart (577)</span>, <span class="sl-mono">Kasten-style</span>,
+        <span class="sl-mono">Moller-Trumbore, occlusion only</span> — with no year and no paper
+        anywhere. They are now in a separate Block B, described as attributions supplied from the
+        published record rather than citations the code makes.</li>
+      <li><b>Radiance was cited through Ward (1994), which the code never names.</b> The code
+        names the software and two of its source files. The entry now leads with the software and
+        the files it quotes, and supplies Ward's paper as the canonical publication while saying
+        plainly that the code does not cite it.</li>
+      <li><b>Every entry now carries the code's own words as its warrant.</b> Each reference
+        quotes the comment or string in <span class="sl-mono">index.html</span> that puts it in
+        the list, so a reader can check the claim without taking this page's word for it. Writing
+        those quotes is what exposed the three errors above.</li>
+      <li><b>Bibliographic detail was checked, not remembered.</b> Titles, journals, volumes,
+        issues, pages and DOIs were verified against indexing records. Two details were corrected:
+        Hottel's issue number was dropped, because the sources consulted give volume and pages
+        without agreeing on an issue; and Tregenza's entry no longer asserts a zone count for the
+        1987 paper, because published descriptions of it differ from the 145 the code implements.
+        That discrepancy is now stated rather than smoothed over.</li>
+      <li><b>Three sources named in the code were missing from the list entirely</b> — Nominatim,
+        the EnergyPlus EPW format as a named format, and Grasshopper. The first two are now in
+        Block A; Grasshopper is in a short list of things the code names that are not
+        methodological sources, alongside jsDelivr and the licences.</li>
+      <li><b>Citation check, both directions, re-run on the rebuilt section:</b> every entry in
+        Block A and Block B is cited in the body, and every source named in the body appears in
+        one of the two blocks or in the short "not a citable source" list. Nothing sits in a block
+        on relevance alone — Perez et al. (1990), Bourgeois et al. (2008) and ASHRAE are outside
+        both, with the reason given for each.</li>
+      <li><b>A dedicated Limitations section was added</b> as section 07, and everything after it
+        renumbered. The limitations were previously spread across the traps box, the "not
+        modelled" ledger, the approximation costs and the provenance caveat — present, but not
+        gathered anywhere a reader could check a study against them.</li>
+    </ul>
+
+    <h4>First pass — the draft against the source</h4>
+    <ul class="sl-refs">
+      <li><b>Three defects found in the application and fixed, not merely documented.</b> The CSV
+        export and the EPW panel both described the clear-sky fallback as "ASHRAE/Hottel", a
+        method the code does not contain; both now name Hottel 1976 and Liu &amp; Jordan 1960. The
+        CSV header did not record the grid size, so a figure taken from it could not be
+        reproduced; it now does, and section 12 claims all five settings rather than four. And the
+        preset-locations comment said 20 cities where there are 24.</li>
       <li><b>A test that could not fail was rewritten.</b> The new check on the ASHRAE label
         initially ran with a climate file loaded, so the fallback string it was written to police
         never executed and the check would have passed with the bug still present. It now asserts
         against the source itself.</li>
+      <li><b>A twilight claim was wrong and became a finding.</b> A draft sentence said the Perez
+        sky is built only above −6° solar altitude. That gate exists in the instantaneous path
+        alone; the cumulative path builds a sky for any hour with positive diffuse horizontal, sun
+        below the horizon included. Section 09 now states the asymmetry.</li>
       <li><b>The metric table was corrected.</b> An early draft listed only instantaneous and
-        cumulative. The code also offers <b>average irradiance</b> — the cumulative sum divided by
-        the hours in the period — and writes a <b>direct component</b> beside every value in the
-        CSV. Both were added.</li>
-      <li><b>The context-shading trap was inverted.</b> Drafted as "context only shades when you
-        switch it on", implying an opt-in. The default is <code>osmShade: true</code>, so loading
-        context silently makes every subsequent run a shaded run. The trap now says so.</li>
-      <li><b>Sky density is two options, not a tier system.</b> An early draft borrowed the sister
-        tool's quality-tier framing. There are no quality tiers here; there is one density control
-        with two values.</li>
-      <li><b>The refraction branch boundaries were corrected</b> from an approximate "below the
-        horizon" to the exact −0.575° the code uses, and the upper cut-off at 85° was added.</li>
-      <li><b>Elevation was moved from "included" to "not modelled" for EPW runs.</b> It is read
-        from the LOCATION header and used only by the clear-sky model; with a climate file loaded
-        it affects nothing.</li>
-      <li><b>One claim was removed for lack of support.</b> A draft sentence in section 06 said the
-        tool had been checked against a reference implementation. It has not: the suite checks
-        internal consistency and closed-form geometry. The paragraph now says that explicitly and
-        calls the distinction out.</li>
-      <li><b>A stale comment in the source was caught by writing the input table.</b> The code's
-        own header said 20 preset cities; there are 24. The page says 24 and the comment has been
-        corrected. Trivial in itself, but it is the kind of drift that makes a source comment
-        untrustworthy as a citation, which is the one thing this page depends on.</li>
-      <li><b>A twilight claim was wrong and is now a finding.</b> A draft sentence in section 08
-        said the Perez sky is built only above −6° solar altitude. That gate exists in the
-        instantaneous path alone; the cumulative path builds a sky for any hour with positive
-        diffuse horizontal, sun below the horizon included. The two paths therefore treat dusk
-        differently, which the section now states.</li>
-      <li><b>Kasten was demoted from a citation to an attribution of family.</b> The implemented
-        coefficients are the 1965 set, not the 1989 revision the code's "Kasten-style" label might
-        suggest, so the entry says which and does not claim the paper is implemented.</li>
-      <li><b>Citation check, both directions:</b> every reference in the list is cited in the body,
-        and every source named in the body appears in the list. Nothing sits in the list on
-        relevance alone — the three that would have are in "Possible references" instead.</li>
+        cumulative. The code also offers average irradiance, and writes a direct component beside
+        every value in the CSV.</li>
+      <li><b>The context-shading trap was inverted.</b> Drafted as an opt-in. The default is
+        <code>osmShade: true</code>, so loading context silently makes every subsequent run a
+        shaded run.</li>
+      <li><b>Sky density is two options, not a tier system</b> — an early draft borrowed the
+        sister tool's quality-tier framing, which does not exist here.</li>
+      <li><b>The refraction branch boundaries were corrected</b> to the exact −0.575° and the 85°
+        cut-off the code uses.</li>
+      <li><b>Elevation moved from "included" to "not modelled" for EPW runs</b>: it is read from
+        the LOCATION header and used only by the clear-sky model.</li>
+      <li><b>One claim was removed for lack of support.</b> A draft sentence said the tool had
+        been checked against a reference implementation. It has not, and section 07 now says so
+        explicitly.</li>
+      <li><b>One malformed table close</b> was caught by a tag-balance check of the finished page
+        and fixed.</li>
     </ul>
     <p class="sl-cite">Version 1.0 · 209 checks passing · page generated against
       <span class="sl-mono">index.html</span> at build 1.0</p>

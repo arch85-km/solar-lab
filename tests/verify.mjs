@@ -162,6 +162,7 @@ const boot = await page.evaluate(() => {
     open: secs.filter(x => !x.classList.contains('closed')).map(x => x.dataset.sec),
     title: document.title,
     brand: document.querySelector('.brand-text b').textContent,
+    tagline: document.querySelector('.brand-text span').textContent,
   };
 });
 check('every panel section starts collapsed',
@@ -225,9 +226,13 @@ check('the old key Show button is gone',
         /The code is MIT/.test(readme) && /accompanying material is CC BY 4\.0/.test(readme));
 }
 
-check('app is titled Solar Analysis Lab',
-      boot.title === 'Solar Analysis Lab' && boot.brand === 'Solar Analysis Lab',
-      'title "' + boot.title + '", brand "' + boot.brand + '"');
+// Both halves of the brand, together: the name and the line under it. The tagline
+// went unguarded until now, which is how it kept saying something the app had
+// outgrown. CSS uppercases it, so the markup holds sentence case.
+check('app is titled Solar Analysis Lab, and says what it does',
+      boot.title === 'Solar Analysis Lab' && boot.brand === 'Solar Analysis Lab' &&
+      boot.tagline === 'Sun path · Shadows · Irradiance',
+      'title "' + boot.title + '", brand "' + boot.brand + '", tagline "' + boot.tagline + '"');
 check('importmap resolves against the real published package',
       cdnHits.has('build/three.module.js') &&
       cdnHits.has('examples/jsm/controls/OrbitControls.js') &&
