@@ -435,7 +435,7 @@ d = −exp( Δ(x₄₀ + x₄₁·Z) ) + x₄₂ + Δ·x₄₃</div>
       <div class="sl-formula">m = 1 / (cos Z + 0.15 · max(93.885 − Z°, 0.1)^−1.253)</div>
       <p>Those coefficients are <b>Kasten's 1965 set</b>, not the 1989 Kasten &amp; Young revision
         that is more often cited. The distinction matters if you compare this term against another
-        implementation, and section 13 sets it out. It is used only to compute the Perez brightness
+        implementation, and the references below set it out. It is used only to compute the Perez brightness
         parameter Δ, so its influence on a result is indirect.</p>
 
       <h4>Normalisation</h4>
@@ -976,321 +976,8 @@ out geom;</div>
     </div>
   </div>
 
-  <!-- 11 -->
-  <div class="sl-sec">
-    <div class="sl-sechead"><span class="sl-secnum">11</span><h2>Licence</h2></div>
-    <div class="sl-secbody">
-      <p>Four licences apply, and the file header of the application states all four. They cover
-        different things and ask for different things.</p>
 
-      <div class="sl-tbl"><table>
-        <thead><tr><th>What</th><th>Licence</th><th>What it permits and asks</th></tr></thead>
-        <tbody>
-          <tr><td><b>The code</b> — <span class="sl-mono">index.html</span> and everything that builds it</td><td class="sl-p">MIT</td><td>Any use, including commercial: use, copy, modify, merge, publish, distribute, sublicense and sell. It asks only that the copyright notice and the permission notice travel with any substantial portion. Keeping the header comment in the file satisfies it.</td></tr>
-          <tr><td><b>The accompanying material</b> — documentation, this page, screenshots, exercises</td><td class="sl-p">CC BY 4.0</td><td>Share and adapt for any purpose, including commercial, with attribution: credit the author, link the licence, and indicate if you changed anything.</td></tr>
-          <tr><td><b>three.js</b> — loaded from jsDelivr at runtime</td><td class="sl-p">MIT</td><td>© 2010–2026 three.js authors. The app contains no three.js code and only fetches it, so nothing is redistributed; if you self-host it instead, its notice must travel with your copy.</td></tr>
-          <tr><td><b>Radiance</b> — the Perez coefficients and the Tregenza/Reinhart construction, reimplemented in JavaScript</td><td class="sl-p">Radiance Software License v2.0</td><td>© 1990–2025 The Regents of the University of California, through Lawrence Berkeley National Laboratory. Redistribution in source or binary form must retain the copyright notice, the conditions and the disclaimer; the LBNL name may not be used to endorse derived products. The full notice is reproduced in the project's third-party notices.</td></tr>
-        </tbody>
-      </table></div>
 
-      <p>Attribute the material as: <span class="sl-mono">Solar Analysis Lab © 2026 Karam
-        Al-Obaidi, licensed under CC BY 4.0</span>, with a link to
-        <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">the
-        licence deed</a>. Screenshots that include a basemap additionally carry
-        © OpenStreetMap contributors under the Open Database License, which the app displays on
-        screen and repeats in the footer of every exported sheet.</p>
-
-      <p><b>A model you make with the tool is yours.</b> None of these licences claims anything
-        over your geometry, your results, your CSV or the images you export. They govern the
-        software and the teaching material, not the work you do with them.</p>
-    </div>
-  </div>
-
-  <!-- 12 -->
-  <div class="sl-sec">
-    <div class="sl-sechead"><span class="sl-secnum">12</span><h2>How to cite</h2></div>
-    <div class="sl-secbody">
-      <p>Cite it as software. Keeping the copyright notice in the file satisfies the licence; a
-        citation is the scholarly act on top of that.</p>
-      <p class="sl-ref">Al-Obaidi, K. M. (2026). <i>Solar Analysis Lab: a browser-based sun path
-        and solar irradiance tool</i> (Version 1.0) [Computer software].
-        https://karam.me.uk/applications/solar-analysis-lab/</p>
-<pre>@software{alobaidi2026solaranalysislab,
-  author  = {Al-Obaidi, Karam M.},
-  title   = {Solar Analysis Lab: a browser-based sun path and solar irradiance tool},
-  year    = {2026},
-  version = {1.0},
-  url     = {https://karam.me.uk/applications/solar-analysis-lab/},
-  note    = {Code MIT licensed; accompanying material CC BY 4.0}
-}</pre>
-
-      <h3>What to report alongside any figure</h3>
-      <p>Five settings change the numbers, and a value quoted without them cannot be reproduced.
-        All five are written into the CSV export as header comments, so the simplest way to
-        satisfy this is to keep the CSV:</p>
-      <div class="sl-tbl"><table>
-        <thead><tr><th>Report</th><th>Where the CSV records it</th></tr></thead>
-        <tbody>
-          <tr><td>The climate file, or that the clear-sky fallback was used</td><td class="sl-p"># Climate</td></tr>
-          <tr><td>Sky density — Tregenza 145 or Reinhart 577</td><td class="sl-p"># Sky</td></tr>
-          <tr><td>Ground reflectance</td><td class="sl-p"># Sky</td></tr>
-          <tr><td>Whether OpenStreetMap context was shading the run</td><td class="sl-p"># Context</td></tr>
-          <tr><td>Grid size</td><td class="sl-p"># Analysis</td></tr>
-        </tbody>
-        <caption>The same header also carries the site and its coordinates, the analysis period, the unit, and the number of context buildings loaded. Exported images and study sheets carry the equivalent in their title block.</caption>
-      </table></div>
-      <p>Add one thing the file cannot record for you: whether the grid was coarsened. If the tool
-        reported that it reduced the grid to stay under 120,000 points, the grid size in the
-        header is the one you asked for and not the one that ran.</p>
-    </div>
-  </div>
-
-  <!-- 13 -->
-  <div class="sl-sec">
-    <div class="sl-sechead"><span class="sl-secnum">13</span><h2>References</h2></div>
-    <div class="sl-secbody">
-      <p>Two blocks, separated by what the source code actually provides. <b>Block A</b> lists
-        sources the code names specifically enough to identify — a publication, a year, a named
-        software module. <b>Block B</b> lists methods the code names by name alone, with no year
-        and no publication; for those the bibliographic entry is supplied from the published
-        record and is an attribution rather than a citation. Nothing appears in either block that
-        the code does not name.</p>
-      <p class="sl-note"><b>How to read the evidence column.</b> Every entry quotes the words in
-        <span class="sl-mono">index.html</span> that put it there. If a source you expect is
-        absent, it is because the code never names it; the two lists after Block B say what those
-        are and why.</p>
-
-      <h3>Block A — sources the code names</h3>
-
-      <ul class="sl-refs">
-        <li><span class="sl-chip is-in">names it</span><b>Meeus, J. (1998).</b>
-          <i>Astronomical Algorithms</i>, 2nd edn. Richmond, VA: Willmann-Bell.
-          ISBN 978-0-943396-61-3. Chapters 25 and 28.<br>
-          <b>Code:</b> <span class="sl-mono">(Jean Meeus, "Astronomical Algorithms", 2nd ed.,
-          chapters 25 &amp; 28)</span> — the most specific citation in the file, naming edition
-          and chapters. Chapter 25 is solar coordinates, chapter 28 the equation of time; both are
-          implemented in <code>SolarCore.orbital()</code>. Used for every sun position the tool
-          computes.</li>
-
-        <li><span class="sl-chip is-in">names it</span><b>NOAA Global Monitoring Laboratory
-          Solar Calculator.</b> National Oceanic and Atmospheric Administration, Boulder, CO.
-          <a href="https://gml.noaa.gov/grad/solcalc/" target="_blank" rel="noopener">gml.noaa.gov/grad/solcalc</a>.
-          A work of the US federal government, in the public domain in the United States.<br>
-          <b>Code:</b> <span class="sl-mono">Reference: NOAA Global Monitoring Laboratory solar
-          calculator</span>, and <span class="sl-mono">Atmospheric refraction correction
-          (NOAA)</span>. Supplies the low-precision arrangement of Meeus's algorithm and the
-          three-branch refraction fit quoted in section 02.</li>
-
-        <li><span class="sl-chip is-in">names it</span><b>Perez, R., Seals, R. &amp; Michalsky, J.
-          (1993).</b> 'All-weather model for sky luminance distribution — preliminary
-          configuration and validation', <i>Solar Energy</i>, 50(3), pp. 235–245.
-          <a href="https://doi.org/10.1016/0038-092X(93)90017-I" target="_blank" rel="noopener">doi:10.1016/0038-092X(93)90017-I</a><br>
-          <b>Code:</b> <span class="sl-mono">Perez — all-weather sky radiance distribution (Perez
-          et al. 1993)</span>, and <span class="sl-mono">gendaymtx.c (Perez 1993 Table 1)</span>.
-          The eight-bin, twenty-coefficient table is that paper's Table 1, and the code names the
-          table explicitly. Every sky the tool builds uses it.</li>
-
-        <li><span class="sl-chip is-in">names it</span><b>Hottel, H. C. (1976).</b> 'A simple
-          model for estimating the transmittance of direct solar radiation through clear
-          atmospheres', <i>Solar Energy</i>, 18, pp. 129–134.
-          <a href="https://doi.org/10.1016/0038-092X(76)90045-1" target="_blank" rel="noopener">doi:10.1016/0038-092X(76)90045-1</a><br>
-          <b>Code:</b> <span class="sl-mono">Beam transmittance: Hottel (1976) for the 23 km
-          visibility standard atmosphere</span>, and at the elevation clamp,
-          <span class="sl-mono">km, Hottel valid to 2.5 km</span>. Supplies a₀, a₁ and k in the
-          clear-sky fallback. Note that the <b>mid-latitude summer correction factors</b> the code
-          applies to those constants (0.97, 0.99, 1.02) are not attributed — see Unresolved
-          attributions.</li>
-
-        <li><span class="sl-chip is-in">names it</span><b>Liu, B. Y. H. &amp; Jordan, R. C.
-          (1960).</b> 'The interrelationship and characteristic distribution of direct, diffuse
-          and total solar radiation', <i>Solar Energy</i>, 4(3), pp. 1–19.
-          <a href="https://doi.org/10.1016/0038-092X(60)90062-1" target="_blank" rel="noopener">doi:10.1016/0038-092X(60)90062-1</a><br>
-          <b>Code:</b> <span class="sl-mono">diffuse: Liu &amp; Jordan (1960) correlation</span>.
-          Implemented as <code>τ_d = 0.271 − 0.294·τ_b</code>, the diffuse half of the clear-sky
-          fallback.</li>
-
-        <li><span class="sl-chip is-in">names it</span><b>Radiance</b> — the software, and two
-          specific files within it. Lawrence Berkeley National Laboratory.
-          <a href="https://github.com/LBNL-ETA/Radiance" target="_blank" rel="noopener">github.com/LBNL-ETA/Radiance</a>.
-          Radiance Software License v2.0, © 1990–2025 The Regents of the University of California.<br>
-          <b>Code:</b> <span class="sl-mono">Generated exactly as Radiance rh_init()
-          (gendaymtx.c)</span>, and <span class="sl-mono">Coefficient table and parameter
-          equations transcribed verbatim from Radiance gendaymtx.c (PerezCoeff / CalcPerezParam /
-          CalcRelLuminance)</span>, and <span class="sl-mono">Kasten-style relative optical air
-          mass used by Radiance CalcAirMass()</span>. The code names the source files and the
-          functions, not a paper. The canonical publication for the software is
-          <b>Ward, G. J. (1994)</b>, 'The RADIANCE lighting simulation and rendering system',
-          <i>Proceedings of SIGGRAPH '94</i>, pp. 459–472,
-          <a href="https://doi.org/10.1145/192161.192286" target="_blank" rel="noopener">doi:10.1145/192161.192286</a>
-          — supplied here, not cited by the code.</li>
-
-        <li><span class="sl-chip is-in">names it</span><b>Ladybug Tools</b> —
-          <a href="https://www.ladybug.tools/" target="_blank" rel="noopener">ladybug.tools</a>,
-          and specifically the module <code>ladybug/epw.py</code>. AGPL-3.0.<br>
-          <b>Code:</b> <span class="sl-mono">Field indices verified against ladybug/epw.py
-          (0-based)</span>, <span class="sl-mono">Methodology follows the Radiance / Ladybug Tools
-          chain</span>, and at the colour ramp, <span class="sl-mono">the ramp students will
-          recognise from Ladybug Tools in Grasshopper, and it is the default here for that
-          reason</span>. Two unrelated debts: the EPW column positions, and the default Spectral
-          palette. No Ladybug Tools code is included in the app.</li>
-
-        <li><span class="sl-chip is-in">names it</span><b>EnergyPlus Weather (EPW) file format.</b>
-          US Department of Energy, Building Technologies Office.
-          <a href="https://energyplus.net/weather" target="_blank" rel="noopener">energyplus.net/weather</a>.
-          The field layout is documented in the <i>EnergyPlus Auxiliary Programs</i> reference,
-          "Weather Converter Program".<br>
-          <b>Code:</b> <span class="sl-mono">EPW — EnergyPlus Weather file parser</span>, and
-          <span class="sl-mono">climate data … EnergyPlus EPW hourly DNI / DHI / GHI</span>. The
-          code names the format and documents the columns it reads; it names no DOE publication,
-          so the document title above is supplied.</li>
-
-        <li><span class="sl-chip is-in">names it</span><b>OpenStreetMap</b> and the
-          <b>Overpass API.</b> OpenStreetMap contributors; Overpass by Roland Olbricht and
-          contributors.
-          <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">openstreetmap.org/copyright</a> ·
-          <a href="https://dev.overpass-api.de/" target="_blank" rel="noopener">dev.overpass-api.de</a>.
-          Map data under the Open Database License (ODbL) 1.0.<br>
-          <b>Code:</b> <span class="sl-mono">footprints and heights from OpenStreetMap via the
-          Overpass API — no key, no account</span>, the endpoint
-          <span class="sl-mono">https://overpass-api.de/api/interpreter</span>, and at the radius
-          cap, <span class="sl-mono">metres; Overpass is a shared free service</span>. Supplies
-          building footprints and height tags for the 3D context, and the basemap tiles.</li>
-
-        <li><span class="sl-chip is-in">names it</span><b>Nominatim.</b> OpenStreetMap Foundation.
-          <a href="https://nominatim.org/" target="_blank" rel="noopener">nominatim.org</a>.<br>
-          <b>Code:</b> <span class="sl-mono">Geocoding by Nominatim / OpenStreetMap. Searches only
-          run when you press Search or Enter, to stay inside their usage policy</span>, and
-          <span class="sl-mono">Nominatim asks for no more than one request a second</span>.
-          Place search only; it takes no part in any calculation.</li>
-
-        <li><span class="sl-chip is-in">names it</span><b>three.js</b>, version 0.185.1 —
-          <a href="https://threejs.org" target="_blank" rel="noopener">threejs.org</a>. MIT
-          licensed, © 2010–2026 three.js authors. Loaded from jsDelivr at runtime.<br>
-          <b>Code:</b> named in the file header as the only runtime dependency, and imported by
-          the importmap. Rendering, the shadow map and the OBJ loader. It takes no part in the
-          irradiance calculation — the ray-tracing worker is written without it and receives raw
-          triangle data, which the worker's own header says is deliberate.</li>
-      </ul>
-
-      <h3>Block B — methods the code names by name only</h3>
-      <p>For each of these the code names a person or an algorithm and nothing more: no year, no
-        journal, no paper. The entry below is therefore an <b>attribution supplied from the
-        published record</b>, not a citation the code makes. Each is the publication the named
-        method is conventionally credited to, and where the code's implementation differs from
-        that publication it is said so.</p>
-
-      <ul class="sl-refs">
-        <li><span class="sl-chip is-part">name only</span><b>Tregenza, P. R. (1987).</b>
-          'Subdivision of the sky hemisphere for luminance measurements', <i>Lighting Research
-          &amp; Technology</i>, 19(1), pp. 13–14.
-          <a href="https://doi.org/10.1177/096032718701900103" target="_blank" rel="noopener">doi:10.1177/096032718701900103</a><br>
-          <b>Code says only:</b> <span class="sl-mono">Tregenza (145)</span> and
-          <span class="sl-mono">SkyDome — Reinhart/Tregenza sky subdivision</span>. The "(145)" is
-          a patch count, not a year. The code implements the 145-patch form — seven bands
-          <code>[30,30,24,24,18,12,6]</code> summing to 144, plus one zenith cap — which is the
-          subdivision as used in Radiance and the daylight-coefficient literature. The 1987 paper
-          itself describes a sky-scanning pattern, and the exact zone count quoted for it varies
-          between sources, so this is credited as the origin of the subdivision rather than as a
-          line-by-line implementation of that paper.</li>
-
-        <li><span class="sl-chip is-part">name only</span><b>Reinhart, C. F. &amp; Walkenhorst, O.
-          (2001).</b> 'Validation of dynamic RADIANCE-based daylight simulations for a test office
-          with external blinds', <i>Energy and Buildings</i>, 33(7), pp. 683–697.
-          <a href="https://doi.org/10.1016/S0378-7788(01)00058-5" target="_blank" rel="noopener">doi:10.1016/S0378-7788(01)00058-5</a><br>
-          <b>Code says only:</b> <span class="sl-mono">Reinhart (577)</span> and
-          <span class="sl-mono">Reinhart/Tregenza sky subdivision</span>. This is the paper in
-          which the refinement of Tregenza's subdivision for dynamic simulation was introduced,
-          and MF:2 → 577 patches is that scheme. The generalisation to arbitrary MF was later
-          formalised by Bourgeois, Reinhart &amp; Ward (2008) and implemented in Radiance as
-          <code>reinhart.cal</code> — see the list below, since the code names neither.</li>
-
-        <li><span class="sl-chip is-part">name only</span><b>Kasten, F. (1965).</b> 'A new table
-          and approximation formula for the relative optical air mass', <i>Archiv für Meteorologie,
-          Geophysik und Bioklimatologie, Serie B</i>, 14, pp. 206–223.
-          <a href="https://doi.org/10.1007/BF02248840" target="_blank" rel="noopener">doi:10.1007/BF02248840</a><br>
-          <b>Code says only:</b> <span class="sl-mono">Kasten-style relative optical air mass used
-          by Radiance CalcAirMass()</span> — a name, hedged with "-style", and a function.
-          <b>The 1965 paper is the right one, and it matters which.</b> The code implements
-          <code>1/(cos Z + 0.15(93.885 − Z)^−1.253)</code>, which is Kasten's 1965 coefficient set.
-          The widely cited revision — Kasten, F. &amp; Young, A. T. (1989), 'Revised optical air
-          mass tables and approximation formula', <i>Applied Optics</i>, 28(22), pp. 4735–4738,
-          <a href="https://doi.org/10.1364/AO.28.004735" target="_blank" rel="noopener">doi:10.1364/AO.28.004735</a>
-          — uses different constants and is <b>not</b> what is implemented. Used only to compute
-          the Perez brightness parameter Δ.</li>
-
-        <li><span class="sl-chip is-part">name only</span><b>Möller, T. &amp; Trumbore, B. (1997).</b>
-          'Fast, minimum storage ray-triangle intersection', <i>Journal of Graphics Tools</i>,
-          2(1), pp. 21–28.
-          <a href="https://doi.org/10.1080/10867651.1997.10487468" target="_blank" rel="noopener">doi:10.1080/10867651.1997.10487468</a><br>
-          <b>Code says only:</b> <span class="sl-mono">Moller-Trumbore, occlusion only (any hit
-          within maxT wins)</span> — a one-line comment above the function. The implementation is
-          the published algorithm reduced to its occlusion form: the barycentric coordinates are
-          computed and tested, but no intersection result is kept and the traversal returns on the
-          first hit. Used at every leaf of the bounding-volume hierarchy.</li>
-      </ul>
-
-      <h3>Named in the code, but not a citable source</h3>
-      <p>Listed for completeness, because each is named in <span class="sl-mono">index.html</span>
-        and a reader may look for it here.</p>
-      <ul class="sl-refs">
-        <li><b>Grasshopper</b> — named once, only to say which environment students will recognise
-          the default colour ramp from. Nothing is taken from it.</li>
-        <li><b>jsDelivr</b> — the CDN three.js is fetched from. A delivery mechanism, not a
-          source.</li>
-        <li><b>The Radiance Software License v2.0</b> and the <b>MIT License</b> — named in the
-          file header as licences. They govern reuse and are set out in section 11; they are not
-          methodological sources.</li>
-      </ul>
-
-      <h3>Possible references the author should verify</h3>
-      <p>Relevant to the methods, and <b>not named anywhere in the code</b> — therefore absent from
-        both blocks above. Listed because a reader may expect them, and because adding the name to
-        a source comment would move each one into Block A.</p>
-      <ul class="sl-refs">
-        <li><b>Perez, R., Ineichen, P., Seals, R., Michalsky, J. &amp; Stewart, R. (1990).</b>
-          'Modeling daylight availability and irradiance components from direct and global
-          irradiance', <i>Solar Energy</i>, 44(5), pp. 271–289.
-          <a href="https://doi.org/10.1016/0038-092X(90)90055-H" target="_blank" rel="noopener">doi:10.1016/0038-092X(90)90055-H</a>
-          — the companion paper, and the usual source for the clearness ε and brightness Δ
-          parameterisation. The code computes both but cites only the 1993 paper and
-          <code>gendaymtx.c</code>.</li>
-        <li><b>Bourgeois, D., Reinhart, C. F. &amp; Ward, G. (2008).</b> 'Standard daylight
-          coefficient model for dynamic daylighting simulations', <i>Building Research &amp;
-          Information</i>, 36(1), pp. 68–82.
-          <a href="https://doi.org/10.1080/09613210701446325" target="_blank" rel="noopener">doi:10.1080/09613210701446325</a>
-          — where the MF:<i>n</i> generalisation the code implements was formalised. The code
-          implements it and names only "Reinhart".</li>
-        <li><b>ASHRAE</b> — <b>deliberately absent.</b> Until version 1.0 the export header and
-          the EPW panel both described the clear-sky fallback as "ASHRAE/Hottel". That was wrong:
-          the ASHRAE Handbook clear-sky model uses tabulated beam and diffuse optical depths, none
-          of which is present. The implementation is Hottel 1976 with Liu &amp; Jordan 1960, both
-          in Block A. The label has been corrected and no ASHRAE method is claimed anywhere.</li>
-      </ul>
-
-      <h3>Unresolved attributions</h3>
-      <p>One. The <b>mid-latitude summer correction factors</b> applied to Hottel's constants —
-        0.97, 0.99 and 1.02 — are the values conventionally tabulated alongside that correlation
-        for four reference atmospheres, and they appear in the standard textbook treatments of it.
-        The code names no source for the specific set, and the primary publication for the
-        correction table could not be identified with confidence from the sources available, so it
-        is recorded here rather than attributed to Hottel's own paper. It affects only the
-        clear-sky fallback.</p>
-
-      <h3>How these citations were assembled</h3>
-      <p>The code names each source but almost never its bibliographic detail: it says
-        "Perez et al. 1993", not the journal and volume. Titles, journals, volumes, issues, page
-        ranges and DOIs were therefore taken from the published record and checked against
-        indexing services rather than reproduced from memory. Two corrections came out of that
-        check and are recorded in the verification report: the air-mass citation was the wrong
-        paper, and several entries claimed the code cited a publication when it names only a
-        method.</p>
-
-      <p class="sl-cite">These are where the tool's methods come from, not an authority for its
-        results. The figures in sections 02, 04 and 06 are measured by the tool's own suite
-        against closed-form geometry and its own climate input, not against any of these
-        sources — see section 07.</p>
-    </div>
-  </div>
 
   <div class="sl-footer">
     <p>Everything on this page was extracted from the tool's source and from its verification
@@ -1300,6 +987,309 @@ out geom;</div>
       reasoning rather than as something read from the code.</p>
     <p>For a compliance submission, use Radiance through Ladybug and Honeybee, IESVE, or another
       validated tool. This one is built to teach relationships and orders of magnitude.</p>
+
+
+    <h3>Licence</h3>
+    <p>Four licences apply, and the file header of the application states all four. They cover
+      different things and ask for different things.</p>
+
+    <div class="sl-tbl"><table>
+      <thead><tr><th>What</th><th>Licence</th><th>What it permits and asks</th></tr></thead>
+      <tbody>
+        <tr><td><b>The code</b> — <span class="sl-mono">index.html</span> and everything that builds it</td><td class="sl-p">MIT</td><td>Any use, including commercial: use, copy, modify, merge, publish, distribute, sublicense and sell. It asks only that the copyright notice and the permission notice travel with any substantial portion. Keeping the header comment in the file satisfies it.</td></tr>
+        <tr><td><b>The accompanying material</b> — documentation, this page, screenshots, exercises</td><td class="sl-p">CC BY 4.0</td><td>Share and adapt for any purpose, including commercial, with attribution: credit the author, link the licence, and indicate if you changed anything.</td></tr>
+        <tr><td><b>three.js</b> — loaded from jsDelivr at runtime</td><td class="sl-p">MIT</td><td>© 2010–2026 three.js authors. The app contains no three.js code and only fetches it, so nothing is redistributed; if you self-host it instead, its notice must travel with your copy.</td></tr>
+        <tr><td><b>Radiance</b> — the Perez coefficients and the Tregenza/Reinhart construction, reimplemented in JavaScript</td><td class="sl-p">Radiance Software License v2.0</td><td>© 1990–2025 The Regents of the University of California, through Lawrence Berkeley National Laboratory. Redistribution in source or binary form must retain the copyright notice, the conditions and the disclaimer; the LBNL name may not be used to endorse derived products. The full notice is reproduced in the project's third-party notices.</td></tr>
+      </tbody>
+    </table></div>
+
+    <p>Attribute the material as: <span class="sl-mono">Solar Analysis Lab © 2026 Karam
+      Al-Obaidi, licensed under CC BY 4.0</span>, with a link to
+      <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">the
+      licence deed</a>. Screenshots that include a basemap additionally carry
+      © OpenStreetMap contributors under the Open Database License, which the app displays on
+      screen and repeats in the footer of every exported sheet.</p>
+
+    <p><b>A model you make with the tool is yours.</b> None of these licences claims anything
+      over your geometry, your results, your CSV or the images you export. They govern the
+      software and the teaching material, not the work you do with them.</p>
+
+    <h3>How to cite</h3>
+    <p>Cite it as software. Keeping the copyright notice in the file satisfies the licence; a
+      citation is the scholarly act on top of that.</p>
+    <p class="sl-ref">Al-Obaidi, K. M. (2026). <i>Solar Analysis Lab: a browser-based sun path
+      and solar irradiance tool</i> (Version 1.0) [Computer software].
+      https://karam.me.uk/applications/solar-analysis-lab/</p>
+<pre>@software{alobaidi2026solaranalysislab,
+  author  = {Al-Obaidi, Karam M.},
+  title   = {Solar Analysis Lab: a browser-based sun path and solar irradiance tool},
+  year    = {2026},
+  version = {1.0},
+  url     = {https://karam.me.uk/applications/solar-analysis-lab/},
+  note    = {Code MIT licensed; accompanying material CC BY 4.0}
+}</pre>
+
+    <h4>What to report alongside any figure</h4>
+    <p>Five settings change the numbers, and a value quoted without them cannot be reproduced.
+      All five are written into the CSV export as header comments, so the simplest way to
+      satisfy this is to keep the CSV:</p>
+    <div class="sl-tbl"><table>
+      <thead><tr><th>Report</th><th>Where the CSV records it</th></tr></thead>
+      <tbody>
+        <tr><td>The climate file, or that the clear-sky fallback was used</td><td class="sl-p"># Climate</td></tr>
+        <tr><td>Sky density — Tregenza 145 or Reinhart 577</td><td class="sl-p"># Sky</td></tr>
+        <tr><td>Ground reflectance</td><td class="sl-p"># Sky</td></tr>
+        <tr><td>Whether OpenStreetMap context was shading the run</td><td class="sl-p"># Context</td></tr>
+        <tr><td>Grid size</td><td class="sl-p"># Analysis</td></tr>
+      </tbody>
+      <caption>The same header also carries the site and its coordinates, the analysis period, the unit, and the number of context buildings loaded. Exported images and study sheets carry the equivalent in their title block.</caption>
+    </table></div>
+    <p>Add one thing the file cannot record for you: whether the grid was coarsened. If the tool
+      reported that it reduced the grid to stay under 120,000 points, the grid size in the
+      header is the one you asked for and not the one that ran.</p>
+
+    <h3>References</h3>
+    <p>Two blocks, separated by what the source code actually provides. <b>Block A</b> lists
+      sources the code names specifically enough to identify — a publication, a year, a named
+      software module. <b>Block B</b> lists methods the code names by name alone, with no year
+      and no publication; for those the bibliographic entry is supplied from the published
+      record and is an attribution rather than a citation. Nothing appears in either block that
+      the code does not name.</p>
+    <p class="sl-note"><b>How to read the evidence column.</b> Every entry quotes the words in
+      <span class="sl-mono">index.html</span> that put it there. If a source you expect is
+      absent, it is because the code never names it; the two lists after Block B say what those
+      are and why.</p>
+
+    <h4>Block A — sources the code names</h4>
+
+    <ul class="sl-refs">
+      <li><span class="sl-chip is-in">names it</span><b>Meeus, J. (1998).</b>
+        <i>Astronomical Algorithms</i>, 2nd edn. Richmond, VA: Willmann-Bell.
+        ISBN 978-0-943396-61-3. Chapters 25 and 28.<br>
+        <b>Code:</b> <span class="sl-mono">(Jean Meeus, "Astronomical Algorithms", 2nd ed.,
+        chapters 25 &amp; 28)</span> — the most specific citation in the file, naming edition
+        and chapters. Chapter 25 is solar coordinates, chapter 28 the equation of time; both are
+        implemented in <code>SolarCore.orbital()</code>. Used for every sun position the tool
+        computes.</li>
+
+      <li><span class="sl-chip is-in">names it</span><b>NOAA Global Monitoring Laboratory
+        Solar Calculator.</b> National Oceanic and Atmospheric Administration, Boulder, CO.
+        <a href="https://gml.noaa.gov/grad/solcalc/" target="_blank" rel="noopener">gml.noaa.gov/grad/solcalc</a>.
+        A work of the US federal government, in the public domain in the United States.<br>
+        <b>Code:</b> <span class="sl-mono">Reference: NOAA Global Monitoring Laboratory solar
+        calculator</span>, and <span class="sl-mono">Atmospheric refraction correction
+        (NOAA)</span>. Supplies the low-precision arrangement of Meeus's algorithm and the
+        three-branch refraction fit quoted in section 02.</li>
+
+      <li><span class="sl-chip is-in">names it</span><b>Perez, R., Seals, R. &amp; Michalsky, J.
+        (1993).</b> 'All-weather model for sky luminance distribution — preliminary
+        configuration and validation', <i>Solar Energy</i>, 50(3), pp. 235–245.
+        <a href="https://doi.org/10.1016/0038-092X(93)90017-I" target="_blank" rel="noopener">doi:10.1016/0038-092X(93)90017-I</a><br>
+        <b>Code:</b> <span class="sl-mono">Perez — all-weather sky radiance distribution (Perez
+        et al. 1993)</span>, and <span class="sl-mono">gendaymtx.c (Perez 1993 Table 1)</span>.
+        The eight-bin, twenty-coefficient table is that paper's Table 1, and the code names the
+        table explicitly. Every sky the tool builds uses it.</li>
+
+      <li><span class="sl-chip is-in">names it</span><b>Hottel, H. C. (1976).</b> 'A simple
+        model for estimating the transmittance of direct solar radiation through clear
+        atmospheres', <i>Solar Energy</i>, 18, pp. 129–134.
+        <a href="https://doi.org/10.1016/0038-092X(76)90045-1" target="_blank" rel="noopener">doi:10.1016/0038-092X(76)90045-1</a><br>
+        <b>Code:</b> <span class="sl-mono">Beam transmittance: Hottel (1976) for the 23 km
+        visibility standard atmosphere</span>, and at the elevation clamp,
+        <span class="sl-mono">km, Hottel valid to 2.5 km</span>. Supplies a₀, a₁ and k in the
+        clear-sky fallback. Note that the <b>mid-latitude summer correction factors</b> the code
+        applies to those constants (0.97, 0.99, 1.02) are not attributed — see Unresolved
+        attributions.</li>
+
+      <li><span class="sl-chip is-in">names it</span><b>Liu, B. Y. H. &amp; Jordan, R. C.
+        (1960).</b> 'The interrelationship and characteristic distribution of direct, diffuse
+        and total solar radiation', <i>Solar Energy</i>, 4(3), pp. 1–19.
+        <a href="https://doi.org/10.1016/0038-092X(60)90062-1" target="_blank" rel="noopener">doi:10.1016/0038-092X(60)90062-1</a><br>
+        <b>Code:</b> <span class="sl-mono">diffuse: Liu &amp; Jordan (1960) correlation</span>.
+        Implemented as <code>τ_d = 0.271 − 0.294·τ_b</code>, the diffuse half of the clear-sky
+        fallback.</li>
+
+      <li><span class="sl-chip is-in">names it</span><b>Radiance</b> — the software, and two
+        specific files within it. Lawrence Berkeley National Laboratory.
+        <a href="https://github.com/LBNL-ETA/Radiance" target="_blank" rel="noopener">github.com/LBNL-ETA/Radiance</a>.
+        Radiance Software License v2.0, © 1990–2025 The Regents of the University of California.<br>
+        <b>Code:</b> <span class="sl-mono">Generated exactly as Radiance rh_init()
+        (gendaymtx.c)</span>, and <span class="sl-mono">Coefficient table and parameter
+        equations transcribed verbatim from Radiance gendaymtx.c (PerezCoeff / CalcPerezParam /
+        CalcRelLuminance)</span>, and <span class="sl-mono">Kasten-style relative optical air
+        mass used by Radiance CalcAirMass()</span>. The code names the source files and the
+        functions, not a paper. The canonical publication for the software is
+        <b>Ward, G. J. (1994)</b>, 'The RADIANCE lighting simulation and rendering system',
+        <i>Proceedings of SIGGRAPH '94</i>, pp. 459–472,
+        <a href="https://doi.org/10.1145/192161.192286" target="_blank" rel="noopener">doi:10.1145/192161.192286</a>
+        — supplied here, not cited by the code.</li>
+
+      <li><span class="sl-chip is-in">names it</span><b>Ladybug Tools</b> —
+        <a href="https://www.ladybug.tools/" target="_blank" rel="noopener">ladybug.tools</a>,
+        and specifically the module <code>ladybug/epw.py</code>. AGPL-3.0.<br>
+        <b>Code:</b> <span class="sl-mono">Field indices verified against ladybug/epw.py
+        (0-based)</span>, <span class="sl-mono">Methodology follows the Radiance / Ladybug Tools
+        chain</span>, and at the colour ramp, <span class="sl-mono">the ramp students will
+        recognise from Ladybug Tools in Grasshopper, and it is the default here for that
+        reason</span>. Two unrelated debts: the EPW column positions, and the default Spectral
+        palette. No Ladybug Tools code is included in the app.</li>
+
+      <li><span class="sl-chip is-in">names it</span><b>EnergyPlus Weather (EPW) file format.</b>
+        US Department of Energy, Building Technologies Office.
+        <a href="https://energyplus.net/weather" target="_blank" rel="noopener">energyplus.net/weather</a>.
+        The field layout is documented in the <i>EnergyPlus Auxiliary Programs</i> reference,
+        "Weather Converter Program".<br>
+        <b>Code:</b> <span class="sl-mono">EPW — EnergyPlus Weather file parser</span>, and
+        <span class="sl-mono">climate data … EnergyPlus EPW hourly DNI / DHI / GHI</span>. The
+        code names the format and documents the columns it reads; it names no DOE publication,
+        so the document title above is supplied.</li>
+
+      <li><span class="sl-chip is-in">names it</span><b>OpenStreetMap</b> and the
+        <b>Overpass API.</b> OpenStreetMap contributors; Overpass by Roland Olbricht and
+        contributors.
+        <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">openstreetmap.org/copyright</a> ·
+        <a href="https://dev.overpass-api.de/" target="_blank" rel="noopener">dev.overpass-api.de</a>.
+        Map data under the Open Database License (ODbL) 1.0.<br>
+        <b>Code:</b> <span class="sl-mono">footprints and heights from OpenStreetMap via the
+        Overpass API — no key, no account</span>, the endpoint
+        <span class="sl-mono">https://overpass-api.de/api/interpreter</span>, and at the radius
+        cap, <span class="sl-mono">metres; Overpass is a shared free service</span>. Supplies
+        building footprints and height tags for the 3D context, and the basemap tiles.</li>
+
+      <li><span class="sl-chip is-in">names it</span><b>Nominatim.</b> OpenStreetMap Foundation.
+        <a href="https://nominatim.org/" target="_blank" rel="noopener">nominatim.org</a>.<br>
+        <b>Code:</b> <span class="sl-mono">Geocoding by Nominatim / OpenStreetMap. Searches only
+        run when you press Search or Enter, to stay inside their usage policy</span>, and
+        <span class="sl-mono">Nominatim asks for no more than one request a second</span>.
+        Place search only; it takes no part in any calculation.</li>
+
+      <li><span class="sl-chip is-in">names it</span><b>three.js</b>, version 0.185.1 —
+        <a href="https://threejs.org" target="_blank" rel="noopener">threejs.org</a>. MIT
+        licensed, © 2010–2026 three.js authors. Loaded from jsDelivr at runtime.<br>
+        <b>Code:</b> named in the file header as the only runtime dependency, and imported by
+        the importmap. Rendering, the shadow map and the OBJ loader. It takes no part in the
+        irradiance calculation — the ray-tracing worker is written without it and receives raw
+        triangle data, which the worker's own header says is deliberate.</li>
+    </ul>
+
+    <h4>Block B — methods the code names by name only</h4>
+    <p>For each of these the code names a person or an algorithm and nothing more: no year, no
+      journal, no paper. The entry below is therefore an <b>attribution supplied from the
+      published record</b>, not a citation the code makes. Each is the publication the named
+      method is conventionally credited to, and where the code's implementation differs from
+      that publication it is said so.</p>
+
+    <ul class="sl-refs">
+      <li><span class="sl-chip is-part">name only</span><b>Tregenza, P. R. (1987).</b>
+        'Subdivision of the sky hemisphere for luminance measurements', <i>Lighting Research
+        &amp; Technology</i>, 19(1), pp. 13–14.
+        <a href="https://doi.org/10.1177/096032718701900103" target="_blank" rel="noopener">doi:10.1177/096032718701900103</a><br>
+        <b>Code says only:</b> <span class="sl-mono">Tregenza (145)</span> and
+        <span class="sl-mono">SkyDome — Reinhart/Tregenza sky subdivision</span>. The "(145)" is
+        a patch count, not a year. The code implements the 145-patch form — seven bands
+        <code>[30,30,24,24,18,12,6]</code> summing to 144, plus one zenith cap — which is the
+        subdivision as used in Radiance and the daylight-coefficient literature. The 1987 paper
+        itself describes a sky-scanning pattern, and the exact zone count quoted for it varies
+        between sources, so this is credited as the origin of the subdivision rather than as a
+        line-by-line implementation of that paper.</li>
+
+      <li><span class="sl-chip is-part">name only</span><b>Reinhart, C. F. &amp; Walkenhorst, O.
+        (2001).</b> 'Validation of dynamic RADIANCE-based daylight simulations for a test office
+        with external blinds', <i>Energy and Buildings</i>, 33(7), pp. 683–697.
+        <a href="https://doi.org/10.1016/S0378-7788(01)00058-5" target="_blank" rel="noopener">doi:10.1016/S0378-7788(01)00058-5</a><br>
+        <b>Code says only:</b> <span class="sl-mono">Reinhart (577)</span> and
+        <span class="sl-mono">Reinhart/Tregenza sky subdivision</span>. This is the paper in
+        which the refinement of Tregenza's subdivision for dynamic simulation was introduced,
+        and MF:2 → 577 patches is that scheme. The generalisation to arbitrary MF was later
+        formalised by Bourgeois, Reinhart &amp; Ward (2008) and implemented in Radiance as
+        <code>reinhart.cal</code> — see the list below, since the code names neither.</li>
+
+      <li><span class="sl-chip is-part">name only</span><b>Kasten, F. (1965).</b> 'A new table
+        and approximation formula for the relative optical air mass', <i>Archiv für Meteorologie,
+        Geophysik und Bioklimatologie, Serie B</i>, 14, pp. 206–223.
+        <a href="https://doi.org/10.1007/BF02248840" target="_blank" rel="noopener">doi:10.1007/BF02248840</a><br>
+        <b>Code says only:</b> <span class="sl-mono">Kasten-style relative optical air mass used
+        by Radiance CalcAirMass()</span> — a name, hedged with "-style", and a function.
+        <b>The 1965 paper is the right one, and it matters which.</b> The code implements
+        <code>1/(cos Z + 0.15(93.885 − Z)^−1.253)</code>, which is Kasten's 1965 coefficient set.
+        The widely cited revision — Kasten, F. &amp; Young, A. T. (1989), 'Revised optical air
+        mass tables and approximation formula', <i>Applied Optics</i>, 28(22), pp. 4735–4738,
+        <a href="https://doi.org/10.1364/AO.28.004735" target="_blank" rel="noopener">doi:10.1364/AO.28.004735</a>
+        — uses different constants and is <b>not</b> what is implemented. Used only to compute
+        the Perez brightness parameter Δ.</li>
+
+      <li><span class="sl-chip is-part">name only</span><b>Möller, T. &amp; Trumbore, B. (1997).</b>
+        'Fast, minimum storage ray-triangle intersection', <i>Journal of Graphics Tools</i>,
+        2(1), pp. 21–28.
+        <a href="https://doi.org/10.1080/10867651.1997.10487468" target="_blank" rel="noopener">doi:10.1080/10867651.1997.10487468</a><br>
+        <b>Code says only:</b> <span class="sl-mono">Moller-Trumbore, occlusion only (any hit
+        within maxT wins)</span> — a one-line comment above the function. The implementation is
+        the published algorithm reduced to its occlusion form: the barycentric coordinates are
+        computed and tested, but no intersection result is kept and the traversal returns on the
+        first hit. Used at every leaf of the bounding-volume hierarchy.</li>
+    </ul>
+
+    <h4>Named in the code, but not a citable source</h4>
+    <p>Listed for completeness, because each is named in <span class="sl-mono">index.html</span>
+      and a reader may look for it here.</p>
+    <ul class="sl-refs">
+      <li><b>Grasshopper</b> — named once, only to say which environment students will recognise
+        the default colour ramp from. Nothing is taken from it.</li>
+      <li><b>jsDelivr</b> — the CDN three.js is fetched from. A delivery mechanism, not a
+        source.</li>
+      <li><b>The Radiance Software License v2.0</b> and the <b>MIT License</b> — named in the
+        file header as licences. They govern reuse and are set out in the Licence note below; they are not
+        methodological sources.</li>
+    </ul>
+
+    <h4>Related sources the code does not name</h4>
+    <p>Relevant to the methods, and <b>not named anywhere in the code</b> — therefore absent from
+      both blocks above. <b>These are not citations this tool makes.</b> They appear here so that
+      a reader who expects to find them knows why they are missing, rather than concluding the
+      list is incomplete. Naming any of them in a source comment would move it into Block A.</p>
+    <ul class="sl-refs">
+      <li><b>Perez, R., Ineichen, P., Seals, R., Michalsky, J. &amp; Stewart, R. (1990).</b>
+        'Modeling daylight availability and irradiance components from direct and global
+        irradiance', <i>Solar Energy</i>, 44(5), pp. 271–289.
+        <a href="https://doi.org/10.1016/0038-092X(90)90055-H" target="_blank" rel="noopener">doi:10.1016/0038-092X(90)90055-H</a>
+        — the companion paper, and the usual source for the clearness ε and brightness Δ
+        parameterisation. The code computes both but cites only the 1993 paper and
+        <code>gendaymtx.c</code>.</li>
+      <li><b>Bourgeois, D., Reinhart, C. F. &amp; Ward, G. (2008).</b> 'Standard daylight
+        coefficient model for dynamic daylighting simulations', <i>Building Research &amp;
+        Information</i>, 36(1), pp. 68–82.
+        <a href="https://doi.org/10.1080/09613210701446325" target="_blank" rel="noopener">doi:10.1080/09613210701446325</a>
+        — where the MF:<i>n</i> generalisation the code implements was formalised. The code
+        implements it and names only "Reinhart".</li>
+      <li><b>ASHRAE</b> — <b>deliberately absent.</b> Until version 1.0 the export header and
+        the EPW panel both described the clear-sky fallback as "ASHRAE/Hottel". That was wrong:
+        the ASHRAE Handbook clear-sky model uses tabulated beam and diffuse optical depths, none
+        of which is present. The implementation is Hottel 1976 with Liu &amp; Jordan 1960, both
+        in Block A. The label has been corrected and no ASHRAE method is claimed anywhere.</li>
+    </ul>
+
+    <h4>Unresolved attributions</h4>
+    <p>One. The <b>mid-latitude summer correction factors</b> applied to Hottel's constants —
+      0.97, 0.99 and 1.02 — are the values conventionally tabulated alongside that correlation
+      for four reference atmospheres, and they appear in the standard textbook treatments of it.
+      The code names no source for the specific set, and the primary publication for the
+      correction table could not be identified with confidence from the sources available, so it
+      is recorded here rather than attributed to Hottel's own paper. It affects only the
+      clear-sky fallback.</p>
+
+    <h4>How these citations were assembled</h4>
+    <p>The code names each source but almost never its bibliographic detail: it says
+      "Perez et al. 1993", not the journal and volume. Titles, journals, volumes, issues, page
+      ranges and DOIs were therefore taken from the published record and checked against
+      indexing services rather than reproduced from memory. Two corrections came out of that
+      check and are recorded in the verification report: the air-mass citation was the wrong
+      paper, and several entries claimed the code cited a publication when it names only a
+      method.</p>
+
+    <p class="sl-cite">These are where the tool's methods come from, not an authority for its
+      results. The figures in sections 02, 04 and 06 are measured by the tool's own suite
+      against closed-form geometry and its own climate input, not against any of these
+      sources — see section 07.</p>
 
     <h3>Verification report</h3>
     <p>This page has been through two passes against <span class="sl-mono">index.html</span>: a
@@ -1347,6 +1337,17 @@ out geom;</div>
         one of the two blocks or in the short "not a citable source" list. Nothing sits in a block
         on relevance alone — Perez et al. (1990), Bourgeois et al. (2008) and ASHRAE are outside
         both, with the reason given for each.</li>
+      <li><b>Licence, How to cite and References moved into the footer</b>, so the numbered
+        sections end at the exercises. This matches the Daylight Lab and Construction Studio
+        notes, and it reflects what those three are: apparatus for using and crediting the tool
+        rather than further method. Their subheadings dropped a level to sit under the footer
+        headings, and the cross-references that named them by number now name them by title.</li>
+      <li><b>One heading addressed the wrong person.</b> "Possible references the author should
+        verify" was an instruction to the software's author sitting inside a document written for
+        students, and "the author" was ambiguous enough that it could be read as the author of a
+        cited paper. It now reads "Related sources the code does not name", which describes the
+        entries rather than instructing anyone, and the paragraph beneath says outright that these
+        are not citations the tool makes.</li>
       <li><b>A dedicated Limitations section was added</b> as section 07, and everything after it
         renumbered. The limitations were previously spread across the traps box, the "not
         modelled" ledger, the approximation costs and the provenance caveat — present, but not
@@ -1359,7 +1360,7 @@ out geom;</div>
         export and the EPW panel both described the clear-sky fallback as "ASHRAE/Hottel", a
         method the code does not contain; both now name Hottel 1976 and Liu &amp; Jordan 1960. The
         CSV header did not record the grid size, so a figure taken from it could not be
-        reproduced; it now does, and section 12 claims all five settings rather than four. And the
+        reproduced; it now does, and the citation note below claims all five settings rather than four. And the
         preset-locations comment said 20 cities where there are 24.</li>
       <li><b>A test that could not fail was rewritten.</b> The new check on the ASHRAE label
         initially ran with a climate file loaded, so the fallback string it was written to police
