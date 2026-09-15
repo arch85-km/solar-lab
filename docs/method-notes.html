@@ -1,0 +1,1199 @@
+<!-- ==========================================================================
+     Solar Analysis Lab — Method Notes
+     Paste into an Elementor "HTML" widget (Elements > HTML).
+
+     Everything is scoped to .sl-doc, so nothing here can touch the rest of
+     your theme. Body text inherits your site's font and headings are set to
+     Poppins to match the site's own headings (--sl-fd, one line to change);
+     only the data — formulas, tables, the BibTeX block — is monospace.
+     To follow the visitor's dark-mode setting, change the opening tag to
+     <div class="sl-doc sl-auto-dark">. Default is light only, which is the
+     safe choice on a light site.
+     © Karam Al-Obaidi
+     ========================================================================== -->
+
+<style>
+.sl-doc{
+  --sl-paper:#F1F2EE; --sl-surface:#FBFBF9; --sl-surface2:#E8EAE4;
+  --sl-ink:#16191B; --sl-ink2:#4C555A; --sl-ink3:#5F696E;
+  --sl-rule:#D6D9D1; --sl-rule2:#E5E7E1;
+  --sl-accent:#1D5A73; --sl-accent-soft:rgba(29,90,115,.10);
+  --sl-ok:#3F6B47;  --sl-ok-soft:rgba(63,107,71,.12);
+  --sl-warn:#8A6410;--sl-warn-soft:rgba(138,100,16,.13);
+  --sl-no:#8E3A32;  --sl-no-soft:rgba(142,58,50,.11);
+  /* Headings and body follow the site's own typeface. `inherit` resolves where
+     it is used — inside .sl-doc, whose parent is the Elementor container — so
+     this keeps working if the theme font ever changes.
+     The monospace stack must NOT inherit: the table number columns use
+     font-variant-numeric:tabular-nums and align on fixed-width digits, and the
+     formulas and BibTeX block depend on their spacing. */
+  --sl-fd:"Poppins",system-ui,-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;
+  --sl-fb:inherit;
+  --sl-fm:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sl-measure:90ch; --sl-rail:4.75rem;
+
+  background:var(--sl-paper); color:var(--sl-ink);
+  font-family:var(--sl-fb); font-size:17px; line-height:1.65; font-weight:400;
+  max-width:1040px; margin:0 auto; padding:0 20px 4rem;
+  -webkit-font-smoothing:antialiased; text-align:left;
+}
+@media (prefers-color-scheme:dark){
+  .sl-doc.sl-auto-dark{
+    --sl-paper:#121517; --sl-surface:#191D20; --sl-surface2:#21262A;
+    --sl-ink:#E9EBE6; --sl-ink2:#A6AFB4; --sl-ink3:#79838A;
+    --sl-rule:#2C3235; --sl-rule2:#232829;
+    --sl-accent:#74B6D0; --sl-accent-soft:rgba(116,182,208,.14);
+    --sl-ok:#7FB88C;  --sl-ok-soft:rgba(127,184,140,.14);
+    --sl-warn:#D6A748;--sl-warn-soft:rgba(214,167,72,.15);
+    --sl-no:#DD8479;  --sl-no-soft:rgba(221,132,121,.14);
+  }
+}
+
+/* local reset — only inside .sl-doc */
+.sl-doc *,.sl-doc *::before,.sl-doc *::after{box-sizing:border-box;}
+.sl-doc h1,.sl-doc h2,.sl-doc h3,.sl-doc h4,.sl-doc p,.sl-doc ul,.sl-doc ol,
+.sl-doc dl,.sl-doc dt,.sl-doc dd,.sl-doc table,.sl-doc figure{margin:0;padding:0;}
+.sl-doc ul,.sl-doc ol{list-style-position:outside;}
+.sl-doc li{margin:0;}
+.sl-doc img{max-width:100%;height:auto;}
+.sl-doc a{color:var(--sl-accent);text-decoration:underline;text-underline-offset:2px;}
+.sl-doc a:focus-visible{outline:2px solid var(--sl-accent);outline-offset:3px;}
+.sl-doc code,.sl-doc .sl-mono{font-family:var(--sl-fm);font-size:.855em;}
+/* Inline bold defaults to 700. A site that ships only 400/500/600 has no such
+   face, so the browser either drops to 600 or fakes one by smearing the 400.
+   Pin it to a weight that exists. */
+.sl-doc b,.sl-doc strong{font-weight:600;}
+.sl-doc code{background:var(--sl-accent-soft);color:var(--sl-accent);
+  padding:.1em .34em;border-radius:2px;border:0;}
+
+/* masthead */
+.sl-doc .sl-masthead{padding:3.5rem 0 2.25rem;border-bottom:2px solid var(--sl-ink);}
+/* The document's own title is an h2, not an h1: the host page supplies the h1,
+   and two of those on one page give a screen reader competing document titles.
+   Styled by class so it keeps the masthead scale regardless of tag. */
+.sl-doc .sl-title{font-family:var(--sl-fd);font-weight:600;
+  font-size:clamp(2.1rem,6.2vw,3.35rem);line-height:1.02;letter-spacing:-.028em;
+  text-wrap:balance;margin:0 0 1.1rem;color:var(--sl-ink);}
+.sl-doc .sl-standfirst{max-width:var(--sl-measure);font-size:1.14rem;line-height:1.6;
+  color:var(--sl-ink2);margin:0;}
+.sl-doc .sl-standfirst strong{color:var(--sl-ink);font-weight:600;}
+.sl-doc .sl-byline{display:flex;flex-wrap:wrap;gap:.5rem 1.6rem;margin-top:1.9rem;
+  font-family:var(--sl-fm);font-size:.74rem;letter-spacing:.04em;color:var(--sl-ink3);}
+.sl-doc .sl-byline b{color:var(--sl-ink2);font-weight:500;}
+
+/* trap notice */
+.sl-doc .sl-traps{margin:2.5rem 0;border:1px solid var(--sl-rule);
+  border-left:4px solid var(--sl-no);background:var(--sl-surface);padding:1.5rem 1.6rem;}
+.sl-doc .sl-traps h2{font-family:var(--sl-fd);font-size:.82rem;font-weight:600;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--sl-no);margin:0 0 .9rem;}
+.sl-doc .sl-traps ol{margin:0;padding-left:1.15rem;display:grid;gap:.6rem;}
+.sl-doc .sl-traps li{max-width:var(--sl-measure);}
+
+/* sections */
+.sl-doc .sl-sec{padding:3.25rem 0 0;}
+.sl-doc .sl-sechead{display:grid;grid-template-columns:var(--sl-rail) 1fr;
+  align-items:baseline;gap:0 1rem;border-top:1px solid var(--sl-rule);
+  padding-top:1.4rem;margin-bottom:1.6rem;}
+.sl-doc .sl-secnum{font-family:var(--sl-fm);font-size:.95rem;font-weight:600;
+  color:var(--sl-accent);letter-spacing:.02em;font-variant-numeric:tabular-nums;}
+.sl-doc .sl-sechead h2{font-family:var(--sl-fd);font-weight:600;
+  font-size:clamp(1.45rem,3.3vw,1.95rem);line-height:1.12;letter-spacing:-.02em;
+  text-wrap:balance;margin:0;color:var(--sl-ink);}
+.sl-doc .sl-secbody{display:grid;grid-template-columns:var(--sl-rail) minmax(0,1fr);gap:0 1rem;}
+.sl-doc .sl-secbody>*{grid-column:2;}
+.sl-doc .sl-secbody>p,.sl-doc .sl-secbody>ul,.sl-doc .sl-secbody>ol{max-width:var(--sl-measure);}
+.sl-doc .sl-secbody>p{margin:0 0 1.05rem;}
+.sl-doc .sl-secbody>ul,.sl-doc .sl-secbody>ol{margin:0 0 1.15rem;padding-left:1.15rem;
+  display:grid;gap:.5rem;}
+.sl-doc h3{font-family:var(--sl-fd);font-weight:600;font-size:1.06rem;
+  letter-spacing:-.005em;margin:1.9rem 0 .7rem;color:var(--sl-ink);}
+.sl-doc .sl-secbody>h3:first-child{margin-top:0;}
+.sl-doc h4{font-family:var(--sl-fm);font-weight:600;font-size:.74rem;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--sl-ink3);margin:1.6rem 0 .6rem;}
+
+.sl-doc .sl-formula{font-family:var(--sl-fm);font-size:.84rem;line-height:1.75;
+  background:var(--sl-surface);border:1px solid var(--sl-rule);
+  border-left:3px solid var(--sl-accent);padding:.95rem 1.1rem;margin:0 0 1.2rem;
+  overflow-x:auto;white-space:pre;color:var(--sl-ink);}
+.sl-doc .sl-formula em{color:var(--sl-ink3);font-style:normal;}
+.sl-doc .sl-note{font-size:.9rem;color:var(--sl-ink2);border-left:2px solid var(--sl-rule);
+  padding-left:.95rem;margin:0 0 1.2rem;max-width:var(--sl-measure);}
+
+/* tables */
+.sl-doc .sl-tbl{overflow-x:auto;margin:0 0 1.4rem;border:1px solid var(--sl-rule);
+  background:var(--sl-surface);}
+.sl-doc .sl-tbl table{border-collapse:collapse;width:100%;font-size:.845rem;
+  line-height:1.45;background:transparent;}
+.sl-doc .sl-tbl th,.sl-doc .sl-tbl td{padding:.5rem .7rem;text-align:left;
+  vertical-align:top;border:0;border-bottom:1px solid var(--sl-rule2);color:var(--sl-ink);}
+.sl-doc .sl-tbl thead th{font-family:var(--sl-fm);font-size:.68rem;font-weight:600;
+  letter-spacing:.07em;text-transform:uppercase;color:var(--sl-ink3);
+  background:var(--sl-surface2);border-bottom:1px solid var(--sl-rule);white-space:nowrap;}
+.sl-doc .sl-tbl tbody tr:last-child td{border-bottom:0;}
+.sl-doc .sl-tbl tbody tr{background:transparent;}
+.sl-doc .sl-tbl .sl-n{text-align:right;font-family:var(--sl-fm);
+  font-variant-numeric:tabular-nums;white-space:nowrap;}
+.sl-doc .sl-tbl .sl-p{font-family:var(--sl-fm);font-size:.8rem;white-space:nowrap;}
+.sl-doc .sl-tbl .sl-d{font-family:var(--sl-fm);font-variant-numeric:tabular-nums;
+  white-space:nowrap;color:var(--sl-accent);font-weight:500;text-align:right;}
+.sl-doc .sl-tbl caption{caption-side:bottom;text-align:left;padding:.6rem .7rem;
+  font-size:.78rem;color:var(--sl-ink3);border-top:1px solid var(--sl-rule2);}
+
+/* chips + ledger */
+.sl-doc .sl-chip{display:inline-block;font-family:var(--sl-fm);font-size:.64rem;
+  font-weight:600;letter-spacing:.07em;text-transform:uppercase;padding:.15em .5em;
+  border-radius:2px;white-space:nowrap;}
+.sl-doc .sl-chip.is-in{background:var(--sl-ok-soft);color:var(--sl-ok);}
+.sl-doc .sl-chip.is-part{background:var(--sl-warn-soft);color:var(--sl-warn);}
+.sl-doc .sl-chip.is-out{background:var(--sl-no-soft);color:var(--sl-no);}
+.sl-doc .sl-ledger{display:grid;gap:0;border:1px solid var(--sl-rule);
+  background:var(--sl-surface);margin-bottom:1.4rem;}
+.sl-doc .sl-ledger>div{display:grid;grid-template-columns:7.5rem minmax(0,1fr);
+  gap:.2rem .9rem;padding:.8rem 1rem;border-bottom:1px solid var(--sl-rule2);}
+.sl-doc .sl-ledger>div:last-child{border-bottom:0;}
+.sl-doc .sl-ledger dt{font-family:var(--sl-fd);font-weight:600;font-size:.95rem;
+  grid-column:2;margin:0;color:var(--sl-ink);}
+.sl-doc .sl-ledger .sl-chip{grid-row:1;grid-column:1;align-self:start;margin-top:.18rem;}
+.sl-doc .sl-ledger dd{grid-column:2;margin:0;font-size:.93rem;color:var(--sl-ink2);
+  line-height:1.55;}
+
+/* exercises */
+.sl-doc .sl-ex{border:1px solid var(--sl-rule);background:var(--sl-surface);
+  padding:1.5rem 1.6rem;margin-bottom:1.5rem;}
+.sl-doc .sl-ex-n{font-family:var(--sl-fm);font-size:.7rem;font-weight:600;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--sl-accent);
+  display:block;margin-bottom:.35rem;}
+.sl-doc .sl-ex h3{margin:0 0 .9rem;font-size:1.18rem;}
+.sl-doc .sl-steps{margin:0;padding-left:1.2rem;display:grid;gap:.5rem;font-size:.95rem;}
+.sl-doc .sl-steps code{font-size:.8rem;}
+.sl-doc .sl-principle{font-size:.93rem;color:var(--sl-ink2);
+  border-top:1px solid var(--sl-rule2);padding-top:.85rem;margin:.95rem 0 0;}
+.sl-doc .sl-principle b{color:var(--sl-ink);font-weight:600;}
+
+/* footer */
+.sl-doc .sl-footer{margin-top:4rem;padding-top:1.6rem;border-top:2px solid var(--sl-ink);
+  font-size:.86rem;color:var(--sl-ink2);}
+.sl-doc .sl-footer p{max-width:var(--sl-measure);margin:0 0 .8rem;}
+.sl-doc .sl-cite{font-family:var(--sl-fm);font-size:.78rem;color:var(--sl-ink3);line-height:1.7;}
+.sl-doc .sl-refs{max-width:var(--sl-measure);margin:0 0 1.2rem;padding-left:1.15rem;
+  display:grid;gap:.55rem;font-size:.9rem;color:var(--sl-ink2);}
+.sl-doc .sl-refs b{color:var(--sl-ink);font-weight:600;}
+.sl-doc .sl-refs .sl-chip{margin-right:.4rem;vertical-align:.08em;}
+.sl-doc .sl-ref{border-left:2px solid var(--sl-rule);padding-left:.95rem;margin:0 0 1rem;
+  max-width:var(--sl-measure);font-size:.92rem;color:var(--sl-ink2);}
+.sl-doc pre{margin:0 0 1rem;padding:.9rem 1rem;background:var(--sl-surface);
+  border:1px solid var(--sl-rule);overflow-x:auto;font-family:var(--sl-fm);
+  font-size:.78rem;line-height:1.6;color:var(--sl-ink);white-space:pre;}
+
+@media (max-width:720px){
+  .sl-doc{--sl-rail:0px;font-size:16px;}
+  .sl-doc .sl-sechead{grid-template-columns:1fr;gap:.35rem;}
+  .sl-doc .sl-secbody{grid-template-columns:minmax(0,1fr);}
+  .sl-doc .sl-secbody>*{grid-column:1;}
+  .sl-doc .sl-traps,.sl-doc .sl-ex{padding:1.15rem;}
+}
+@media (max-width:560px){
+  .sl-doc .sl-ledger>div{grid-template-columns:1fr;}
+  .sl-doc .sl-ledger .sl-chip{grid-row:auto;grid-column:1;justify-self:start;margin-bottom:.3rem;}
+  .sl-doc .sl-ledger dt,.sl-doc .sl-ledger dd{grid-column:1;}
+}
+@media (prefers-reduced-motion:reduce){
+  .sl-doc *{animation-duration:.01ms !important;transition-duration:.01ms !important;}
+}
+</style>
+
+<div class="sl-doc">
+
+  <div class="sl-masthead">
+    <h2 class="sl-title">Solar Analysis Lab - Method Notes</h2>
+    <p class="sl-standfirst">
+      What this tool computes, how it computes it, and — the part that matters most when you
+      cite it — <strong>what it does not model at all</strong>. Everything below is read from the
+      source code and the tool's own validation run, not from what a solar analysis tool is
+      generally assumed to do.
+    </p>
+    <div class="sl-byline">
+      <span><b>Audience</b> Architecture students and staff</span>
+      <span><b>Engines</b> Perez all-weather sky · BVH ray tracing</span>
+      <span><b>Runs</b> Entirely in the browser</span>
+      <span><b>Updated</b> 15 September 2026</span>
+    </div>
+  </div>
+
+  <div class="sl-traps">
+    <h2>Four things to know before you cite a number</h2>
+    <ol>
+      <li><b>What the eye sees and what the number reports are two different machineries.</b>
+        The shadows in the viewport are a GPU shadow map of fixed size; the analysis is a
+        ray test against a bounding-volume hierarchy, run in a worker. They can disagree at
+        the edges, and when they do the number is the one to trust.</li>
+      <li><b>With no EPW loaded, every figure is a synthetic clear day.</b> The fallback is a
+        fair-weather upper bound with no cloud in it at all. A kWh/m² total produced that way
+        is not a climate result and must never be quoted as one.</li>
+      <li><b>The OpenStreetMap context shades the analysis but is never measured.</b> Sensors
+        come from your model alone, so the neighbours cast onto it and receive nothing. The
+        switch that lets them shade is <b>on by default</b>, which is the opposite of what most
+        people assume — a run with context loaded is already a shaded run.</li>
+      <li><b>Only the near ring of context casts a viewport shadow.</b> Buildings within 160 m
+        are in the shadow map; the rest are not, because a frustum stretched over 600 m of city
+        would blur the model's own shadows. The ray tracer sees all of them regardless, so the
+        numbers account for buildings whose shadows you cannot see.</li>
+    </ol>
+  </div>
+
+  <!-- 01 -->
+  <div class="sl-sec">
+    <div class="sl-sechead"><span class="sl-secnum">01</span><h2>What it calculates</h2></div>
+    <div class="sl-secbody">
+      <p>One quantity, reported two ways. Instantaneous irradiance is computed for the single
+        date and time on the scrubber; cumulative radiation is accumulated hour by hour over a
+        period you choose.</p>
+
+      <div class="sl-tbl"><table>
+        <thead><tr><th>Metric</th><th>Unit</th><th class="sl-n">Decimals</th><th>Basis</th></tr></thead>
+        <tbody>
+          <tr><td><b>Irradiance</b></td><td class="sl-p">W/m²</td><td class="sl-n">3</td><td>One instant</td></tr>
+          <tr><td><b>Cumulative radiation</b></td><td class="sl-p">kWh/m²</td><td class="sl-n">3</td><td>Summed over the period</td></tr>
+          <tr><td><b>Average irradiance</b></td><td class="sl-p">W/m²</td><td class="sl-n">3</td><td>The same sum divided by the hours in the period</td></tr>
+          <tr><td><b>Direct component</b></td><td class="sl-p">same as above</td><td class="sl-n">3</td><td>The beam part alone, written to the CSV beside every value</td></tr>
+        </tbody>
+        <caption>Three decimals is what the CSV carries. The on-screen legend and readouts round further; quote the CSV, not the screen.</caption>
+      </table></div>
+
+      <h3>The periods on offer</h3>
+      <div class="sl-tbl"><table>
+        <thead><tr><th>Period</th><th>Days</th><th>Note</th></tr></thead>
+        <tbody>
+          <tr><td class="sl-p">Full year</td><td>1 Jan – 31 Dec</td><td>The default</td></tr>
+          <tr><td class="sl-p">Current month</td><td>The whole calendar month containing the scrubber date</td><td></td></tr>
+          <tr><td class="sl-p">Current day</td><td>The scrubber date only</td><td></td></tr>
+          <tr><td class="sl-p">Cooling season</td><td>1 May – 30 September</td><td>153 days</td></tr>
+          <tr><td class="sl-p">Heating season</td><td>1 October – 30 April</td><td>Wraps the new year; the code accumulates 1 Oct – 31 Dec and 1 Jan – 30 Apr separately and adds them</td></tr>
+          <tr><td class="sl-p">Custom range</td><td>Any two dates</td><td>Given in either order; the tool sorts them</td></tr>
+        </tbody>
+        <caption>An hour window applies on top of any period — from hour 0 to hour 24 by default, so nothing is excluded unless you ask.</caption>
+      </table></div>
+
+      <h3>Irradiance at a sensor</h3>
+      <p>Every analysis reduces to the same problem, and the code says so in as many words: a set
+        of directions, each carrying an amount of energy, plus a visibility test per sensor.
+        Direct sun, the diffuse sky patches and the reflecting ground are folded into one flat
+        source list so the ray tracer has a single code path. The value at a sensor is then a
+        cosine-weighted sum over that list, with blocked directions dropped:</p>
+      <div class="sl-formula">E(p) = Σⱼ  Vⱼ · max(0, n̂ₚ · d̂ⱼ) · vis(p, d̂ⱼ)        <em>W/m²</em>
+
+<em>j</em>    runs over every source: the sky patches, the ground
+     patches, and the sun
+<em>Vⱼ</em>   the energy carried by direction j, already multiplied
+     by that patch's solid angle
+<em>n̂ₚ</em>   the sensor's outward normal — back-facing directions
+     contribute nothing, they are not merely attenuated
+<em>vis</em>  0 if any triangle blocks the ray, 1 otherwise; a binary
+     any-hit test, with no partial occlusion</div>
+
+      <p>The three groups of sources are built as follows.</p>
+      <div class="sl-formula"><em>diffuse sky</em>    Vᵢ = Lᵢ · ωᵢ
+               Lᵢ from the Perez distribution, ωᵢ the patch
+               solid angle. 145 patches, or 577 at Reinhart
+               density.
+
+<em>ground</em>         Vᵢ = (ρ · GHI / π) · ωᵢ
+               The ground is the sky dome mirrored below the
+               horizon, at a single uniform radiance. ρ is the
+               ground reflectance, default 0.20.
+
+<em>direct beam</em>    V = DNI
+               One direction for an instant. Over a period, every
+               sun-up hour is binned onto a 2.5° grid and the
+               bins are energy-weighted; the test suite reduces
+               4,703 sun-up hours to 589 unique directions.</div>
+
+      <p class="sl-note"><b>The beam is deliberately kept out of the sky patches.</b> Smearing a
+        low-altitude sun across 145 Tregenza patches is a well-known artefact of the coarse
+        <code>gendaymtx</code> default, and the code says it is avoiding exactly that. The
+        consequence for you is that the direct term keeps its angular sharpness at low sun —
+        which is precisely where overshadowing studies live.</p>
+
+      <p>Cumulative runs accumulate the same source list over every hour in the period, giving
+        Wh/m², which is divided by 1,000 for the kWh/m² display or by the hour count for the
+        average-irradiance display. The ray trace itself runs once, against the accumulated
+        source list, not once per hour.</p>
+    </div>
+  </div>
+
+  <!-- 02 -->
+  <div class="sl-sec">
+    <div class="sl-sechead"><span class="sl-secnum">02</span><h2>The solar position</h2></div>
+    <div class="sl-secbody">
+      <p>The code names its source in the module header: the NOAA Global Monitoring Laboratory
+        solar calculator, after Meeus, <i>Astronomical Algorithms</i>, 2nd edition, chapters 25
+        and 28. It is the low-precision form of that algorithm, which is what NOAA's own
+        calculator uses.</p>
+
+      <p>The Julian day is computed for the civil date at 00:00 UT with the standard Gregorian
+        correction, then converted to Julian centuries since J2000.0. From that come the mean
+        longitude, mean anomaly, orbital eccentricity, the equation of centre, true and apparent
+        longitude with the nutation term in Ω, the obliquity of the ecliptic and its correction,
+        and finally the declination. The equation of time is the usual series in
+        <code>y = tan²(ε/2)</code>:</p>
+      <div class="sl-formula">EoT = 4 · (y·sin 2L₀ − 2e·sin M + 4ey·sin M·cos 2L₀
+           − ½y²·sin 4L₀ − 1.25e²·sin 2M)          <em>minutes</em></div>
+
+      <h3>Refraction</h3>
+      <p>NOAA's piecewise fit is applied to the true altitude to give the apparent altitude the
+        tool reports. It has three branches and an upper cut-off, and the altitude ranges are
+        exactly these:</p>
+      <div class="sl-tbl"><table>
+        <thead><tr><th>True altitude</th><th>Correction applied</th></tr></thead>
+        <tbody>
+          <tr><td class="sl-p">above 85°</td><td>none — returns zero</td></tr>
+          <tr><td class="sl-p">5° to 85°</td><td><span class="sl-mono">58.1/tan h − 0.07/tan³h + 0.000086/tan⁵h</span></td></tr>
+          <tr><td class="sl-p">−0.575° to 5°</td><td>a quartic in altitude, <span class="sl-mono">1735 + h(−518.2 + h(103.4 + h(−12.79 + 0.711h)))</span></td></tr>
+          <tr><td class="sl-p">below −0.575°</td><td><span class="sl-mono">−20.772/tan h</span></td></tr>
+        </tbody>
+        <caption>Result in arcseconds, divided by 3600. Every altitude the tool displays or uses for shading is the refracted one.</caption>
+      </table></div>
+
+      <h3>Clock time, time zone and daylight saving</h3>
+      <p>The site carries a standard-time offset from UTC, in hours, adjustable from −12 to +14
+        in half-hour steps. Daylight saving is a separate switch worth one hour. The code
+        subtracts it before doing any astronomy — <code>stdMinutes = minutes − dstHours × 60</code>
+        — so the switch shifts the clock and never the sun. True solar time then adds the equation
+        of time and the longitude correction of four minutes per degree.</p>
+      <p>What you see is the switch labelled <b>Daylight saving (+1h)</b>, off by default, and a
+        clock that jumps by an hour when you use it while the sun stays where it was. Sunrise,
+        sunset and solar noon are reported in local clock time and move with it.</p>
+
+      <h3>Sunrise, sunset and day length</h3>
+      <p>Computed at the conventional 90.833° zenith, which carries the standard allowance for
+        refraction and the sun's semi-diameter. Polar day and polar night are detected explicitly
+        and reported as such rather than producing a spurious time.</p>
+
+      <h4>Checked against published values</h4>
+      <p>The tool's test suite drives the shipped file in headless Chromium and checks the solar
+        geometry against answers derived independently of the code. These are measured, not
+        asserted:</p>
+      <div class="sl-tbl"><table>
+        <thead><tr><th>Check</th><th class="sl-n">Expected</th><th class="sl-n">Computed</th></tr></thead>
+        <tbody>
+          <tr><td>London equinox solar-noon altitude, against <span class="sl-mono">90 − φ + δ</span></td><td class="sl-n">38.97°</td><td class="sl-d">38.99°</td></tr>
+          <tr><td>London solar noon, azimuth due south</td><td class="sl-n">180°</td><td class="sl-d">180.00°</td></tr>
+          <tr><td>London 21 June sunrise, against published Heathrow time</td><td class="sl-n">03:44 GMT</td><td class="sl-d">03:45</td></tr>
+          <tr><td>London 21 June sunset, against published Heathrow time</td><td class="sl-n">20:22 GMT</td><td class="sl-d">20:23</td></tr>
+          <tr><td>Sydney 21 June day length</td><td class="sl-n">≈ 9.9 h</td><td class="sl-d">9.89 h</td></tr>
+          <tr><td>Sydney winter noon, azimuth due north</td><td class="sl-n">0° / 360°</td><td class="sl-d">360.00°</td></tr>
+        </tbody>
+        <caption>Sunrise and sunset are the only checks here against externally published times; the rest are against closed-form geometry. One minute on sunrise at London's latitude is well inside the tolerance the suite enforces, which is six.</caption>
+      </table></div>
+    </div>
+  </div>
+
+  <!-- 03 -->
+  <div class="sl-sec">
+    <div class="sl-sechead"><span class="sl-secnum">03</span><h2>The sky model</h2></div>
+    <div class="sl-secbody">
+
+      <h3>a. Sky discretisation</h3>
+      <p>The sky vault is divided into Tregenza/Reinhart patches. The module header states that it
+        is generated exactly as Radiance's <code>rh_init()</code> does in
+        <code>gendaymtx.c</code>, and the construction is reproduced here in full because it is
+        short enough to check:</p>
+      <div class="sl-formula">α            = (π/2) / (7·MF + 0.5)
+row i altitude = α · (i + 0.5)
+patches in row = tnaz[⌊i/MF⌋] · MF,   tnaz = [30,30,24,24,18,12,6]
+solid angle    = 2π · (sin α(i+1) − sin αi) / patchesInRow
+zenith cap     = 2π · (1 − cos(α/2))</div>
+      <p>MF:1 gives 145 patches, which is Tregenza's subdivision unchanged; MF:2 gives 577, which
+        is Reinhart's. Both counts include the single zenith cap. The interface offers exactly
+        these two, labelled <b>Tregenza (145)</b> and <b>Reinhart (577)</b>. The solid angle is
+        integrated over the band rather than evaluated at the patch centre, and the suite confirms
+        the patch set sums to a hemisphere: 6.283185 sr against 2π.</p>
+
+      <h3>b. The all-weather sky</h3>
+      <p>The Perez model supplies the relative radiance of each patch. The module header states
+        that the coefficient table and the parameter equations are transcribed verbatim from
+        Radiance's <code>gendaymtx.c</code> — specifically <code>PerezCoeff</code>,
+        <code>CalcPerezParam</code> and <code>CalcRelLuminance</code> — and the full eight-bin,
+        twenty-coefficient table is present in the file.</p>
+      <div class="sl-formula">L(γ, ζ) = (1 + a·exp(b / cos ζ)) · (1 + c·exp(d·γ) + e·cos²γ)
+
+<em>γ</em>  angle between the sky point and the sun
+<em>ζ</em>  zenith angle of the sky point, with cos ζ floored at 0.01</div>
+      <p>Clearness ε selects the bin. The upper bounds are
+        <code>1.065, 1.230, 1.500, 1.950, 2.800, 4.500, 6.200</code> and above, with ε itself
+        clamped to the range 1.0 to 11.9. Brightness Δ uses the air mass and the eccentricity
+        correction, clamped to 0.01–0.6.</p>
+      <p>Two details of Radiance's implementation are carried across rather than simplified away.
+        The brightness is clamped for the intermediate clearness bins —
+        <code>if (ε &gt; 1.065 &amp;&amp; ε &lt; 2.8 &amp;&amp; Δ &lt; 0.2) Δ = 0.2</code> — and in the
+        <b>lowest</b> bin, the overcast one, the coefficients c and d are computed from Perez's
+        equations 7 and 8 instead of the linear equation 6 used for every other bin:</p>
+      <div class="sl-formula">c = exp( (Δ(x₃₀ + x₃₁·Z))^x₃₂ ) − x₃₃
+d = −exp( Δ(x₄₀ + x₄₁·Z) ) + x₄₂ + Δ·x₄₃</div>
+      <p>The air mass is the Kasten-style relative optical air mass the code identifies with
+        Radiance's <code>CalcAirMass()</code>:</p>
+      <div class="sl-formula">m = 1 / (cos Z + 0.15 · max(93.885 − Z°, 0.1)^−1.253)</div>
+
+      <h4>Normalisation</h4>
+      <p>Relative radiances mean nothing on their own, so the patch set is scaled to reproduce the
+        measured diffuse horizontal irradiance exactly. The sum of radiance × solid angle ×
+        cos ζ over all patches is computed, and every patch is divided by it and multiplied by
+        DHI. If that sum degenerates the code falls back to a uniform sky rather than dividing by
+        something near zero. The suite confirms the round trip at four solar altitudes — 12°, 30°,
+        55° and 78° — recovering the input DHI to two decimal places in every case.</p>
+
+      <h3>c. The clear-sky fallback</h3>
+      <p>When no EPW is loaded, and only then, the hourly irradiance comes from a synthetic clear
+        day. Beam transmittance is Hottel's 1976 correlation for the 23 km visibility standard
+        atmosphere, with the mid-latitude summer correction factors applied to each constant:</p>
+      <div class="sl-formula">a₀ = 0.97 · (0.4237 − 0.00821(6 − A)²)
+a₁ = 0.99 · (0.5055 + 0.00595(6.5 − A)²)
+k  = 1.02 · (0.2711 + 0.01858(2.5 − A)²)
+
+τ_b = a₀ + a₁ · exp(−k / cos Z)
+DNI = G_on · τ_b,   G_on = 1367 · (1 + 0.033 cos(2π·doy/365))</div>
+      <p>A is site elevation in kilometres, clamped to the range 0–2.5 km because that is where
+        Hottel's fit is valid — the code says so at the clamp. The diffuse fraction is the
+        Liu &amp; Jordan 1960 correlation, <code>τ_d = 0.271 − 0.294·τ_b</code>, and global
+        horizontal follows as <code>DNI·cos Z + DHI</code>. Solar altitude is floored at a cosine
+        of 0.02 so the model does not diverge at the horizon.</p>
+      <p class="sl-note"><b>What to conclude from a cumulative figure produced this way.</b> That
+        it is an upper bound on a fair-weather site, and nothing more. There is no cloud in this
+        model, no aerosol variation, no seasonal turbidity and no year-to-year variability. A
+        London roof will read far above anything the real climate delivers. Use it to compare two
+        designs on the same synthetic day, which is legitimate and useful; do not use it to
+        predict a yield, and do not describe it as a climate result. The tool says as much on
+        screen while it is in use.</p>
+    </div>
+  </div>
+
+  <!-- 04 -->
+  <div class="sl-sec">
+    <div class="sl-sechead"><span class="sl-secnum">04</span><h2>Where the irradiance comes from</h2></div>
+    <div class="sl-secbody">
+      <p>An EPW file, when you load one. The parser reads a deliberately small subset of the
+        format, and the module header records which reference the field positions were checked
+        against: <code>ladybug/epw.py</code>, 0-based.</p>
+
+      <div class="sl-tbl"><table>
+        <thead><tr><th class="sl-n">Index</th><th>Field</th><th>Used for</th></tr></thead>
+        <tbody>
+          <tr><td class="sl-d">1</td><td>Month</td><td>Mapping the row to a day of year</td></tr>
+          <tr><td class="sl-d">2</td><td>Day</td><td>As above</td></tr>
+          <tr><td class="sl-d">3</td><td>Hour, 1–24</td><td>The hour slot within that day</td></tr>
+          <tr><td class="sl-d">6</td><td>Dry bulb temperature, °C</td><td>The climate summary only — it enters no calculation</td></tr>
+          <tr><td class="sl-d">13</td><td>Global horizontal irradiance, Wh/m²</td><td>The ground-reflected term, and the live cross-check</td></tr>
+          <tr><td class="sl-d">14</td><td>Direct normal irradiance, Wh/m²</td><td>The beam</td></tr>
+          <tr><td class="sl-d">15</td><td>Diffuse horizontal irradiance, Wh/m²</td><td>Normalising the Perez sky</td></tr>
+        </tbody>
+        <caption>The LOCATION header supplies city, state, country, source, latitude, longitude, time zone and elevation, and loading a file moves the site to match. Everything else in the format is ignored.</caption>
+      </table></div>
+
+      <p>Values at or above 9990 are treated as the radiation missing-value sentinel and zeroed;
+        dry bulb is rejected at an absolute value of 99 or more. 29 February is dropped, so the
+        year is always 8,760 hours. A file yielding fewer than 8,000 valid hourly records is
+        rejected outright with a message saying how many it found, rather than being silently
+        analysed with holes in it.</p>
+
+      <h3>The hour convention</h3>
+      <p>This is the detail most likely to put a result out by an hour, and the code states it at
+        both places it matters: <b>EPW hour h describes the hour preceding h</b>. So hour 1 covers
+        midnight to 01:00 and lands in index 0. For an instant, the tool takes
+        <code>hourIndex = ⌊minutes / 60⌋</code>. For a cumulative run it samples the middle of
+        each hour:</p>
+      <div class="sl-formula">minutes = h · 60 + 30      <em>mid-hour: EPW hour h covers (h−1, h]</em></div>
+      <p>The sun position for that hour is therefore computed at its midpoint, not its start or
+        end, which is the right choice for a quantity that is an hourly mean — but it does mean
+        the sun moves in half-hour steps within the accumulation, and a shadow edge sweeping
+        across a façade is resolved no finer than that.</p>
+
+      <h3>What the parser reports back</h3>
+      <p>Loading a file produces a summary: annual global horizontal, direct normal and diffuse
+        horizontal totals in kWh/m²; the number of hours with any radiation at all, which the tool
+        calls sun-up hours; and the minimum, maximum and mean dry-bulb temperature. For the
+        Chicago O'Hare file the suite uses, sun-up hours come to 4,703.</p>
+
+      <h3>The live cross-check</h3>
+      <p>The tool continuously computes the irradiance an unobstructed upward-facing surface would
+        receive from the current source list, and compares it with the global horizontal the
+        climate file reports for the same hour. The two must agree when an EPW is loaded, because
+        the sky matrix is built to reproduce DHI exactly and the beam is added at its own
+        measured DNI — if they diverged, the sky assembly would be wrong. Measured over a full
+        year, the suite finds the sampled sum at 203,410 W/m² against the file's 203,788, a
+        difference of −0.19%, which is the mid-hour sampling and nothing else.</p>
+      <p class="sl-note">A second measured check of the same machinery: a downward-facing surface
+        reads 180.0 W/m² where reflectance × GHI predicts 179.0, and roof annual radiation comes
+        to 1,403 kWh/m² against a site global horizontal of 1,406.6. Both confirm the ground term
+        and the accumulated sky are scaled correctly.</p>
+    </div>
+  </div>
+
+  <!-- 05 -->
+  <div class="sl-sec">
+    <div class="sl-sechead"><span class="sl-secnum">05</span><h2>What is and isn't modelled</h2></div>
+    <div class="sl-secbody">
+      <h3>Included</h3>
+      <dl class="sl-ledger">
+        <div><span class="sl-chip is-in">In</span><dt>Self-shading and mutual shading</dt><dd>Every triangle of your model occludes every other, tested per sensor per direction. This is the tool's core competence and it is exact within the resolution of the grid.</dd></div>
+        <div><span class="sl-chip is-in">In</span><dt>The all-weather sky</dt><dd>Perez et al. 1993 driven by the hourly DNI and DHI of a real climate file, over 145 or 577 patches, normalised to reproduce the measured diffuse horizontal exactly.</dd></div>
+        <div><span class="sl-chip is-in">In</span><dt>Ground-reflected radiation</dt><dd>The sky dome mirrored below the horizon at a uniform radiance ρ·GHI/π. Reflectance adjustable 0–1, default 0.20. It can be switched off, and switching it off changes the numbers.</dd></div>
+        <div><span class="sl-chip is-in">In</span><dt>Urban context as an occluder</dt><dd>OpenStreetMap footprints extruded to their tagged heights, fetched through the Overpass API, up to 1,200 buildings within 600 m. They shade the analysis when the switch is on, which it is by default.</dd></div>
+        <div><span class="sl-chip is-in">In</span><dt>Any geometry you import</dt><dd>OBJ files, several at once, each with its own scale, rotation and position. Imported geometry becomes both sensors and occluders, exactly like the built-in massing.</dd></div>
+        <div><span class="sl-chip is-part">Partly</span><dt>Terrain</dt><dd>Only as a flat ground plane at y = 0 for the reflected term. There is no height model, so a site on a slope, in a valley or above its neighbours is not represented — bring it in as OBJ geometry if it matters.</dd></div>
+      </dl>
+
+      <h3>Not modelled</h3>
+      <p>These are the assumptions a student is most likely to make wrongly, because a
+        general-purpose solar tool would handle them. Each one is traceable to something the code
+        does not do, not to a general expectation of what such tools omit.</p>
+      <dl class="sl-ledger">
+        <div><span class="sl-chip is-out">Out</span><dt>Reflected sun from adjacent façades</dt><dd>There is no interreflection of any kind. The source list contains the sky, the ground and the sun, and a ray that hits a triangle is simply blocked — it does not bounce. A glazed tower opposite will take light away from your façade and give none back, and the CSV header says <span class="sl-mono">No interreflection</span> in as many words. Every surface is a diffuse receiver only.</dd></div>
+        <div><span class="sl-chip is-out">Out</span><dt>Material properties of any kind</dt><dd>No absorptance, no reflectance on the model itself, no colour, no emissivity. A sensor reports the irradiance arriving at it, never what the surface does with it. The ground reflectance is the only material number in the tool, and it belongs to the ground plane rather than to any surface you draw.</dd></div>
+        <div><span class="sl-chip is-out">Out</span><dt>Glazing and transmittance</dt><dd>Nothing is transparent. A window is a solid triangle that blocks the beam completely, so nothing about internal daylight or solar gain through glass can be read from this tool. Its sister tool exists for that.</dd></div>
+        <div><span class="sl-chip is-out">Out</span><dt>Spectral effects</dt><dd>Broadband throughout. No wavelength dependence, no separate visible and near-infrared bands, no colour of sky or sun.</dd></div>
+        <div><span class="sl-chip is-out">Out</span><dt>Atmospheric turbidity as a variable</dt><dd>Under a climate file, turbidity enters only as whatever is already implicit in the measured DNI and DHI. Under the clear-sky fallback it is fixed by Hottel's 23 km visibility atmosphere and cannot be adjusted — there is no turbidity input anywhere in the interface.</dd></div>
+        <div><span class="sl-chip is-out">Out</span><dt>Altitude correction beyond Hottel's</dt><dd>Site elevation enters the clear-sky model only, through Hottel's A term, clamped to 2.5 km. With an EPW loaded, elevation is recorded from the header and used for nothing at all.</dd></div>
+        <div><span class="sl-chip is-out">Out</span><dt>Snow albedo, seasonal or otherwise</dt><dd>Ground reflectance is a single number for the whole run. It cannot vary by month, so a winter cumulative figure for a snow-covered site is wrong in a direction the tool cannot correct.</dd></div>
+        <div><span class="sl-chip is-out">Out</span><dt>Tree canopy and vegetation</dt><dd>No trees, no partial transmission, no seasonal leaf cover. Overpass is queried for buildings alone. A deciduous street would have to be modelled as OBJ solids, and would then shade the whole year identically.</dd></div>
+        <div><span class="sl-chip is-out">Out</span><dt>Sensors on context geometry</dt><dd>Sensors come from your model alone. You cannot read a number off a neighbour, and the context contributes no measured area to any statistic.</dd></div>
+        <div><span class="sl-chip is-part">Note</span><dt>Calendar</dt><dd>A flat 365-day year. 29 February is dropped from any EPW, and daylight saving shifts the clock for the instantaneous view but is applied throughout a cumulative run as a single constant offset, not as a seasonal rule.</dd></div>
+      </dl>
+    </div>
+  </div>
+
+  <!-- 06 -->
+  <div class="sl-sec">
+    <div class="sl-sechead"><span class="sl-secnum">06</span><h2>Resolution and accuracy</h2></div>
+    <div class="sl-secbody">
+
+      <h3>a. The sensor grid</h3>
+      <p>There is no rectangular workplane here. Sensors are generated from the model's own
+        triangles by recursive four-way midpoint subdivision: each triangle is split until its
+        area falls below <code>gridSize² / 2</code>, which is the area of a right triangle with an
+        edge of the target size. Subdivision is capped at seven levels. Each resulting
+        sub-triangle contributes one sensor at its centroid, pushed off the surface along the
+        normal by the offset distance, and carries its own area so that area-weighted statistics
+        are correct on an irregular mesh.</p>
+      <div class="sl-tbl"><table>
+        <thead><tr><th>Parameter</th><th class="sl-n">Default</th><th class="sl-n">Range</th><th>Note</th></tr></thead>
+        <tbody>
+          <tr><td>Grid size</td><td class="sl-d">1.5 m</td><td class="sl-n">0.2 – 20 m</td><td>Target edge length, not a spacing</td></tr>
+          <tr><td>Offset</td><td class="sl-d">0.02 m</td><td class="sl-n">0.001 – 1 m</td><td>Lifts the sensor clear of its own surface</td></tr>
+        </tbody>
+        <caption>The ceiling is 120,000 sensors. If the requested grid would exceed it, the tool backs every triangle off by the same number of subdivision levels — up to seven — rather than freezing the tab, and says so in a toast. A result that has been coarsened this way is flagged, and the grid size you asked for is not the one you got.</caption>
+      </table></div>
+
+      <h3>b. The ray test</h3>
+      <p>Occlusion runs in a Web Worker, off the main thread, so the viewport stays interactive
+        and progress can be reported honestly rather than estimated. The worker needs no three.js:
+        it receives raw triangle data, nine floats per triangle, and answers occlusion queries
+        against a bounding-volume hierarchy it builds itself — median split on the centroid along
+        the longest axis of each node, with leaves of four triangles or fewer.</p>
+      <p>Each leaf test is Möller–Trumbore, and the code notes that it is occlusion only: any hit
+        within the ray's maximum distance wins and the traversal stops. There is no nearest-hit
+        search, because nothing beyond the first blocker matters. Progress is posted roughly sixty
+        times over the sensor loop.</p>
+      <p class="sl-note">The ray length is capped at six times the model radius, or 500 m,
+        whichever is larger. Geometry beyond that distance cannot block anything — which is
+        generous for a building but worth knowing if you import a site model spanning kilometres.</p>
+
+      <h3>c. The shadow map — for the eye only</h3>
+      <p>The shadows in the viewport are a three.js shadow map at a fixed 2048 × 2048 texels with
+        PCF soft filtering, cast onto a plane that carries a <code>ShadowMaterial</code> so the
+        basemap shows through untouched everywhere else. The catcher is sized to the model's
+        neighbourhood — 3.2 times the model radius, or 1.15 times the context's shadow ring,
+        whichever is larger — because a frustum sized to the model alone cuts the context's
+        shadows off with a straight edge.</p>
+      <p>Only context buildings within <code>SHADOW_RADIUS = 160 m</code> cast into that map. The
+        reasoning is in the code: the map is a fixed budget of texels, so a frustum stretched over
+        600 m of city would blur the model's own shadows, and a block 200 m away only reaches the
+        site when the sun is under about 10°.</p>
+      <p><b>None of this feeds the numbers.</b> The shadow map is a rendering of the scene; the
+        analysis is the ray test described above, which sees all 1,200 context buildings whatever
+        the map shows. The catcher is explicitly marked as excluded from analysis so it never
+        becomes a sensor surface itself. If a façade reads as shaded in the number but lit in the
+        viewport, the far ring is the reason.</p>
+
+      <h3>d. What the browser approximations cost</h3>
+      <dl class="sl-ledger">
+        <div><span class="sl-chip is-part">−0.19%</span><dt>Mid-hour sampling</dt><dd>Sampling the sun at the midpoint of each hour rather than integrating across it. Measured over a full year against the climate file's own global horizontal: 203,410 W/m² sampled against 203,788 reported. Systematic and small, but it is the floor on any annual total.</dd></div>
+        <div><span class="sl-chip is-part">2.5°</span><dt>Sun-bin resolution</dt><dd>Over a period, sun-up hours are binned onto a 2.5° grid in altitude and azimuth and each bin becomes one energy-weighted direction — 589 directions from 4,703 hours in the measured case. Shadow edges in a cumulative map are therefore quantised at roughly 2.5° of solar movement, about ten minutes of clock time.</dd></div>
+        <div><span class="sl-chip is-part">145 vs 577</span><dt>Sky density</dt><dd>Tregenza is the default. Reinhart quarters each patch, at four times the tracing cost, and matters most where a small patch of sky is visible through a narrow gap. For an open site the difference is slight; for a courtyard or a light well it is worth checking both.</dd></div>
+        <div><span class="sl-chip is-part">binary</span><dt>No penumbra</dt><dd>Visibility is a hard 0 or 1 per direction, with no sun disc and no partial occlusion. Softness in a cumulative map comes only from sources at different angles being blocked differently, never from a single source being half-blocked.</dd></div>
+        <div><span class="sl-chip is-part">190 ms</span><dt>Dragging the time slider</dt><dd>Moving the scrubber rebuilds the sky and redraws many times a second. The analysis does not follow it: re-running is manual by default. <b>Auto</b> makes it follow, and when it does the tool forces instantaneous mode and debounces at 190 ms, so a drag triggers one run when you stop rather than one per frame. The sky dome itself is cached and only rebuilt when the density changes.</dd></div>
+      </dl>
+
+      <h4>What is measured, and what is not</h4>
+      <p>The figures above and in section 02 come from the tool's own suite, which drives the
+        shipped file in headless Chromium. There is no comparison here against a validated
+        reference implementation — no Radiance cross-run, no measured site data. What the suite
+        establishes is internal consistency and agreement with closed-form geometry, which is a
+        weaker claim than validation and should be described as such.</p>
+    </div>
+  </div>
+
+  <!-- 07 -->
+  <div class="sl-sec">
+    <div class="sl-sechead"><span class="sl-secnum">07</span><h2>Inputs you control</h2></div>
+    <div class="sl-secbody">
+      <p>Every adjustable parameter, with the range the interface enforces and the value the tool
+        opens with. Defaults describe the demo massing in London.</p>
+
+      <h4>Location</h4>
+      <div class="sl-tbl"><table>
+        <thead><tr><th>Parameter</th><th class="sl-n">Default</th><th class="sl-n">Range</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td>City</td><td class="sl-d">London, UK</td><td class="sl-n">24 presets</td><td>Spanning the major climate zones; sets latitude, longitude and time zone</td></tr>
+          <tr><td>Latitude</td><td class="sl-d">51.48°</td><td class="sl-n">−90 – 90</td><td>0.01° steps</td></tr>
+          <tr><td>Longitude</td><td class="sl-d">−0.45°</td><td class="sl-n">−180 – 180</td><td>0.01° steps</td></tr>
+          <tr><td>Time zone</td><td class="sl-d">0</td><td class="sl-n">−12 – 14</td><td>Hours from UTC, half-hour steps</td></tr>
+          <tr><td>Elevation</td><td class="sl-d">25 m</td><td class="sl-n">unbounded</td><td>Clear-sky model only; unused with an EPW</td></tr>
+          <tr><td>Project north</td><td class="sl-d">0°</td><td class="sl-n">−180 – 180</td><td>Turns the building, not the site — see the note below</td></tr>
+          <tr><td>Daylight saving</td><td class="sl-d">off</td><td class="sl-n">on / off</td><td>Worth one hour of clock time</td></tr>
+        </tbody>
+        <caption>Place search uses Nominatim, on an explicit search only and never per keystroke. Named locations can be saved and are kept in the browser.</caption>
+      </table></div>
+
+      <p class="sl-note"><b>Project north turns the building, and only the building.</b> The sun
+        path is the sky and the basemap is the ground; both are geographic and stay put. This is
+        the "my drawing's north is X° off true north" control. Resetting the <em>view</em> to
+        north-up is a different thing entirely and lives on the compass.</p>
+
+      <h4>Site basemap</h4>
+      <div class="sl-tbl"><table>
+        <thead><tr><th>Parameter</th><th class="sl-n">Default</th><th class="sl-n">Range</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td>Source</td><td class="sl-d">None</td><td class="sl-n">4 options</td><td>None · OpenStreetMap · OpenStreetMap + 3D buildings · Site image</td></tr>
+          <tr><td>Site extent</td><td class="sl-d">400 m</td><td class="sl-n">100 – 2000 m</td><td>50 m steps; also sets the Overpass query box</td></tr>
+          <tr><td>Opacity</td><td class="sl-d">1.0</td><td class="sl-n">0.1 – 1</td><td>0.05 steps</td></tr>
+          <tr><td>Site image width</td><td class="sl-d">200 m</td><td class="sl-n">5 – 5000 m</td><td>The real-world width of the image you supply</td></tr>
+        </tbody>
+        <caption>Tiles are fetched only for the extent in view and capped per load. A site image is read in the browser and never uploaded.</caption>
+      </table></div>
+
+      <h4>3D context from OpenStreetMap</h4>
+      <p>Footprints and heights come from the Overpass API with no key and no account. The query
+        is a single request per load, for a box capped at 600 m across:</p>
+      <div class="sl-formula">[out:json][timeout:25];
+(way["building"](bbox); relation["building"](bbox););
+out geom;</div>
+      <div class="sl-tbl"><table>
+        <thead><tr><th>Limit</th><th class="sl-n">Value</th><th>Why it exists</th></tr></thead>
+        <tbody>
+          <tr><td>Maximum buildings</td><td class="sl-d">1,200</td><td>Beyond this the list is truncated and the panel says it was capped</td></tr>
+          <tr><td>Maximum radius</td><td class="sl-d">600 m</td><td>Overpass is a shared free service, volunteer-run and for modest use</td></tr>
+          <tr><td>Shadow ring</td><td class="sl-d">160 m</td><td>Only these cast into the viewport shadow map; all of them shade the analysis</td></tr>
+        </tbody>
+      </table></div>
+      <p>Height is resolved in order: a <code>height</code> or <code>building:height</code> tag of
+        at least 2 m; failing that <code>building:levels</code> at 3.2 m per level; failing both, a
+        default of 8 m, which is two storeys. Anything taller than 400 m is clipped. The panel
+        reports how many heights had to be guessed, and that number is worth reading before you
+        rely on an overshadowing result.</p>
+
+      <h4>Model</h4>
+      <div class="sl-tbl"><table>
+        <thead><tr><th>Parameter</th><th class="sl-n">Default</th><th class="sl-n">Range</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td>Sample massing</td><td class="sl-d">Demo massing</td><td class="sl-n">6 options</td><td>Demo massing · Courtyard block · Tower with context · Shaded facade study · Single box · Empty site</td></tr>
+          <tr><td>OBJ units</td><td class="sl-d">Metres</td><td class="sl-n">5 options</td><td>Metres · centimetres · millimetres · feet · inches</td></tr>
+          <tr><td>OBJ up axis</td><td class="sl-d">Y up</td><td class="sl-n">Y up / Z up</td><td>The scene is Y up, −Z north, +X east</td></tr>
+          <tr><td>OBJ scale</td><td class="sl-d">1.0</td><td class="sl-n">0.1 – 5</td><td>0.05 steps, on top of the unit conversion</td></tr>
+          <tr><td>OBJ rotation</td><td class="sl-d">0°</td><td class="sl-n">−180 – 180</td><td>1° steps, about the model's own centre</td></tr>
+          <tr><td>Drop to ground</td><td class="sl-d">on</td><td class="sl-n">on / off</td><td>Sits the model on y = 0</td></tr>
+          <tr><td>Centre under the sun path</td><td class="sl-d">on</td><td class="sl-n">on / off</td><td>Off lets you place it by hand</td></tr>
+        </tbody>
+        <caption>Several OBJ files can be loaded at once, each with its own scale, rotation and position.</caption>
+      </table></div>
+
+      <h4>Date and time</h4>
+      <div class="sl-tbl"><table>
+        <thead><tr><th>Parameter</th><th class="sl-n">Default</th><th class="sl-n">Range</th></tr></thead>
+        <tbody>
+          <tr><td>Day of year</td><td class="sl-d">172 — 21 June</td><td class="sl-n">1 – 365</td></tr>
+          <tr><td>Time</td><td class="sl-d">12:00</td><td class="sl-n">00:00 – 23:59, 1-minute steps</td></tr>
+          <tr><td>Animation speed</td><td class="sl-d">1.4</td><td class="sl-n">0.2 – 6</td></tr>
+        </tbody>
+      </table></div>
+
+      <h4>Sun path display</h4>
+      <div class="sl-tbl"><table>
+        <thead><tr><th>Parameter</th><th class="sl-n">Default</th><th class="sl-n">Range</th></tr></thead>
+        <tbody>
+          <tr><td>Dome radius</td><td class="sl-d">1.0</td><td class="sl-n">0.5 – 2.2</td></tr>
+          <tr><td>Chart scale</td><td class="sl-d">1.0</td><td class="sl-n">0.5 – 2.5</td></tr>
+          <tr><td>Monthly arcs, hourly analemmas, today's arc, compass, altitude rings, cast shadows, ground grid</td><td class="sl-d">all on</td><td class="sl-n">on / off</td></tr>
+          <tr><td>Sky dome patches</td><td class="sl-d">off</td><td class="sl-n">on / off</td></tr>
+          <tr><td>Flatten automatically in top view</td><td class="sl-d">on</td><td class="sl-n">on / off</td></tr>
+        </tbody>
+        <caption>The flattened chart is a stereographic projection, radius = R·tan((90 − altitude)/2); the suite confirms r(45°) = 41.421 against the closed form. The chart can be moved across the site, which is a drawing offset only and changes no sun position, shadow or number.</caption>
+      </table></div>
+
+      <h4>Analysis</h4>
+      <div class="sl-tbl"><table>
+        <thead><tr><th>Parameter</th><th class="sl-n">Default</th><th class="sl-n">Range</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td>Analysis type</td><td class="sl-d">Instant W/m²</td><td class="sl-n">Instant / Cumulative</td><td></td></tr>
+          <tr><td>Period</td><td class="sl-d">Full year</td><td class="sl-n">6 options</td><td>See the table in section 01</td></tr>
+          <tr><td>From hour</td><td class="sl-d">0</td><td class="sl-n">0 – 23</td><td></td></tr>
+          <tr><td>To hour</td><td class="sl-d">24</td><td class="sl-n">1 – 24</td><td>Exclusive; 0–24 includes every hour</td></tr>
+          <tr><td>Result unit</td><td class="sl-d">kWh/m² total</td><td class="sl-n">kWh/m² / W/m² average</td><td></td></tr>
+          <tr><td>Grid size</td><td class="sl-d">1.5 m</td><td class="sl-n">0.2 – 20 m</td><td>0.1 m steps</td></tr>
+          <tr><td>Offset</td><td class="sl-d">0.02 m</td><td class="sl-n">0.001 – 1 m</td><td>0.005 m steps</td></tr>
+          <tr><td>Sky density</td><td class="sl-d">Tregenza (145)</td><td class="sl-n">145 / 577</td><td></td></tr>
+          <tr><td>Ground reflectance</td><td class="sl-d">0.20</td><td class="sl-n">0 – 1</td><td>0.05 steps</td></tr>
+          <tr><td>Include ground-reflected</td><td class="sl-d">on</td><td class="sl-n">on / off</td><td>Off removes the term entirely</td></tr>
+          <tr><td>Surfaces shade each other</td><td class="sl-d">on</td><td class="sl-n">on / off</td><td>Off gives the unobstructed upper bound at every point</td></tr>
+          <tr><td>OpenStreetMap context shades the analysis</td><td class="sl-d">on</td><td class="sl-n">on / off</td><td>Only has an effect once context is loaded</td></tr>
+        </tbody>
+      </table></div>
+
+      <h4>Results and export</h4>
+      <div class="sl-tbl"><table>
+        <thead><tr><th>Control</th><th class="sl-n">Default</th><th class="sl-n">Range</th></tr></thead>
+        <tbody>
+          <tr><td>Colour scheme</td><td class="sl-d">Spectral</td><td class="sl-n">Spectral · Viridis · Turbo · Heat · Greyscale</td></tr>
+          <tr><td>Legend scaling</td><td class="sl-d">Auto (min–max)</td><td class="sl-n">Auto / Manual</td></tr>
+          <tr><td>Legend min / max</td><td class="sl-d">0 / 1000</td><td class="sl-n">any</td></tr>
+        </tbody>
+        <caption>Three exports: results CSV, viewport PNG, and an annotated study sheet. The sheet can be produced from a sun-path study with no analysis run at all.</caption>
+      </table></div>
+    </div>
+  </div>
+
+  <!-- 08 -->
+  <div class="sl-sec">
+    <div class="sl-sechead"><span class="sl-secnum">08</span><h2>Compared with Ladybug and Radiance</h2></div>
+    <div class="sl-secbody">
+      <p class="sl-note"><b>Provenance of this section.</b> Everything else on this page is read
+        from the source code. This section is not, and cannot be: the code says nothing about how
+        Radiance or Ladybug behave in practice. What follows reasons from what the code does to
+        what should follow, so check it against those tools' own documentation before relying on
+        it. The figures quoted elsewhere on this page are measured; none in this section are.</p>
+
+      <p>The file header states the intent plainly — the methodology follows the Radiance and
+        Ladybug Tools chain — and the correspondence is close enough to be worth setting out
+        term by term.</p>
+
+      <h3>Where results should agree</h3>
+      <ul>
+        <li><b>The diffuse term.</b> The Perez coefficient table and its parameter equations are
+          transcribed from <code>gendaymtx.c</code>, including the brightness clamp for the
+          intermediate bins and the alternative expressions for c and d in the overcast bin. The
+          sky patch construction is <code>rh_init()</code>'s, to the same formula. For the same
+          DNI and DHI, the patch radiances should match Radiance's closely, and any residual is
+          arithmetic rather than method.</li>
+        <li><b>Solar geometry.</b> NOAA after Meeus, agreeing with published sunrise and sunset to
+          about a minute. No meaningful divergence from any tool.</li>
+        <li><b>Simple unobstructed cases.</b> A horizontal surface reproduces the climate file's
+          own global horizontal to −0.19% over a year, and an annual roof total lands within 0.3%
+          of the site global horizontal. A flat unshaded surface should agree with a Ladybug
+          incident-radiation study closely.</li>
+      </ul>
+
+      <h3>Where results will diverge</h3>
+      <ul>
+        <li><b>Anything relying on reflection.</b> Radiance is a full global-illumination engine;
+          this tool has no interreflection whatever. An urban canyon with bright façades, a
+          courtyard, a light well or any surface facing a reflective neighbour will read low here
+          and there is no setting that closes the gap. This is the single largest source of
+          divergence and it is one-directional.</li>
+        <li><b>The direct term at low sun.</b> Radiance's <code>gendaymtx</code> by default smears
+          the beam across the sky patches; this tool bins it separately at 2.5°. Its direct
+          component should therefore be sharper than a default <code>gendaymtx</code> run and
+          closer to a <code>-d</code> direct-only calculation. Comparisons must be explicit about
+          which Radiance configuration is on the other side.</li>
+        <li><b>Shadow edges over a period.</b> Mid-hour sampling and 2.5° sun bins quantise a
+          cumulative shadow boundary. A Radiance run at finer time resolution will place that
+          edge more precisely.</li>
+        <li><b>Materials.</b> Ladybug and Radiance carry reflectance, specularity and
+          transmittance. This tool carries none of them on the model. Any study whose answer
+          depends on what a surface is made of cannot be reproduced here.</li>
+        <li><b>The sky at twilight, where the two paths here differ from each other.</b> The
+          instantaneous calculation builds a Perez sky only when the sun is above −6°, so civil
+          twilight contributes nothing to an instant reading. The cumulative path applies no such
+          gate: it builds a sky for any hour with positive diffuse horizontal, including hours with
+          the sun below the horizon. For a climate file this is the right behaviour — that diffuse
+          energy is real and measured — but it means an instant reading at dusk and a one-hour
+          cumulative run over the same hour are not computed the same way, and the cumulative one
+          will be the larger.</li>
+      </ul>
+
+      <h3>The Ladybug connection in the code</h3>
+      <p>Ladybug Tools is named twice. The EPW field indices were verified against
+        <code>ladybug/epw.py</code>, which is the reason those column numbers can be trusted. And
+        the default colour scheme, <b>Spectral</b>, is the blue-to-red radiation ramp chosen
+        specifically because it is the one students will recognise from Ladybug in Grasshopper —
+        the code says so at the definition. No Ladybug Tools code is included in the app.</p>
+
+      <p>For a compliance submission, an energy model or anything a consultant will stake a
+        recommendation on, use Radiance through Ladybug and Honeybee, IESVE, or another validated
+        tool. This one is built to teach relationships and orders of magnitude, and its
+        omissions — interreflection above all — are too large for it to be anything else.</p>
+    </div>
+  </div>
+
+  <!-- 09 -->
+  <div class="sl-sec">
+    <div class="sl-sechead"><span class="sl-secnum">09</span><h2>Three exercises</h2></div>
+    <div class="sl-secbody">
+      <p>Each isolates one variable and holds everything else fixed. Unless told otherwise, work
+        in London at the default coordinates, grid size <code>1.0 m</code>, sky
+        <code>Tregenza (145)</code>, ground reflectance <code>0.20</code>, and let each run finish
+        before reading the legend.</p>
+
+      <div class="sl-ex">
+        <span class="sl-ex-n">Exercise 01</span>
+        <h3>A neighbour that costs you nothing in June can take your winter entirely</h3>
+        <ol class="sl-steps">
+          <li>Load the <code>Tower with context</code> sample. Set the date to <code>21 June</code>, time <code>12:00</code>.</li>
+          <li>Run an <b>instant</b> analysis. Record the mean and minimum W/m² on the lower south façade.</li>
+          <li>Change the date to <code>21 December</code>, keep the time at <code>12:00</code>, and re-run. Record both figures again.</li>
+          <li>Now switch to <b>cumulative</b>, <code>Cooling season (May – Sep)</code>, unit <code>kWh/m²</code>. Run, and record the façade mean.</li>
+          <li>Switch the period to <code>Heating season (Oct – Apr)</code> and run again.</li>
+          <li>Finally, turn <b>Surfaces shade each other</b> off and re-run the heating season. That is the same façade with the neighbour removed.</li>
+        </ol>
+        <p class="sl-principle"><b>Principle.</b> Overshadowing is a function of solar altitude,
+          and altitude collapses in winter — at London's latitude noon sun falls from about 62° in
+          June to about 15° in December. The same obstruction subtends a far larger part of the
+          winter sky, so a tower that is invisible to a summer study can remove most of the
+          heating-season gain. Step 6 separates the neighbour's contribution from the façade's own
+          self-shading, which is the number you actually want when arguing about a site boundary.</p>
+      </div>
+
+      <div class="sl-ex">
+        <span class="sl-ex-n">Exercise 02</span>
+        <h3>Overhang depth is set by the summer altitude, not the equinox</h3>
+        <ol class="sl-steps">
+          <li>Load the <code>Shaded facade study</code> sample. Grid size <code>0.5 m</code>.</li>
+          <li>Set the date to <code>21 March</code> (day 80), time <code>12:00</code>, and run an <b>instant</b> analysis. Note how much of the glazed area the overhang shades.</li>
+          <li>Change to <code>21 June</code>, same time, and re-run. Note the shaded fraction again.</li>
+          <li>Change to <code>21 December</code> and re-run. Note it a third time.</li>
+          <li>Now run three <b>cumulative</b> passes on the same geometry — <code>Cooling season</code>, then <code>Heating season</code>, then <code>Full year</code> — and record the façade mean for each.</li>
+          <li>Turn on <b>Cast shadows</b> and animate a June day, then a December day, watching where the shadow line sits at noon.</li>
+        </ol>
+        <p class="sl-principle"><b>Principle.</b> A horizontal overhang intercepts sun in
+          proportion to how steeply it arrives. Sized at the equinox it will be far too shallow in
+          June and needlessly obstructive in December; sized at the summer solstice it does the
+          work when cooling load is highest and steps out of the way when the sun drops. The right
+          question is never "how deep should an overhang be" but "at what altitude should it stop
+          shading", and steps 5 and 6 show the two seasons pulling in opposite directions.</p>
+      </div>
+
+      <div class="sl-ex">
+        <span class="sl-ex-n">Exercise 03</span>
+        <h3>East and west are identical under a clear sky and unequal under a real climate</h3>
+        <ol class="sl-steps">
+          <li>Load the <code>Single box (reference)</code> sample with <b>no EPW loaded</b>, so the clear-sky fallback is running. The panel says so.</li>
+          <li>Run <b>cumulative</b>, <code>Full year</code>, <code>kWh/m²</code>. Record the mean on the east façade and on the west façade.</li>
+          <li>They will be close to equal. Satisfy yourself that this is geometry: the synthetic day is symmetric about solar noon, so morning and afternoon deliver the same energy.</li>
+          <li>Now import a real EPW for the same city and re-run the identical analysis.</li>
+          <li>Record east and west again, and take the difference as a percentage of the east value.</li>
+          <li>Repeat for a second climate from a different region — somewhere with a monsoon, or with morning coastal fog — and compare the sign and size of the asymmetry.</li>
+        </ol>
+        <p class="sl-principle"><b>Principle.</b> Solar geometry is symmetric about noon; weather
+          is not. Morning cloud, afternoon convective build-up, coastal fog and urban haze all
+          break the symmetry, and the direction they break it in is a property of the climate
+          rather than of the latitude. This is the clearest demonstration of why a clear-sky result
+          cannot stand in for a climate result — the two disagree not by a scale factor but by a
+          shape, and no correction applied to the symmetric answer would recover the real one.</p>
+      </div>
+
+      <p class="sl-note">A caution for all three: read the field, not the point. Sensors sit at
+        sub-triangle centroids and a single one near a shadow edge can differ sharply from its
+        neighbours, because visibility is binary and there is no penumbra. Quote means over a
+        façade, and quote differences between runs rather than absolute values.</p>
+    </div>
+  </div>
+
+  <!-- 10 -->
+  <div class="sl-sec">
+    <div class="sl-sechead"><span class="sl-secnum">10</span><h2>Licence</h2></div>
+    <div class="sl-secbody">
+      <p>Four licences apply, and the file header of the application states all four. They cover
+        different things and ask for different things.</p>
+
+      <div class="sl-tbl"><table>
+        <thead><tr><th>What</th><th>Licence</th><th>What it permits and asks</th></tr></thead>
+        <tbody>
+          <tr><td><b>The code</b> — <span class="sl-mono">index.html</span> and everything that builds it</td><td class="sl-p">MIT</td><td>Any use, including commercial: use, copy, modify, merge, publish, distribute, sublicense and sell. It asks only that the copyright notice and the permission notice travel with any substantial portion. Keeping the header comment in the file satisfies it.</td></tr>
+          <tr><td><b>The accompanying material</b> — documentation, this page, screenshots, exercises</td><td class="sl-p">CC BY 4.0</td><td>Share and adapt for any purpose, including commercial, with attribution: credit the author, link the licence, and indicate if you changed anything.</td></tr>
+          <tr><td><b>three.js</b> — loaded from jsDelivr at runtime</td><td class="sl-p">MIT</td><td>© 2010–2026 three.js authors. The app contains no three.js code and only fetches it, so nothing is redistributed; if you self-host it instead, its notice must travel with your copy.</td></tr>
+          <tr><td><b>Radiance</b> — the Perez coefficients and the Tregenza/Reinhart construction, reimplemented in JavaScript</td><td class="sl-p">Radiance Software License v2.0</td><td>© 1990–2025 The Regents of the University of California, through Lawrence Berkeley National Laboratory. Redistribution in source or binary form must retain the copyright notice, the conditions and the disclaimer; the LBNL name may not be used to endorse derived products. The full notice is reproduced in the project's third-party notices.</td></tr>
+        </tbody>
+      </table></div>
+
+      <p>Attribute the material as: <span class="sl-mono">Solar Analysis Lab © 2026 Karam
+        Al-Obaidi, licensed under CC BY 4.0</span>, with a link to
+        <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">the
+        licence deed</a>. Screenshots that include a basemap additionally carry
+        © OpenStreetMap contributors under the Open Database License, which the app displays on
+        screen and repeats in the footer of every exported sheet.</p>
+
+      <p><b>A model you make with the tool is yours.</b> None of these licences claims anything
+        over your geometry, your results, your CSV or the images you export. They govern the
+        software and the teaching material, not the work you do with them.</p>
+    </div>
+  </div>
+
+  <!-- 11 -->
+  <div class="sl-sec">
+    <div class="sl-sechead"><span class="sl-secnum">11</span><h2>How to cite</h2></div>
+    <div class="sl-secbody">
+      <p>Cite it as software. Keeping the copyright notice in the file satisfies the licence; a
+        citation is the scholarly act on top of that.</p>
+      <p class="sl-ref">Al-Obaidi, K. M. (2026). <i>Solar Analysis Lab: a browser-based sun path
+        and solar irradiance tool</i> (Version 1.0) [Computer software].
+        https://karam.me.uk/applications/solar-analysis-lab/</p>
+<pre>@software{alobaidi2026solaranalysislab,
+  author  = {Al-Obaidi, Karam M.},
+  title   = {Solar Analysis Lab: a browser-based sun path and solar irradiance tool},
+  year    = {2026},
+  version = {1.0},
+  url     = {https://karam.me.uk/applications/solar-analysis-lab/},
+  note    = {Code MIT licensed; accompanying material CC BY 4.0}
+}</pre>
+
+      <h3>What to report alongside any figure</h3>
+      <p>Five settings change the numbers, and a value quoted without them cannot be reproduced.
+        All five are written into the CSV export as header comments, so the simplest way to
+        satisfy this is to keep the CSV:</p>
+      <div class="sl-tbl"><table>
+        <thead><tr><th>Report</th><th>Where the CSV records it</th></tr></thead>
+        <tbody>
+          <tr><td>The climate file, or that the clear-sky fallback was used</td><td class="sl-p"># Climate</td></tr>
+          <tr><td>Sky density — Tregenza 145 or Reinhart 577</td><td class="sl-p"># Sky</td></tr>
+          <tr><td>Ground reflectance</td><td class="sl-p"># Sky</td></tr>
+          <tr><td>Whether OpenStreetMap context was shading the run</td><td class="sl-p"># Context</td></tr>
+          <tr><td>Grid size</td><td class="sl-p"># Analysis</td></tr>
+        </tbody>
+        <caption>The same header also carries the site and its coordinates, the analysis period, the unit, and the number of context buildings loaded. Exported images and study sheets carry the equivalent in their title block.</caption>
+      </table></div>
+      <p>Add one thing the file cannot record for you: whether the grid was coarsened. If the tool
+        reported that it reduced the grid to stay under 120,000 points, the grid size in the
+        header is the one you asked for and not the one that ran.</p>
+    </div>
+  </div>
+
+  <!-- 12 -->
+  <div class="sl-sec">
+    <div class="sl-sechead"><span class="sl-secnum">12</span><h2>References</h2></div>
+    <div class="sl-secbody">
+      <p>What the solar algorithm, the sky models and the ray test are drawn from, and what each
+        one contributes. These are the sources the code itself names; where it names none — the
+        colour ramps, the sample massing models and the default limits among them — none is listed
+        here either.</p>
+      <p class="sl-note"><b>Provenance of the citations.</b> The code names each source but not its
+        bibliographic detail: it says "Perez et al. 1993", not the journal and volume. That detail
+        was added from the published record.</p>
+
+      <ul class="sl-refs">
+        <li><span class="sl-chip is-in">cited in code</span><b>NOAA Solar Calculator</b>, NOAA
+          Global Monitoring Laboratory, after Meeus, J. (1998). <i>Astronomical Algorithms</i>,
+          2nd edn. Richmond, VA: Willmann-Bell. Chapters 25 and 28. — Solar position in its
+          low-precision form: Julian day, the orbital series, equation of time, declination and
+          NOAA's three-branch refraction fit. The code names the chapters, which is unusually
+          specific and makes the implementation checkable line by line. Verified against published
+          sunrise and sunset times to about one minute.</li>
+
+        <li><span class="sl-chip is-in">cited in code</span>Perez, R., Seals, R. &amp; Michalsky, J.
+          (1993). 'All-weather model for sky luminance distribution — preliminary configuration and
+          validation', <i>Solar Energy</i>, 50(3), pp. 235–245.
+          <a href="https://doi.org/10.1016/0038-092X(93)90017-I" target="_blank" rel="noopener">doi:10.1016/0038-092X(93)90017-I</a>
+          — The all-weather sky, used whenever any sky is built. The full eight-bin,
+          twenty-coefficient table is present, including the alternative expressions for c and d
+          that apply to the <b>lowest</b>-clearness bin, ε ≤ 1.065, the overcast one. The
+          coefficients are published data from this paper's Table 1.</li>
+
+        <li><span class="sl-chip is-in">cited in code</span><b>Radiance</b> — Ward, G. J. (1994).
+          'The RADIANCE lighting simulation and rendering system', <i>Proceedings of the 21st
+          Annual Conference on Computer Graphics and Interactive Techniques (SIGGRAPH '94)</i>,
+          pp. 459–472.
+          <a href="https://doi.org/10.1145/192161.192286" target="_blank" rel="noopener">doi:10.1145/192161.192286</a>
+          — Named throughout, and at two specific points: the sky patch construction is generated
+          exactly as <code>rh_init()</code> does, and the Perez coefficient table and parameter
+          equations are transcribed from <code>gendaymtx.c</code> — <code>PerezCoeff</code>,
+          <code>CalcPerezParam</code> and <code>CalcRelLuminance</code>. This is the closest
+          correspondence in the tool and the reason the diffuse term should agree with Radiance.</li>
+
+        <li><span class="sl-chip is-in">cited in code</span>Tregenza, P. R. (1987). 'Subdivision of
+          the sky hemisphere for luminance measurements', <i>Lighting Research &amp; Technology</i>,
+          19(1), pp. 13–14.
+          <a href="https://doi.org/10.1177/096032718701900103" target="_blank" rel="noopener">doi:10.1177/096032718701900103</a>
+          — The 145-patch subdivision, offered as the default sky density. The row structure
+          <code>[30,30,24,24,18,12,6]</code> with a zenith cap is his, and
+          <code>α = (π/2)/(7·MF + 0.5)</code> at MF:1 reproduces it exactly.</li>
+
+        <li><span class="sl-chip is-in">cited in code</span>Reinhart, C. F. &amp; Walkenhorst, O.
+          (2001). 'Validation of dynamic RADIANCE-based daylight simulations for a test office with
+          external blinds', <i>Energy and Buildings</i>, 33(7), pp. 683–697.
+          <a href="https://doi.org/10.1016/S0378-7788(01)00058-5" target="_blank" rel="noopener">doi:10.1016/S0378-7788(01)00058-5</a>
+          — Named in the code as the second half of "Reinhart/Tregenza". The MF:<i>n</i>
+          generalisation that subdivides Tregenza's patches, giving 577 at MF:2, is the Reinhart
+          scheme implemented in Radiance as <code>reinhart.cal</code>. The code names Reinhart
+          without a year, so this is the attribution of the scheme rather than of a line of code.</li>
+
+        <li><span class="sl-chip is-in">cited in code</span>Hottel, H. C. (1976). 'A simple model
+          for estimating the transmittance of direct solar radiation through clear atmospheres',
+          <i>Solar Energy</i>, 18(2), pp. 129–134.
+          <a href="https://doi.org/10.1016/0038-092X(76)90045-1" target="_blank" rel="noopener">doi:10.1016/0038-092X(76)90045-1</a>
+          — Beam transmittance in the clear-sky fallback, for the 23 km visibility standard
+          atmosphere. The code carries his a₀, a₁ and k constants with the mid-latitude summer
+          correction factors 0.97, 0.99 and 1.02, and clamps site elevation to 2.5 km because that
+          is where the fit holds.</li>
+
+        <li><span class="sl-chip is-in">cited in code</span>Liu, B. Y. H. &amp; Jordan, R. C. (1960).
+          'The interrelationship and characteristic distribution of direct, diffuse and total solar
+          radiation', <i>Solar Energy</i>, 4(3), pp. 1–19.
+          <a href="https://doi.org/10.1016/0038-092X(60)90062-1" target="_blank" rel="noopener">doi:10.1016/0038-092X(60)90062-1</a>
+          — The diffuse correlation paired with Hottel in the fallback, implemented as
+          <code>τ_d = 0.271 − 0.294·τ_b</code>.</li>
+
+        <li><span class="sl-chip is-part">inferred from name</span>Kasten, F. &amp; Young, A. T.
+          (1989). 'Revised optical air mass tables and approximation formula', <i>Applied Optics</i>,
+          28(22), pp. 4735–4738.
+          <a href="https://doi.org/10.1364/AO.28.004735" target="_blank" rel="noopener">doi:10.1364/AO.28.004735</a>
+          — The code calls its air mass "Kasten-style" and ties it to Radiance's
+          <code>CalcAirMass()</code> rather than to a paper. The implemented formula,
+          <code>1/(cos Z + 0.15(93.885 − Z)^−1.253)</code>, is the earlier Kasten (1965)
+          coefficient set rather than the 1989 revision, so the attribution is to the family, not
+          to this exact publication. Used only to compute Perez brightness Δ.</li>
+
+        <li><span class="sl-chip is-part">inferred from name</span>Möller, T. &amp; Trumbore, B.
+          (1997). 'Fast, minimum storage ray-triangle intersection', <i>Journal of Graphics
+          Tools</i>, 2(1), pp. 21–28.
+          <a href="https://doi.org/10.1080/10867651.1997.10487468" target="_blank" rel="noopener">doi:10.1080/10867651.1997.10487468</a>
+          — Named in a one-line comment as the ray–triangle test, used at every leaf of the
+          bounding-volume hierarchy. The code uses it in occlusion-only form: any hit within the
+          ray's maximum distance returns immediately and no barycentric result is kept.</li>
+
+        <li><span class="sl-chip is-in">cited in code</span><b>Ladybug Tools</b> —
+          <a href="https://www.ladybug.tools/" target="_blank" rel="noopener">ladybug.tools</a>,
+          specifically <code>ladybug/epw.py</code>. — Named twice, for two unrelated reasons. The
+          EPW field indices were verified against that module, which is why columns 13, 14 and 15
+          can be relied on. Separately, the default <b>Spectral</b> colour ramp is chosen because
+          it is the one students recognise from Ladybug in Grasshopper, and the code says so at the
+          definition. No Ladybug Tools code is included in the app.</li>
+
+        <li><span class="sl-chip is-in">cited in code</span><b>EnergyPlus Weather (EPW) format</b>,
+          US Department of Energy. — The hourly climate format the tool reads. The code documents
+          the LOCATION header layout and the data columns it uses, and states the hour convention
+          that EPW hour h describes the hour preceding h, which is the detail that decides whether
+          a result is an hour out.</li>
+
+        <li><span class="sl-chip is-in">cited in code</span><b>OpenStreetMap</b> and the
+          <b>Overpass API</b> — <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">openstreetmap.org/copyright</a>,
+          <a href="https://dev.overpass-api.de/" target="_blank" rel="noopener">dev.overpass-api.de</a>.
+          — Building footprints and height tags for the 3D context, and the basemap tiles and
+          Nominatim place search. Data is © OpenStreetMap contributors under the Open Database
+          License. Overpass is volunteer-run and for modest use, which is why the tool makes one
+          request per load, caps the box at 600 m and never polls.</li>
+
+        <li><span class="sl-chip is-in">cited in code</span><b>three.js</b> —
+          <a href="https://threejs.org" target="_blank" rel="noopener">threejs.org</a>, MIT
+          licensed, loaded from jsDelivr at runtime. — Rendering, the shadow map and the OBJ
+          loader. It takes no part in the irradiance calculation: the ray-tracing worker is
+          deliberately written without it and receives raw triangle data instead.</li>
+      </ul>
+
+      <h3>Possible references the author should verify</h3>
+      <p>Relevant to the methods but <b>not named anywhere in the code</b>, and therefore not cited
+        above. Listed because a reader may expect them.</p>
+      <ul class="sl-refs">
+        <li>Perez, R., Ineichen, P., Seals, R., Michalsky, J. &amp; Stewart, R. (1990). 'Modeling
+          daylight availability and irradiance components from direct and global irradiance',
+          <i>Solar Energy</i>, 44(5), pp. 271–289. — The companion paper to the 1993 sky model,
+          and the usual source for the clearness and brightness parameterisation. The code
+          implements ε and Δ but cites only the 1993 paper and <code>gendaymtx.c</code> for them.
+          Worth adding to the source comment if the parameterisation is regarded as coming from
+          here.</li>
+        <li>Bourgeois, D., Reinhart, C. F. &amp; Ward, G. (2008). 'Standard daylight coefficient
+          model for dynamic daylighting simulations', <i>Building Research &amp; Information</i>,
+          36(1), pp. 68–82. — Where the MF:<i>n</i> generalisation of the Tregenza subdivision was
+          formalised. The code implements it but names only "Reinhart".</li>
+        <li><b>ASHRAE</b> — <b>deliberately not cited.</b> Earlier versions of this app labelled
+          the clear-sky fallback "ASHRAE/Hottel", in the export header and in the interface. That
+          was wrong: the ASHRAE Handbook clear-sky model uses tabulated beam and diffuse optical
+          depths, and none of that is present. The implementation is Hottel 1976 with Liu &amp;
+          Jordan 1960, both cited above. The label has been corrected in version 1.0 and no ASHRAE
+          method is claimed.</li>
+      </ul>
+
+      <h3>Unresolved attributions</h3>
+      <p>One, and it is minor. The <b>mid-latitude summer correction factors</b> applied to
+        Hottel's constants — 0.97, 0.99 and 1.02 — are the values conventionally tabulated with
+        that correlation for four reference atmospheres, and they appear in the standard textbook
+        treatments. The code names no source for the specific set, and the primary publication for
+        the correction table could not be identified with confidence, so it is recorded here rather
+        than attributed to Hottel's paper itself.</p>
+
+      <p class="sl-cite">These are where the tool's methods come from, not an authority for its
+        results. The figures in sections 02, 04 and 06 are measured by the tool's own suite against
+        closed-form geometry and its own climate input, not against any of these sources.</p>
+    </div>
+  </div>
+
+  <div class="sl-footer">
+    <p>Everything on this page was extracted from the tool's source and from its verification
+      suite, which drives the shipped file in headless Chromium. Where a figure is quoted it is
+      measured, not estimated. Where the code did not make something clear it has been said so
+      rather than inferred — and section 08, which compares this tool with others, is marked as
+      reasoning rather than as something read from the code.</p>
+    <p>For a compliance submission, use Radiance through Ladybug and Honeybee, IESVE, or another
+      validated tool. This one is built to teach relationships and orders of magnitude.</p>
+
+    <h3>Verification report</h3>
+    <p>This page was re-read against <span class="sl-mono">index.html</span> after drafting, and
+      every constant, range, month boundary, formula and citation checked in both directions. The
+      pass changed the following.</p>
+    <ul class="sl-refs">
+      <li><b>Two defects found in the application and fixed, not merely documented.</b> The CSV
+        export and the interface both described the clear-sky fallback as "ASHRAE/Hottel", a method
+        the code does not contain; both now name Hottel 1976 and Liu &amp; Jordan 1960. And the CSV
+        header did not record the grid size, so a figure taken from it could not be reproduced;
+        it now does. Section 11 was rewritten from "four of five settings" to all five, and ASHRAE
+        moved out of the reference list into the note above.</li>
+      <li><b>A test that could not fail was rewritten.</b> The new check on the ASHRAE label
+        initially ran with a climate file loaded, so the fallback string it was written to police
+        never executed and the check would have passed with the bug still present. It now asserts
+        against the source itself.</li>
+      <li><b>The metric table was corrected.</b> An early draft listed only instantaneous and
+        cumulative. The code also offers <b>average irradiance</b> — the cumulative sum divided by
+        the hours in the period — and writes a <b>direct component</b> beside every value in the
+        CSV. Both were added.</li>
+      <li><b>The context-shading trap was inverted.</b> Drafted as "context only shades when you
+        switch it on", implying an opt-in. The default is <code>osmShade: true</code>, so loading
+        context silently makes every subsequent run a shaded run. The trap now says so.</li>
+      <li><b>Sky density is two options, not a tier system.</b> An early draft borrowed the sister
+        tool's quality-tier framing. There are no quality tiers here; there is one density control
+        with two values.</li>
+      <li><b>The refraction branch boundaries were corrected</b> from an approximate "below the
+        horizon" to the exact −0.575° the code uses, and the upper cut-off at 85° was added.</li>
+      <li><b>Elevation was moved from "included" to "not modelled" for EPW runs.</b> It is read
+        from the LOCATION header and used only by the clear-sky model; with a climate file loaded
+        it affects nothing.</li>
+      <li><b>One claim was removed for lack of support.</b> A draft sentence in section 06 said the
+        tool had been checked against a reference implementation. It has not: the suite checks
+        internal consistency and closed-form geometry. The paragraph now says that explicitly and
+        calls the distinction out.</li>
+      <li><b>A stale comment in the source was caught by writing the input table.</b> The code's
+        own header said 20 preset cities; there are 24. The page says 24 and the comment has been
+        corrected. Trivial in itself, but it is the kind of drift that makes a source comment
+        untrustworthy as a citation, which is the one thing this page depends on.</li>
+      <li><b>A twilight claim was wrong and is now a finding.</b> A draft sentence in section 08
+        said the Perez sky is built only above −6° solar altitude. That gate exists in the
+        instantaneous path alone; the cumulative path builds a sky for any hour with positive
+        diffuse horizontal, sun below the horizon included. The two paths therefore treat dusk
+        differently, which the section now states.</li>
+      <li><b>Kasten was demoted from a citation to an attribution of family.</b> The implemented
+        coefficients are the 1965 set, not the 1989 revision the code's "Kasten-style" label might
+        suggest, so the entry says which and does not claim the paper is implemented.</li>
+      <li><b>Citation check, both directions:</b> every reference in the list is cited in the body,
+        and every source named in the body appears in the list. Nothing sits in the list on
+        relevance alone — the three that would have are in "Possible references" instead.</li>
+    </ul>
+    <p class="sl-cite">Version 1.0 · 209 checks passing · page generated against
+      <span class="sl-mono">index.html</span> at build 1.0</p>
+  </div>
+
+</div>

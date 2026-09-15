@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
   Solar Analysis Lab — 3D sun path and solar radiation analysis
-  Version 3.0
+  Version 1.0
   Copyright (c) 2026 Karam Al-Obaidi — code MIT (see LICENSE), accompanying material
   CC BY 4.0 (see LICENSE-CONTENT)
 
@@ -16,7 +16,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="author" content="Karam Al-Obaidi">
-<meta name="application-version" id="meta-version" content="3.0">
+<meta name="application-version" id="meta-version" content="1.0">
 <meta name="description" content="Interactive 3D sun path and solar radiation analysis for architectural design teaching. EPW climate import, OBJ model import, Perez sky model, W/m2 irradiance on all surfaces.">
 <title>Solar Analysis Lab</title>
 <style>
@@ -861,7 +861,7 @@ body.embed{--topbar-h:44px}
                 Import EPW weather file
               </button>
               <input type="file" id="f-epw" accept=".epw,.txt" hidden>
-              <p class="hint" id="epw-hint">No EPW loaded &mdash; using a synthetic <b>clear-sky</b> model (ASHRAE/Hottel). Import an EPW for real climate data.</p>
+              <p class="hint" id="epw-hint">No EPW loaded &mdash; using a synthetic <b>clear-sky</b> model (Hottel 1976 / Liu &amp; Jordan 1960). Import an EPW for real climate data.</p>
               <div id="epw-chip"></div>
               <dl class="kv" id="epw-kv" style="display:none"></dl>
             </div>
@@ -1343,7 +1343,7 @@ const fmtNum = (v, dp = 0) =>
   (!isFinite(v)) ? '–' : v.toLocaleString('en-GB',{minimumFractionDigits:dp, maximumFractionDigits:dp});
 
 /* ============================================================================
- *  Preset locations — 20 cities spanning the major climate zones
+ *  Preset locations — 24 cities spanning the major climate zones
  * ========================================================================== */
 const CITIES = [
   { n:'London, United Kingdom',        lat: 51.48, lon:  -0.45, tz:  0,   el:  25 },
@@ -2406,7 +2406,7 @@ const Mercator = (() => {
  * running build can be identified at a glance — a stale download that looks
  * almost right is otherwise very hard to tell apart from the current one.
  */
-const BUILD = '3.0';
+const BUILD = '1.0';
 
 /**
  * Aerial imagery through a tile proxy on your own server.
@@ -4563,8 +4563,9 @@ function exportCSV(){
     '# © Karam Al-Obaidi, MIT licensed. Method: NOAA solar position; Perez et al. 1993',
     '# all-weather sky on Tregenza/Reinhart patches; ray-cast shading. No interreflection.',
     '# Site,' + (State.site.name || 'custom') + ',lat,' + State.site.lat + ',lon,' + State.site.lon + ',tz,' + State.site.tz,
-    '# Climate,' + (State.weather ? State.weather.fileName : 'synthetic clear sky (ASHRAE/Hottel)'),
-    '# Analysis,' + r.unitLong + ',' + r.period + ',unit,' + r.unit,
+    '# Climate,' + (State.weather ? State.weather.fileName : 'synthetic clear sky (Hottel 1976 / Liu & Jordan 1960)'),
+    '# Analysis,' + r.unitLong + ',' + r.period + ',unit,' + r.unit +
+      ',grid size m,' + State.analysis.gridSize,
     '# Sky,' + (State.analysis.density === 2 ? 'Reinhart 577' : 'Tregenza 145') +
       ',ground reflectance,' + State.analysis.groundRefl,
     '# Context,' + (OsmBuildings.info.count

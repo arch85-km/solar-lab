@@ -999,10 +999,31 @@ const ctxCsv = await page.evaluate(async () => {
   await new Promise(r => setTimeout(r, 300));
   URL.createObjectURL = real;
   const text = captured && captured.text ? await captured.text() : '';
-  return text.split('\n').find(l => l.startsWith('# Context')) || '(no context line)';
+  const head = text.split('\n').filter(l => l.startsWith('#'));
+  return {
+    ctx:      head.find(l => l.startsWith('# Context'))  || '(no context line)',
+    analysis: head.find(l => l.startsWith('# Analysis')) || '(no analysis line)',
+    climate:  head.find(l => l.startsWith('# Climate'))  || '(no climate line)',
+    head: head.join('\n'),
+  };
 });
 check('the export records whether the context was shading the run',
-      /# Context,4 OpenStreetMap buildings,shading the analysis,no/.test(ctxCsv), ctxCsv);
+      /# Context,4 OpenStreetMap buildings,shading the analysis,no/.test(ctxCsv.ctx), ctxCsv.ctx);
+// Every setting needed to reproduce a figure has to travel with the figure, or a
+// student quoting a number out of the CSV cannot say what produced it.
+check('the export header carries the grid size',
+      /grid size m,[\d.]+/.test(ctxCsv.analysis), ctxCsv.analysis);
+// The fallback is Hottel 1976 + Liu & Jordan 1960. It was labelled ASHRAE, which
+// is a method the code does not contain — and the label travels into reports.
+// This run has an EPW loaded, so the fallback branch never executes here; assert
+// against the source instead, or the check would pass while the bug survived.
+{
+  const src = await readFile(join(ROOT, 'index.html'), 'utf8');
+  const climateLine = (src.match(/'# Climate,'[^\n]*/) || ['(not found)'])[0];
+  check('the export names the clear-sky method it implements, not ASHRAE',
+        !/ASHRAE/i.test(src) && /Hottel 1976 \/ Liu & Jordan 1960/.test(climateLine),
+        climateLine.trim());
+}
 
 // A blocked or busy Overpass must leave the map working and say what happened
 overpassStatus = 503;
