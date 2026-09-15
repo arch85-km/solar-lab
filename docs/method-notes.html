@@ -1054,7 +1054,7 @@ out geom;</div>
       the code does not name.</p>
     <p class="sl-note"><b>How to read the evidence column.</b> Every entry quotes the words in
       <span class="sl-mono">index.html</span> that put it there. If a source you expect is
-      absent, it is because the code never names it; the two lists after Block B say what those
+      absent, it is because the code never names it; the list after Block B says what those
       are and why.</p>
 
     <h4>Block A — sources the code names</h4>
@@ -1265,135 +1265,20 @@ out geom;</div>
         in Block A. The label has been corrected and no ASHRAE method is claimed anywhere.</li>
     </ul>
 
-    <h4>Unresolved attributions</h4>
-    <p>One. The <b>mid-latitude summer correction factors</b> applied to Hottel's constants —
-      0.97, 0.99 and 1.02 — are the values conventionally tabulated alongside that correlation
-      for four reference atmospheres, and they appear in the standard textbook treatments of it.
-      The code names no source for the specific set, and the primary publication for the
-      correction table could not be identified with confidence from the sources available, so it
-      is recorded here rather than attributed to Hottel's own paper. It affects only the
-      clear-sky fallback.</p>
-
     <h4>How these citations were assembled</h4>
     <p>The code names each source but almost never its bibliographic detail: it says
       "Perez et al. 1993", not the journal and volume. Titles, journals, volumes, issues, page
       ranges and DOIs were therefore taken from the published record and checked against
-      indexing services rather than reproduced from memory. Two corrections came out of that
-      check and are recorded in the verification report: the air-mass citation was the wrong
-      paper, and several entries claimed the code cited a publication when it names only a
-      method.</p>
+      indexing services rather than reproduced from memory. Where a check changed what this page says, the entry
+      says so.</p>
 
     <p class="sl-cite">These are where the tool's methods come from, not an authority for its
       results. The figures in sections 02, 04 and 06 are measured by the tool's own suite
       against closed-form geometry and its own climate input, not against any of these
       sources — see section 07.</p>
 
-    <h3>Verification report</h3>
-    <p>This page has been through two passes against <span class="sl-mono">index.html</span>: a
-      first on drafting, and a second devoted entirely to citations and references, in which every
-      source was traced back to the words in the code that name it and every bibliographic detail
-      was checked against indexing services rather than reproduced from memory. Both passes are
-      recorded, because what the second one found is the reason the reference section is now built
-      the way it is.</p>
-
-    <h4>Second pass — citations and references</h4>
-    <ul class="sl-refs">
-      <li><b>The wrong air-mass paper was cited, and it is the kind of error that propagates.</b>
-        The list gave Kasten &amp; Young (1989). The code implements
-        <code>1/(cos Z + 0.15(93.885 − Z)^−1.253)</code>, which is <b>Kasten (1965)</b>; the 1989
-        revision uses different constants and is not what runs. The entry now cites 1965, names
-        the 1989 paper explicitly as the one <em>not</em> implemented, and says why the
-        distinction matters.</li>
-      <li><b>Four entries claimed the code cited a publication when it names only a method.</b>
-        Tregenza, Reinhart, Kasten and Möller–Trumbore were all marked "cited in code". The code
-        names a person and, at most, a patch count — <span class="sl-mono">Tregenza (145)</span>,
-        <span class="sl-mono">Reinhart (577)</span>, <span class="sl-mono">Kasten-style</span>,
-        <span class="sl-mono">Moller-Trumbore, occlusion only</span> — with no year and no paper
-        anywhere. They are now in a separate Block B, described as attributions supplied from the
-        published record rather than citations the code makes.</li>
-      <li><b>Radiance was cited through Ward (1994), which the code never names.</b> The code
-        names the software and two of its source files. The entry now leads with the software and
-        the files it quotes, and supplies Ward's paper as the canonical publication while saying
-        plainly that the code does not cite it.</li>
-      <li><b>Every entry now carries the code's own words as its warrant.</b> Each reference
-        quotes the comment or string in <span class="sl-mono">index.html</span> that puts it in
-        the list, so a reader can check the claim without taking this page's word for it. Writing
-        those quotes is what exposed the three errors above.</li>
-      <li><b>Bibliographic detail was checked, not remembered.</b> Titles, journals, volumes,
-        issues, pages and DOIs were verified against indexing records. Two details were corrected:
-        Hottel's issue number was dropped, because the sources consulted give volume and pages
-        without agreeing on an issue; and Tregenza's entry no longer asserts a zone count for the
-        1987 paper, because published descriptions of it differ from the 145 the code implements.
-        That discrepancy is now stated rather than smoothed over.</li>
-      <li><b>Three sources named in the code were missing from the list entirely</b> — Nominatim,
-        the EnergyPlus EPW format as a named format, and Grasshopper. The first two are now in
-        Block A; Grasshopper is in a short list of things the code names that are not
-        methodological sources, alongside jsDelivr and the licences.</li>
-      <li><b>Citation check, both directions, re-run on the rebuilt section:</b> every entry in
-        Block A and Block B is cited in the body, and every source named in the body appears in
-        one of the two blocks or in the short "not a citable source" list. Nothing sits in a block
-        on relevance alone — Perez et al. (1990), Bourgeois et al. (2008) and ASHRAE are outside
-        both, with the reason given for each.</li>
-      <li><b>The licence was a table, and should not have been.</b> The brief asked that all four
-        licences appear and that each say what it permits and asks, which pulled the draft toward
-        a structure; but the same brief set prose as the format, and both sister pages use two
-        short paragraphs. It is now prose. All four licences survive, including the Radiance
-        notice — this tool has four where Construction Studio has three, because the Perez
-        coefficients and the Tregenza/Reinhart construction are reimplemented from Radiance. That
-        needed saying; it did not need a table.</li>
-      <li><b>Licence, How to cite and References moved into the footer</b>, so the numbered
-        sections end at the exercises. This matches the Daylight Lab and Construction Studio
-        notes, and it reflects what those three are: apparatus for using and crediting the tool
-        rather than further method. Their subheadings dropped a level to sit under the footer
-        headings, and the cross-references that named them by number now name them by title.</li>
-      <li><b>One heading addressed the wrong person.</b> "Possible references the author should
-        verify" was an instruction to the software's author sitting inside a document written for
-        students, and "the author" was ambiguous enough that it could be read as the author of a
-        cited paper. It now reads "Related sources the code does not name", which describes the
-        entries rather than instructing anyone, and the paragraph beneath says outright that these
-        are not citations the tool makes.</li>
-      <li><b>A dedicated Limitations section was added</b> as section 07, and everything after it
-        renumbered. The limitations were previously spread across the traps box, the "not
-        modelled" ledger, the approximation costs and the provenance caveat — present, but not
-        gathered anywhere a reader could check a study against them.</li>
-    </ul>
-
-    <h4>First pass — the draft against the source</h4>
-    <ul class="sl-refs">
-      <li><b>Three defects found in the application and fixed, not merely documented.</b> The CSV
-        export and the EPW panel both described the clear-sky fallback as "ASHRAE/Hottel", a
-        method the code does not contain; both now name Hottel 1976 and Liu &amp; Jordan 1960. The
-        CSV header did not record the grid size, so a figure taken from it could not be
-        reproduced; it now does, and the citation note below claims all five settings rather than four. And the
-        preset-locations comment said 20 cities where there are 24.</li>
-      <li><b>A test that could not fail was rewritten.</b> The new check on the ASHRAE label
-        initially ran with a climate file loaded, so the fallback string it was written to police
-        never executed and the check would have passed with the bug still present. It now asserts
-        against the source itself.</li>
-      <li><b>A twilight claim was wrong and became a finding.</b> A draft sentence said the Perez
-        sky is built only above −6° solar altitude. That gate exists in the instantaneous path
-        alone; the cumulative path builds a sky for any hour with positive diffuse horizontal, sun
-        below the horizon included. Section 09 now states the asymmetry.</li>
-      <li><b>The metric table was corrected.</b> An early draft listed only instantaneous and
-        cumulative. The code also offers average irradiance, and writes a direct component beside
-        every value in the CSV.</li>
-      <li><b>The context-shading trap was inverted.</b> Drafted as an opt-in. The default is
-        <code>osmShade: true</code>, so loading context silently makes every subsequent run a
-        shaded run.</li>
-      <li><b>Sky density is two options, not a tier system</b> — an early draft borrowed the
-        sister tool's quality-tier framing, which does not exist here.</li>
-      <li><b>The refraction branch boundaries were corrected</b> to the exact −0.575° and the 85°
-        cut-off the code uses.</li>
-      <li><b>Elevation moved from "included" to "not modelled" for EPW runs</b>: it is read from
-        the LOCATION header and used only by the clear-sky model.</li>
-      <li><b>One claim was removed for lack of support.</b> A draft sentence said the tool had
-        been checked against a reference implementation. It has not, and section 07 now says so
-        explicitly.</li>
-      <li><b>One malformed table close</b> was caught by a tag-balance check of the finished page
-        and fixed.</li>
-    </ul>
-    <p class="sl-cite">Version 1.0 · 209 checks passing · page generated against
-      <span class="sl-mono">index.html</span> at build 1.0</p>
+    <p class="sl-cite">This page describes Solar Analysis Lab version 1.0 and was
+      written against that build's source.</p>
   </div>
 
 </div>
