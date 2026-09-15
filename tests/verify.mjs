@@ -183,14 +183,50 @@ const stamp = await page.evaluate(() => ({
   check('the version is recorded in the file, not shown on screen',
         !!stamp.build && stamp.meta === stamp.build && inComment === stamp.build &&
         !stamp.onScreen && stamp.credit.trim() === '© Karam Al-Obaidi' &&
-        stamp.tip === 'Sun Studio v' + stamp.build,
+        stamp.tip === 'Solar Analysis Lab v' + stamp.build,
         'v' + stamp.build + ' in the header comment, the meta tag and the credit tooltip');
 }
 check('the old key Show button is gone',
       await page.evaluate(() => !document.getElementById('b-bm-key-show')));
 
-check('app is titled Sun Studio',
-      boot.title === 'Sun Studio' && boot.brand === 'Sun Studio',
+// A half-rename is worse than none, so this is asserted against the files
+{
+  const files = ['index.html', 'tests/verify.mjs', 'tools/make-deploy.mjs',
+                 'server/tile-proxy.php', 'README.md', 'THIRD-PARTY-NOTICES.md',
+                 'package.json'];
+  // Assembled rather than written out, or this check would find itself in the
+  // very file it is scanning.
+  const oldName = new RegExp(['Sun', 'Studio'].join(' ') + '|sun' + '-studio', 'i');
+  const left = [];
+  for (const f of files){
+    const txt = await readFile(join(ROOT, f), 'utf8');
+    if (oldName.test(txt)) left.push(f);
+  }
+  check('the old name survives nowhere in the project', left.length === 0,
+        left.length ? left.join(', ') : files.length + ' files checked');
+
+  // …but the stored-data keys must NOT follow the rename, or every saved
+  // location and tour opt-out in a browser is silently orphaned.
+  const keys = await page.evaluate(() => {
+    const A = window.__SUNAPP;
+    return { places: A.PLACES_KEY, tour: A.TOUR_KEY, theme: A.UI_THEME_KEY };
+  });
+  check('renaming the app does not orphan saved locations or preferences',
+        Object.values(keys).every(k => k.startsWith('sunpath.')),
+        Object.values(keys).join(', '));
+
+  const lic = await readFile(join(ROOT, 'LICENSE'), 'utf8');
+  const content = await readFile(join(ROOT, 'LICENSE-CONTENT'), 'utf8');
+  const readme = await readFile(join(ROOT, 'README.md'), 'utf8');
+  check('code is MIT and the accompanying material is CC BY 4.0, said in all three places',
+        /MIT License/.test(lic) && /LICENSE-CONTENT/.test(lic) &&
+        /CC BY 4\.0/.test(content) &&
+        /creativecommons\.org\/licenses\/by\/4\.0/.test(content) &&
+        /The code is MIT/.test(readme) && /accompanying material is CC BY 4\.0/.test(readme));
+}
+
+check('app is titled Solar Analysis Lab',
+      boot.title === 'Solar Analysis Lab' && boot.brand === 'Solar Analysis Lab',
       'title "' + boot.title + '", brand "' + boot.brand + '"');
 check('importmap resolves against the real published package',
       cdnHits.has('build/three.module.js') &&
@@ -2246,11 +2282,11 @@ console.log('\n=== deploy build ===');
       { encoding: 'utf8' });
   } catch (e) { ranOk = false; stdout = String(e.stdout || e.message); }
 
-  const dir = join(out, 'sun-studio-v' + build + '-proxy');
+  const dir = join(out, 'solar-analysis-lab-v' + build + '-proxy');
   const pageFile = join(dir, 'index.html');
   const phpFile = join(dir, 'tile-proxy.php');
   check('the build script emits a page and a proxy, stamped with the source version',
-        ranOk && exists(pageFile) && exists(phpFile), 'sun-studio-v' + build + '-proxy');
+        ranOk && exists(pageFile) && exists(phpFile), 'solar-analysis-lab-v' + build + '-proxy');
   if (exists(pageFile) && exists(phpFile)){
     const html = readFileSync(pageFile, 'utf8');
     const php = readFileSync(phpFile, 'utf8');
@@ -2267,11 +2303,11 @@ console.log('\n=== deploy build ===');
       execFileSync(process.execPath,
         [join(ROOT, 'tools', 'make-deploy.mjs'), '--out', out], { encoding: 'utf8' });
     } catch (e) { return false; }
-    const plain = join(out, 'sun-studio-v' + build + '-plain', 'index.html');
+    const plain = join(out, 'solar-analysis-lab-v' + build + '-plain', 'index.html');
     if (!exists(plain)) return false;
     const h = readFileSync(plain, 'utf8');
     return /const PROXY_URL = '';/.test(h) && !/MAPTILER_KEY/.test(h) &&
-           !exists(join(out, 'sun-studio-v' + build + '-plain', 'tile-proxy.php'));
+           !exists(join(out, 'solar-analysis-lab-v' + build + '-plain', 'tile-proxy.php'));
   })());
 }
 

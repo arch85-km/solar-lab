@@ -1,7 +1,9 @@
 # Third-party notices
 
-Sun Studio is licensed under the MIT License (see `LICENSE`). It builds on the work
-below. Copies of the required notices are reproduced in full.
+Solar Analysis Lab's **code** is licensed under the MIT License (see `LICENSE`); its
+**accompanying material** — documentation, screenshots and exercises — under CC BY 4.0
+(see `LICENSE-CONTENT`). It builds on the work below. Copies of the required notices are
+reproduced in full.
 
 ---
 
@@ -42,7 +44,7 @@ THE SOFTWARE.
 
 ## Radiance
 
-Sun Studio contains no Radiance code, but two things were derived from it and
+Solar Analysis Lab contains no Radiance code, but two things were derived from it and
 reimplemented in JavaScript:
 
 - the Tregenza / Reinhart sky-patch construction, following `rh_init()` in `gendaymtx.c`;
@@ -194,7 +196,7 @@ therefore deliberately absent rather than merely unimplemented.
 
 ## Weather data
 
-**Sun Studio redistributes no weather data.** EPW files are supplied by the person using
+**Solar Analysis Lab redistributes no weather data.** EPW files are supplied by the person using
 the app, and are read in the browser — nothing is uploaded anywhere.
 
 The test suite downloads one EPW at run time (Chicago O'Hare TMY3, from the Ladybug Tools

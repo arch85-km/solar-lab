@@ -1,6 +1,6 @@
-# Sun Studio
+# Solar Analysis Lab
 
-**Sun Studio** is an interactive 3D sun-path and solar-radiation analysis tool for teaching environmental
+**Solar Analysis Lab** is an interactive 3D sun-path and solar-radiation analysis tool for teaching environmental
 design to architecture students. It runs entirely in the browser from a **single
 responsive HTML file** that drops straight into a WordPress page.
 
@@ -59,7 +59,7 @@ page entirely* below) and upload both files into the same folder.
             aspect-ratio:16/10;min-height:520px;border-radius:10px;overflow:hidden;
             box-shadow:0 6px 28px rgba(0,0,0,.28)">
   <iframe src="/wp-content/uploads/sunpath/index.html?embed=1"
-          title="Sun Studio — sun path and solar radiation analysis"
+          title="Solar Analysis Lab — sun path and solar radiation analysis"
           style="position:absolute;inset:0;width:100%;height:100%;border:0"
           allowfullscreen loading="lazy"></iframe>
 </div>
@@ -164,7 +164,7 @@ instead, in a small PHP proxy:
 node tools/make-deploy.mjs --key YOUR_MAPTILER_KEY
 ```
 
-That writes `deploy/sun-studio-v<version>-proxy/` containing `index.html` — with **no key
+That writes `deploy/solar-analysis-lab-v<version>-proxy/` containing `index.html` — with **no key
 in it** — and `tile-proxy.php`, which has the key. Upload both into the same folder,
 keeping those names. `PROXY_URL` inside the page is a relative path, so the pair works in
 any directory on any domain; moving or renaming the folder is fine as long as they stay
@@ -506,12 +506,26 @@ tests/assets/         downloaded on demand (Chicago O'Hare TMY3, for validation)
 
 ## Licence
 
-**Sun Studio is MIT licensed** — © 2026 Karam Al-Obaidi. Use it, adapt it, host it on your
-own site, hand it to students, free of charge and for any purpose, commercial or not. The
-only condition is that the copyright notice travels with copies you distribute.
+Two licences, because the app and the teaching material around it are different kinds of
+thing:
 
-It builds on two pieces of licensed work, both permissive and both compatible with the
-above:
+**The code is MIT** — © 2026 Karam Al-Obaidi. `index.html`, `tools/`, `server/` and
+`tests/`. Use it, adapt it, host it on your own site, hand it to students, free of charge
+and for any purpose, commercial or not; the only condition is that the copyright notice
+travels with copies you distribute. Full text in [`LICENSE`](LICENSE).
+
+**The accompanying material is CC BY 4.0** — this README and any other documentation
+pages, `docs/` and its screenshots, and the exercises and handouts distributed with the
+app. Share and adapt it freely, including commercially, as long as you credit it, link the
+licence and say if you changed anything. MIT is a software licence and says nothing
+sensible about a worksheet or a screenshot, which is why those are covered separately; see
+[`LICENSE-CONTENT`](LICENSE-CONTENT). The attribution line to use:
+
+> Solar Analysis Lab © 2026 Karam Al-Obaidi, licensed under
+> [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
+
+The code builds on three pieces of licensed work, all permissive and all compatible with
+the above:
 
 - **three.js** (MIT) — the only runtime dependency, loaded from a CDN. If you switch to
   self-hosting it, ship its licence file alongside.

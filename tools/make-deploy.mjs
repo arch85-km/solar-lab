@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Sun Studio — build the files to upload to a web server.
+ * Solar Analysis Lab — build the files to upload to a web server.
  *
  * The app itself holds no map key — a key in a public page is readable by anyone
  * who views the source, so there is nowhere in the HTML to put one. For aerial
@@ -84,7 +84,7 @@ if (key && page.includes(key)){
 
 /* ── write ─────────────────────────────────────────────────────────────── */
 
-const dir = join(outRoot, `sun-studio-v${build}-${variant}`);
+const dir = join(outRoot, `solar-analysis-lab-v${build}-${variant}`);
 if (existsSync(dir)) rmSync(dir, { recursive: true });
 mkdirSync(dir, { recursive: true });
 
@@ -102,7 +102,7 @@ if (key){
 
 /* ── say what to do with it ────────────────────────────────────────────── */
 
-console.log(`Sun Studio v${build} — ${variant}`);
+console.log(`Solar Analysis Lab v${build} — ${variant}`);
 console.log(`  ${dir}`);
 for (const f of written) console.log(`    ${f}`);
 console.log('');

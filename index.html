@@ -1,8 +1,9 @@
 <!DOCTYPE html>
 <!--
-  Sun Studio — 3D sun path and solar radiation analysis
-  Version 2.7
-  Copyright (c) 2026 Karam Al-Obaidi — MIT License (see LICENSE)
+  Solar Analysis Lab — 3D sun path and solar radiation analysis
+  Version 3.0
+  Copyright (c) 2026 Karam Al-Obaidi — code MIT (see LICENSE), accompanying material
+  CC BY 4.0 (see LICENSE-CONTENT)
 
   Loads three.js (MIT, (c) 2010-2026 three.js authors) from jsDelivr at runtime.
   The Perez sky coefficients and the Tregenza/Reinhart patch construction are
@@ -15,12 +16,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="author" content="Karam Al-Obaidi">
-<meta name="application-version" id="meta-version" content="2.7">
+<meta name="application-version" id="meta-version" content="3.0">
 <meta name="description" content="Interactive 3D sun path and solar radiation analysis for architectural design teaching. EPW climate import, OBJ model import, Perez sky model, W/m2 irradiance on all surfaces.">
-<title>Sun Studio</title>
+<title>Solar Analysis Lab</title>
 <style>
 /* ============================================================
-   Sun Studio — design tokens
+   Solar Analysis Lab — design tokens
    ============================================================ */
 :root{
   --bg:#0d1117;
@@ -744,7 +745,7 @@ body.embed{--topbar-h:44px}
     <div class="brand">
       <div class="brand-mark"></div>
       <div class="brand-text">
-        <b>Sun Studio</b>
+        <b>Solar Analysis Lab</b>
         <span>Environmental design analysis</span>
       </div>
     </div>
@@ -1296,7 +1297,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 
 /* ============================================================================
- *  Sun Studio — 3D sun path and solar radiation analysis
+ *  Solar Analysis Lab — 3D sun path and solar radiation analysis
  *
  *  Methodology follows the Radiance / Ladybug Tools chain:
  *    - solar position .............. NOAA solar position algorithm
@@ -2405,7 +2406,7 @@ const Mercator = (() => {
  * running build can be identified at a glance — a stale download that looks
  * almost right is otherwise very hard to tell apart from the current one.
  */
-const BUILD = '2.7';
+const BUILD = '3.0';
 
 /**
  * Aerial imagery through a tile proxy on your own server.
@@ -4558,7 +4559,7 @@ function exportCSV(){
   const r = State.results;
   if (!r) { toast('Run an analysis first.', 'err'); return; }
   const lines = [
-    '# Sun Studio — solar radiation analysis export',
+    '# Solar Analysis Lab — solar radiation analysis export',
     '# © Karam Al-Obaidi, MIT licensed. Method: NOAA solar position; Perez et al. 1993',
     '# all-weather sky on Tregenza/Reinhart patches; ray-cast shading. No interreflection.',
     '# Site,' + (State.site.name || 'custom') + ',lat,' + State.site.lat + ',lon,' + State.site.lon + ',tz,' + State.site.tz,
@@ -4703,7 +4704,7 @@ function composeSheet(source, W, H, s){
   setFont(9.5, '650');
   g.fillStyle = T.sheetFaint;
   g.textAlign = 'left';
-  g.fillText('SUN STUDIO · SOLAR RADIATION STUDY', pad, Math.round(26 * s));
+  g.fillText('SOLAR ANALYSIS LAB · SOLAR RADIATION STUDY', pad, Math.round(26 * s));
   if ('letterSpacing' in g) g.letterSpacing = '0px';
 
   setFont(19, '650');
@@ -5875,7 +5876,7 @@ const TOUR_KEY = 'sunpath.tour.seen.v1';
 
 const TOUR = [
   {
-    title: 'Welcome to Sun Studio',
+    title: 'Welcome to Solar Analysis Lab',
     body: 'A quick tour of the five things you need — about 30 seconds. ' +
           'You can keep moving the model while it runs.',
     centre: true,
@@ -5940,8 +5941,9 @@ const TOUR = [
           '<kbd>T</kbd> theme, <kbd>Space</kbd> animate, <kbd>E</kbd> export, ' +
           '<kbd>F</kbd> fullscreen, arrows to move time and date.' +
           '<br><br><span style="color:var(--text-faint);font-size:11px">' +
-          'Sun Studio © Karam Al-Obaidi · MIT licensed. Built on three.js, and on the ' +
-          'Perez sky model and Tregenza sky subdivision as implemented in Radiance.</span>',
+          'Solar Analysis Lab © Karam Al-Obaidi · code MIT, teaching material CC BY 4.0. ' +
+          'Built on three.js, and on the Perez sky model and Tregenza sky subdivision as ' +
+          'implemented in Radiance.</span>',
     centre: true,
   },
 ];
@@ -6245,7 +6247,7 @@ function init(){
   // apart without a stamp in the corner of every screenshot.
   document.getElementById('meta-version').setAttribute('content', BUILD);
   const credit = document.getElementById('credit');
-  if (credit) credit.title = 'Sun Studio v' + BUILD;
+  if (credit) credit.title = 'Solar Analysis Lab v' + BUILD;
 
   // The proxy option only makes sense once a deployed copy points at one
   if (PROXY_URL){

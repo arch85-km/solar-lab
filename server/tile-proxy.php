@@ -1,6 +1,6 @@
 <?php
 /**
- * Sun Studio — map tile proxy
+ * Solar Analysis Lab — map tile proxy
  *
  * Keeps a MapTiler (or any keyed XYZ) API key on the server so it never reaches
  * the browser. The page requests tiles from this script; this script adds the
@@ -8,12 +8,12 @@
  * is not readable by visitors.
  *
  * Install
- *   Upload next to sun-studio-*.html, e.g.
- *     /wp-content/uploads/sun-studio/tile-proxy.php
+ *   Upload next to index.html, e.g.
+ *     /wp-content/uploads/solar-analysis-lab/tile-proxy.php
  *   Set $MAPTILER_KEY below. Nothing else needs configuring: requests are only
  *   accepted from pages on this same host.
  *
- * Licence: MIT, same as the app. © 2026 Karam Al-Obaidi
+ * Licence: MIT, same as the app's code. © 2026 Karam Al-Obaidi
  */
 declare(strict_types=1);
 
