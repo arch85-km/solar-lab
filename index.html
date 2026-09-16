@@ -122,6 +122,27 @@
 
 *,*::before,*::after{box-sizing:border-box}
 html,body{margin:0;padding:0;height:100%;overflow:hidden;overscroll-behavior:none}
+
+/* This is an application shell, not a document, and its labels are furniture
+   rather than prose. Left selectable, a press-and-drag that starts on any label
+   begins a native text-selection drag; carry that over the viewport and the
+   browser shows the no-drop cursor — a circle with a line through it — for the
+   whole gesture, because the page registers no drop target. Release outside the
+   window and it can persist until the next click. Escape does not clear it: it
+   is browser drag state, not anything the app owns. Suppressing selection on
+   the chrome removes the gesture rather than trying to undo its cursor.
+
+   Real content stays selectable below: the status-bar figures and the map
+   attribution are worth copying, and form fields must be. */
+#topbar, .panel, .vp-overlay, .sel-list, .pop, #tour-card{
+  user-select:none; -webkit-user-select:none;
+}
+#viewport canvas, .vp-overlay img, .brand-mark{
+  -webkit-user-drag:none; user-drag:none;
+}
+#statusbar, #vp-attrib, input, textarea, select{
+  user-select:text; -webkit-user-select:text;
+}
 body{
   background:var(--bg);
   color:var(--text);
@@ -175,7 +196,7 @@ button,input,select,textarea{font:inherit;color:inherit}
   background:radial-gradient(circle at 36% 32%,#ffd98a,#ffb340 42%,#e07a1f 78%,#a85410);
   box-shadow:0 0 0 1px rgba(255,200,120,.35),0 0 13px rgba(255,179,64,.5);
 }
-.brand-text{display:flex;flex-direction:column;line-height:1.12}
+.brand-text{display:flex;flex-direction:column;gap:2px;line-height:1.15}
 .brand-text b{font-size:12.5px;font-weight:650;letter-spacing:.2px;white-space:nowrap}
 /* The tagline sits one step down from the app name, not two: --text-dim rather
    than --text-faint, half a pixel larger and at 500. Tracking eases slightly as

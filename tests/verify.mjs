@@ -2097,6 +2097,32 @@ const lightOverflow = await page.evaluate(() =>
   document.documentElement.scrollWidth - document.documentElement.clientWidth);
 check('no horizontal overflow in light mode', lightOverflow <= 1, 'overflow ' + lightOverflow + 'px');
 
+// Dragging from a panel label used to select its text, which starts a native
+// drag; carried over the viewport, with no drop target anywhere on the page, the
+// browser shows the no-drop cursor for the whole gesture and can leave it stuck
+// after the button comes up. Nothing in the app can clear that — it is browser
+// drag state. The guard is that the chrome selects nothing in the first place.
+// Asserted through computed style rather than a synthetic drag: dispatched
+// MouseEvents do not create real selections in Chromium, so a scripted
+// press-drag-release "passes" whether the guard is there or not. The property
+// that decides whether the browser can begin the gesture is the one worth
+// checking. Both directions matter — over-applying the guard would make the
+// status-bar figures and the map credit uncopyable, which is a different bug.
+const dragGuard = await page.evaluate(() => {
+  const styleOf = (sel) => {
+    const el = document.querySelector(sel);
+    return el ? getComputedStyle(el).userSelect : 'missing';
+  };
+  return {
+    chrome: ['#topbar', '.panel', '.vp-overlay'].map(s => s + '=' + styleOf(s)),
+    copyable: ['#statusbar', '#vp-attrib', '#i-lat'].map(s => s + '=' + styleOf(s)),
+  };
+});
+check('the interface chrome cannot start a text-selection drag',
+      dragGuard.chrome.every(s => s.endsWith('=none')), dragGuard.chrome.join(' '));
+check('the figures and the map credit are still selectable',
+      dragGuard.copyable.every(s => s.endsWith('=text')), dragGuard.copyable.join(' '));
+
 // Back to dark for the remaining checks and the reference screenshots
 await page.evaluate(() => window.__SUNAPP.setUiTheme('dark'));
 await page.waitForTimeout(300);
