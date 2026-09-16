@@ -2182,7 +2182,25 @@ let THEME = THEMES.dark;
  * ========================================================================== */
 const viewportEl = document.getElementById('viewport');
 
-const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, alpha: false });
+/*
+ * powerPreference matters on a laptop with switchable graphics. Left unset, the
+ * browser chooses, and different browsers on the same machine choose
+ * differently — which is how one of them ends up orbiting smoothly and another
+ * on the integrated GPU does not.
+ *
+ * preserveDrawingBuffer stays ON, and it is not free — it keeps the drawing
+ * buffer after every composite, at the cost of a copy per frame. Turning it off
+ * was tried: the app's own study-sheet export does not need it, because that
+ * path renders and reads the canvas synchronously in one task. But anything
+ * reading the canvas *later* gets a cleared buffer, which took out six pixel
+ * checks in the verification suite — the shadow comparison, the chart-over-
+ * imagery contrast in both themes, and the light-mode viewport check. Any
+ * screenshot tool a user points at the page has the same problem. If this ever
+ * needs to come off, those readers have to force a render first.
+ */
+const renderer = new THREE.WebGLRenderer({
+  antialias: true, preserveDrawingBuffer: true, alpha: false,
+  powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
