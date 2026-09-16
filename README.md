@@ -519,7 +519,7 @@ pages, `docs/` and its screenshots, and the exercises and handouts distributed w
 app. Share and adapt it freely, including commercially, as long as you credit it, link the
 licence and say if you changed anything. MIT is a software licence and says nothing
 sensible about a worksheet or a screenshot, which is why those are covered separately; see
-[`LICENSE-CONTENT`](LICENSE-CONTENT). The attribution line to use:
+[`DOCS-LICENCE.md`](DOCS-LICENCE.md). The attribution line to use:
 
 > Solar Analysis Lab © 2026 Karam Al-Obaidi, licensed under
 > [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
@@ -548,4 +548,4 @@ policy governs and this licence choice should be checked against it.*
 
 ---
 
-© Karam Al-Obaidi
+© Karam Al-Obaidi · ORCID [0000-0002-4379-6964](https://orcid.org/0000-0002-4379-6964)

@@ -2,7 +2,7 @@
 
 Solar Analysis Lab's **code** is licensed under the MIT License (see `LICENSE`); its
 **accompanying material** — documentation, screenshots and exercises — under CC BY 4.0
-(see `LICENSE-CONTENT`). It builds on the work below. Copies of the required notices are
+(see `DOCS-LICENCE.md`). It builds on the work below. Copies of the required notices are
 reproduced in full.
 
 ---

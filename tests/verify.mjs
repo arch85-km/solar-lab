@@ -11,7 +11,7 @@
  */
 import { createServer } from 'node:http';
 import { deflateSync } from 'node:zlib';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, dirname, extname, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -217,7 +217,7 @@ check('the old key Show button is gone',
         Object.values(keys).join(', '));
 
   const lic = await readFile(join(ROOT, 'LICENSE'), 'utf8');
-  const content = await readFile(join(ROOT, 'LICENSE-CONTENT'), 'utf8');
+  const content = await readFile(join(ROOT, 'DOCS-LICENCE.md'), 'utf8');
   const readme = await readFile(join(ROOT, 'README.md'), 'utf8');
   check('code is MIT and the accompanying material is CC BY 4.0, said in all three places',
         /MIT License/.test(lic) &&
@@ -227,16 +227,59 @@ check('the old key Show button is gone',
   // LICENSE must stay the plain MIT text. GitHub identifies a licence by matching
   // the file against known templates; a scope preamble — however useful to a human
   // — drops the match below threshold and the repo shows "Other" instead of "MIT".
-  // The scope statement lives in LICENSE-CONTENT and the README, which are free to
+  // The scope statement lives in DOCS-LICENCE.md and the README, which are free to
   // say whatever they like. This guards a regression that actually happened.
   const licBody = lic.trimStart();
   check('LICENSE is the plain MIT text, so GitHub can identify it',
         licBody.startsWith('MIT License\n') &&
         /^MIT License\n+Copyright \(c\) \d{4}/.test(licBody) &&
-        !/CC BY|LICENSE-CONTENT|Applies to/.test(lic),
+        !/CC BY|DOCS-LICENCE|Applies to/.test(lic),
         'first line "' + licBody.split('\n')[0] + '", ' + lic.split('\n').length + ' lines');
+  // And there must be exactly one file in the root that GitHub will read as a
+  // licence. Its detector matches the *filename* before it looks inside, and the
+  // patterns below are the ones it uses — LICENSE-* among them, so that a
+  // dual-licensed project can ship LICENSE-MIT and LICENSE-APACHE. A second match
+  // makes the repository page report the licence as ambiguous ("MIT, License
+  // licenses found") instead of naming it. That is why the CC BY file is called
+  // DOCS-LICENCE.md: same content, a name the detector does not collect.
+  const rootNames = (await readdir(ROOT, { withFileTypes: true }))
+        .filter(e => e.isFile()).map(e => e.name);
+  const licenceLike = rootNames.filter(n => /^(licen[cs]e|copying|copyright)([-_.]|$)/i.test(n));
+  check('only one file in the root reads as a licence, so the badge names MIT',
+        licenceLike.length === 1 && licenceLike[0] === 'LICENSE',
+        licenceLike.join(', ') || 'none found');
   const pkg = JSON.parse(await readFile(join(ROOT, 'package.json'), 'utf8'));
   check('package.json declares the code licence', pkg.license === 'MIT', pkg.license);
+
+  // make-deploy.mjs refuses to build when the three version markers inside
+  // index.html disagree. The Method Notes are the document people cite, and they
+  // state the version four times over — masthead, Harvard entry, BibTeX and the
+  // closing line — with no such guard. A page citing a version the software does
+  // not report is worse than one that omits the version, so check them here.
+  const notes = await readFile(join(ROOT, 'docs', 'method-notes.html'), 'utf8');
+  const src = await readFile(join(ROOT, 'index.html'), 'utf8');
+  const appVersion = src.match(/const BUILD = '([^']+)';/)[1];
+  const stated = {
+    masthead: (notes.match(/class="sl-brow">Version ([\d.]+) ·/) || [])[1],
+    harvard:  (notes.match(/\(Version ([\d.]+)\) \[Computer software\]/) || [])[1],
+    bibtex:   (notes.match(/version\s*=\s*\{([\d.]+)\}/) || [])[1],
+    closing:  (notes.match(/describes Solar Analysis Lab version ([\d.]+)/) || [])[1],
+  };
+  check('the Method Notes cite the version the app actually reports',
+        Object.values(stated).every(v => v === appVersion),
+        'app ' + appVersion + ', page ' +
+        Object.entries(stated).map(([k, v]) => k + ' ' + v).join(', '));
+
+  // The ORCID is the one string on the page that cannot be checked by reading the
+  // source: get a digit wrong and the citation credits somebody else entirely.
+  // Pin it, and require it in both places a citation is read from — the masthead,
+  // for a person, and the BibTeX, for a reference manager.
+  const ORCID = '0000-0002-4379-6964';
+  const orcids = notes.match(/\b\d{4}-\d{4}-\d{4}-\d{3}[\dX]\b/g) || [];
+  check('the author is identified by the same ORCID everywhere it appears',
+        orcids.length >= 3 && orcids.every(o => o === ORCID) &&
+        /orcid\s*=\s*\{0000-0002-4379-6964\}/.test(notes),
+        orcids.length + ' occurrences');
 }
 
 // Both halves of the brand, together: the name and the line under it. The tagline

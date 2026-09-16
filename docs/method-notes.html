@@ -80,6 +80,12 @@
 .sl-doc .sl-byline{display:flex;flex-wrap:wrap;gap:.5rem 1.6rem;margin-top:1.9rem;
   font-family:var(--sl-fm);font-size:.74rem;letter-spacing:.04em;color:var(--sl-ink3);}
 .sl-doc .sl-byline b{color:var(--sl-ink2);font-weight:500;}
+/* The author and version lines each take the whole width, so the three descriptor
+   items keep one row and these sit under them rather than wrapping into the gaps. */
+.sl-doc .sl-byline .sl-brow{flex-basis:100%;}
+.sl-doc .sl-byline .sl-brow a{color:inherit;text-decoration:none;
+  border-bottom:1px solid var(--sl-rule);}
+.sl-doc .sl-byline .sl-brow a:hover{color:var(--sl-accent);border-bottom-color:var(--sl-accent);}
 
 /* trap notice */
 .sl-doc .sl-traps{margin:2.5rem 0;border:1px solid var(--sl-rule);
@@ -216,7 +222,9 @@
       <span><b>Audience</b> Architecture students and staff</span>
       <span><b>Engines</b> Perez all-weather sky · BVH ray tracing</span>
       <span><b>Runs</b> Entirely in the browser</span>
-      <span><b>Updated</b> 16 September 2026</span>
+      <span class="sl-brow">Karam Al-Obaidi ·
+        <a href="https://orcid.org/0000-0002-4379-6964" target="_blank" rel="noopener">ORCID 0000-0002-4379-6964</a></span>
+      <span class="sl-brow">Version 1.0.0 · 16 September 2026</span>
     </div>
   </div>
 
@@ -1031,8 +1039,13 @@ out geom;</div>
     <p class="sl-ref">Al-Obaidi, K. M. (2026). <i>Solar Analysis Lab: A browser-based sun path
       and solar irradiance tool</i> (Version 1.0.0) [Computer software].
       https://karam.me.uk/applications/solar-analysis-lab/</p>
+    <p><b>Author</b> Karam M. Al-Obaidi, ORCID
+      <a href="https://orcid.org/0000-0002-4379-6964" target="_blank" rel="noopener">0000-0002-4379-6964</a>.
+      Harvard has no slot for an identifier, so it is given here rather than padded into
+      the reference above, which should be copied as it stands.</p>
 <pre>@software{alobaidi2026solaranalysislab,
   author  = {Al-Obaidi, Karam M.},
+  orcid   = {0000-0002-4379-6964},
   title   = {Solar Analysis Lab: A browser-based sun path and solar irradiance tool},
   year    = {2026},
   version = {1.0.0},
