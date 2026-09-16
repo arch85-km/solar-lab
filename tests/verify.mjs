@@ -270,6 +270,23 @@ check('the old key Show button is gone',
         'app ' + appVersion + ', page ' +
         Object.entries(stated).map(([k, v]) => k + ' ' + v).join(', '));
 
+  // The deposit metadata is read by machines that will not be looking at it
+  // again: Zenodo builds the archived record from .zenodo.json, GitHub builds
+  // the "Cite this repository" panel from CITATION.cff, and a version or title
+  // that drifts from the app is baked into a DOI nobody can edit afterwards.
+  // The ORCID is deliberately in two forms — CFF wants the full URL, Zenodo the
+  // bare identifier — so compare the digits, not the strings.
+  const cff = await readFile(join(ROOT, 'CITATION.cff'), 'utf8');
+  const zen = JSON.parse(await readFile(join(ROOT, '.zenodo.json'), 'utf8'));
+  const cffVersion = (cff.match(/^version:\s*(\S+)/m) || [])[1];
+  const cffTitle = (cff.match(/^title:\s*"([^"]+)"/m) || [])[1];
+  const digits = t => (String(t).match(/\d{4}-\d{4}-\d{4}-\d{3}[\dX]/) || [])[0];
+  check('the deposit metadata agrees with the app, and with itself',
+        cffVersion === appVersion && zen.version === appVersion &&
+        cffTitle === zen.title &&
+        digits(cff) === digits(zen.creators[0].orcid),
+        'cff ' + cffVersion + ', zenodo ' + zen.version + ', app ' + appVersion);
+
 }
 
 // Both halves of the brand, together: the name and the line under it. The tagline

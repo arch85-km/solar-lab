@@ -1,0 +1,26 @@
+{
+  "upload_type": "software",
+  "title": "Solar Analysis Lab: A browser-based sun path and solar irradiance tool",
+  "version": "1.0.0",
+  "language": "eng",
+  "license": "MIT",
+  "creators": [
+    {
+      "name": "Al-Obaidi, Karam M.",
+      "affiliation": "Sheffield Hallam University",
+      "orcid": "0000-0002-4379-6964"
+    }
+  ],
+  "description": "<p>Solar Analysis Lab is a sun path and solar irradiance tool for architecture students that runs entirely in the browser. It ships as a single self-contained HTML file with no build step for the end user and no install.</p><p>The sun is moved through the day and the year over a massing model, with shadows cast in real time and the path drawn in 3D or as a stereographic projection. Geometry can be imported as OBJ, or built from OpenStreetMap buildings over a map basemap or an uploaded site image. Climate is read from an EPW file; with none loaded, a clear-sky model stands in.</p><p>A grid of sensors reports solar irradiance in W/m2 and cumulative radiation in kWh/m2 on every surface. The calculation ray traces against a bounding-volume hierarchy in a worker, with the sky discretised over Tregenza/Reinhart patches under the Perez all-weather model, and is validated against the measured global horizontal radiation in the climate file itself. The method notes in docs/method-notes.html document every assumption, name every source the code implements, and declare the tool's limitations.</p>",
+  "notes": "Dual-licensed. The software (index.html, tools/, server/ and tests/) is released under the MIT Licence. The documentation and teaching material (README.md, docs/, the method notes page, the exercises and figures) is released under CC BY 4.0.",
+  "keywords": [
+    "solar radiation",
+    "sun path",
+    "solar irradiance",
+    "shading analysis",
+    "building performance",
+    "architectural education",
+    "architecture",
+    "three.js"
+  ]
+}

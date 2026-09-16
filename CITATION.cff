@@ -1,0 +1,38 @@
+cff-version: 1.2.0
+message: "If this tool informs a paper, a thesis, a lecture or a studio brief, please cite it as software."
+type: software
+title: "Solar Analysis Lab: A browser-based sun path and solar irradiance tool"
+version: 1.0.0
+date-released: 2026-09-16
+abstract: >-
+  A sun path and solar irradiance tool for architecture students that runs
+  entirely in the browser, shipped as a single self-contained HTML file. The sun
+  is moved through the day and the year over a massing model, with shadows cast
+  in real time and the path drawn in 3D or as a stereographic projection.
+  Geometry can be imported or built from OpenStreetMap buildings over a map
+  basemap, and climate taken from an EPW file or, with none loaded, from a
+  clear-sky model. A grid of sensors then reports solar irradiance in W/m² and
+  cumulative radiation in kWh/m² on every surface, computed by ray tracing
+  against a bounding-volume hierarchy in a worker, with the sky discretised over
+  Tregenza/Reinhart patches under the Perez all-weather model. The method notes
+  in docs/method-notes.html document every assumption, name every source the
+  code implements, and declare the tool's limitations.
+authors:
+  - family-names: Al-Obaidi
+    given-names: Karam M.
+    orcid: "https://orcid.org/0000-0002-4379-6964"
+    affiliation: "Sheffield Hallam University"
+license:
+  - MIT
+  - CC-BY-4.0
+repository-code: "https://github.com/arch85-km/solar-lab"
+url: "https://karam.me.uk/applications/solar-analysis-lab/"
+keywords:
+  - solar radiation
+  - sun path
+  - solar irradiance
+  - shading analysis
+  - building performance
+  - architectural education
+  - architecture
+  - three.js
