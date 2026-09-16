@@ -216,7 +216,7 @@
       <span><b>Audience</b> Architecture students and staff</span>
       <span><b>Engines</b> Perez all-weather sky · BVH ray tracing</span>
       <span><b>Runs</b> Entirely in the browser</span>
-      <span><b>Updated</b> 15 September 2026</span>
+      <span><b>Updated</b> 16 September 2026</span>
     </div>
   </div>
 
@@ -792,11 +792,12 @@ out geom;</div>
         <tbody>
           <tr><td>Dome radius</td><td class="sl-d">1.0</td><td class="sl-n">0.5 – 2.2</td></tr>
           <tr><td>Chart scale</td><td class="sl-d">1.0</td><td class="sl-n">0.5 – 2.5</td></tr>
-          <tr><td>Monthly arcs, hourly analemmas, today's arc, compass, altitude rings, cast shadows, ground grid</td><td class="sl-d">all on</td><td class="sl-n">on / off</td></tr>
+          <tr><td>Monthly arcs, hourly analemmas, today's arc, compass, altitude rings, cast shadows</td><td class="sl-d">all on</td><td class="sl-n">on / off</td></tr>
+          <tr><td>Ground grid <span class="sl-mono">(no basemap only)</span></td><td class="sl-d">on</td><td class="sl-n">on / off</td></tr>
           <tr><td>Sky dome patches</td><td class="sl-d">off</td><td class="sl-n">on / off</td></tr>
           <tr><td>Flatten automatically in top view</td><td class="sl-d">on</td><td class="sl-n">on / off</td></tr>
         </tbody>
-        <caption>The flattened chart is a stereographic projection, radius = R·tan((90 − altitude)/2); the suite confirms r(45°) = 41.421 against the closed form. The chart can be moved across the site, which is a drawing offset only and changes no sun position, shadow or number.</caption>
+        <caption>The flattened chart is a stereographic projection, radius = R·tan((90 − altitude)/2); the suite confirms r(45°) = 41.421 against the closed form. The chart can be moved across the site, which is a drawing offset only and changes no sun position, shadow or number. The ground grid shows only when there is bare ground to show it on: a basemap hides it, because a survey grid over a real map is clutter and the two surfaces compete for depth.</caption>
       </table></div>
 
       <h4>Analysis</h4>
@@ -828,6 +829,19 @@ out geom;</div>
         </tbody>
         <caption>Three exports: results CSV, viewport PNG, and an annotated study sheet. The sheet can be produced from a sun-path study with no analysis run at all.</caption>
       </table></div>
+
+      <h4>Diagnostics</h4>
+      <p>Two things the app will tell you about itself, which matter when it runs
+        slowly on a particular machine. At launch it names the graphics renderer in the
+        browser console, and warns if that name is a software rasteriser — a browser with
+        hardware acceleration switched off draws every pixel on the processor and will
+        stutter on any computer, however fast. Adding <code>?perf=1</code> to the URL puts a
+        live frame rate beside that name in the corner of the viewport; it reads
+        <span class="sl-mono">idle</span> until you move something, because the viewport
+        draws only when the scene changes.</p>
+      <p class="sl-note">If a student reports that the model will not turn smoothly, the
+        renderer name is the first thing to ask for. It is usually the browser's graphics
+        settings rather than the model, and no change to the geometry will help.</p>
     </div>
   </div>
 
@@ -1014,14 +1028,14 @@ out geom;</div>
     <h3>How to cite</h3>
     <p>Cite it as software. Keeping the copyright notice in the file satisfies the licence; a
       citation is the scholarly act on top of that.</p>
-    <p class="sl-ref">Al-Obaidi, K. M. (2026). <i>Solar Analysis Lab: a browser-based sun path
-      and solar irradiance tool</i> (Version 1.0) [Computer software].
+    <p class="sl-ref">Al-Obaidi, K. M. (2026). <i>Solar Analysis Lab: A browser-based sun path
+      and solar irradiance tool</i> (Version 1.0.0) [Computer software].
       https://karam.me.uk/applications/solar-analysis-lab/</p>
 <pre>@software{alobaidi2026solaranalysislab,
   author  = {Al-Obaidi, Karam M.},
-  title   = {Solar Analysis Lab: a browser-based sun path and solar irradiance tool},
+  title   = {Solar Analysis Lab: A browser-based sun path and solar irradiance tool},
   year    = {2026},
-  version = {1.0},
+  version = {1.0.0},
   url     = {https://karam.me.uk/applications/solar-analysis-lab/},
   note    = {Code MIT licensed; accompanying material CC BY 4.0}
 }</pre>
@@ -1258,7 +1272,7 @@ out geom;</div>
         <a href="https://doi.org/10.1080/09613210701446325" target="_blank" rel="noopener">doi:10.1080/09613210701446325</a>
         — where the MF:<i>n</i> generalisation the code implements was formalised. The code
         implements it and names only "Reinhart".</li>
-      <li><b>ASHRAE</b> — <b>deliberately absent.</b> Until version 1.0 the export header and
+      <li><b>ASHRAE</b> — <b>deliberately absent.</b> Until version 1.0.0 the export header and
         the EPW panel both described the clear-sky fallback as "ASHRAE/Hottel". That was wrong:
         the ASHRAE Handbook clear-sky model uses tabulated beam and diffuse optical depths, none
         of which is present. The implementation is Hottel 1976 with Liu &amp; Jordan 1960, both
@@ -1277,7 +1291,7 @@ out geom;</div>
       against closed-form geometry and its own climate input, not against any of these
       sources — see section 07.</p>
 
-    <p class="sl-cite">This page describes Solar Analysis Lab version 1.0 and was
+    <p class="sl-cite">This page describes Solar Analysis Lab version 1.0.0 and was
       written against that build's source.</p>
   </div>
 
