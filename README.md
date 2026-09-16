@@ -548,4 +548,4 @@ policy governs and this licence choice should be checked against it.*
 
 ---
 
-© Karam Al-Obaidi · ORCID [0000-0002-4379-6964](https://orcid.org/0000-0002-4379-6964)
+© Karam Al-Obaidi

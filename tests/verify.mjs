@@ -270,16 +270,6 @@ check('the old key Show button is gone',
         'app ' + appVersion + ', page ' +
         Object.entries(stated).map(([k, v]) => k + ' ' + v).join(', '));
 
-  // The ORCID is the one string on the page that cannot be checked by reading the
-  // source: get a digit wrong and the citation credits somebody else entirely.
-  // Pin it, and require it in both places a citation is read from — the masthead,
-  // for a person, and the BibTeX, for a reference manager.
-  const ORCID = '0000-0002-4379-6964';
-  const orcids = notes.match(/\b\d{4}-\d{4}-\d{4}-\d{3}[\dX]\b/g) || [];
-  check('the author is identified by the same ORCID everywhere it appears',
-        orcids.length >= 3 && orcids.every(o => o === ORCID) &&
-        /orcid\s*=\s*\{0000-0002-4379-6964\}/.test(notes),
-        orcids.length + ' occurrences');
 }
 
 // Both halves of the brand, together: the name and the line under it. The tagline
