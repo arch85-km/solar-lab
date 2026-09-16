@@ -2141,15 +2141,20 @@ console.log('\n=== guided tour ===');
   // the control it points at. That transient is not what these checks are about,
   // and a fixed timeout raced it: on a loaded machine the measurement landed
   // mid-slide and the run failed on whichever step happened to be slow.
+  // Two matching samples are not enough: placement happens, the panel finishes
+  // sliding, and only then does transitionend re-place the card. Sample in the
+  // gap between those and the rectangles match while the card is still about to
+  // move. Require the position to hold across several consecutive reads.
   const settle = async () => {
-    let prev = null;
-    for (let t = 0; t < 40; t++){                 // up to ~2 s
+    let prev = null, steady = 0;
+    for (let t = 0; t < 60; t++){                 // up to ~3 s
       const r = await tp.evaluate(() => {
         const c = document.getElementById('tour-card').getBoundingClientRect();
         const s = document.getElementById('tour-spot').getBoundingClientRect();
         return [c.left, c.top, c.width, c.height, s.left, s.top, s.width, s.height].join(',');
       });
-      if (r === prev) return;
+      steady = (r === prev) ? steady + 1 : 0;
+      if (steady >= 4) return;                    // ~200 ms without moving
       prev = r;
       await tp.waitForTimeout(50);
     }

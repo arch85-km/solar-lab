@@ -6229,7 +6229,36 @@ function updateLabelSizes(){
   compassGroup.traverse(fit);
 }
 
-function render(){ updateLabelSizes(); renderer.render(scene, camera); }
+function render(){ updateLabelSizes(); renderer.render(scene, camera); frames++; }
+
+/**
+ * Which GPU the browser actually handed us, and whether it is one at all.
+ *
+ * This is the first thing worth knowing when someone reports that orbiting is
+ * slow. A browser with hardware acceleration switched off, or one that has
+ * blocklisted the card, quietly falls back to software rasterisation and names
+ * SwiftShader here — on any machine, however fast. In that state the
+ * powerPreference hint above is ignored and nothing about the scene will help.
+ * Two browsers on the same computer can differ, which is exactly how the same
+ * page runs smoothly in one and stutters in the other.
+ *
+ * Add ?perf=1 to the URL for a live frame rate beside it.
+ */
+let frames = 0;
+function gpuReport(){
+  try {
+    const gl = renderer.getContext();
+    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+    const name = String(dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)
+                            : gl.getParameter(gl.RENDERER));
+    return {
+      name,
+      webgl2: !!renderer.capabilities.isWebGL2,
+      pixelRatio: renderer.getPixelRatio(),
+      software: /swiftshader|software|llvmpipe|basic render|microsoft basic/i.test(name),
+    };
+  } catch (e) { return { name: 'unavailable', webgl2: false, pixelRatio: 1, software: false }; }
+}
 
 /**
  * Keep drawing for a short window after anything changes, rather than running a
@@ -6242,7 +6271,8 @@ function requestRender(ms = 280){
 }
 controls.addEventListener('change', () => requestRender());
 
-let lastT = performance.now(), compassT = 0;
+let lastT = performance.now(), compassT = 0, perfT = performance.now();
+let perfEl = null, perfGpu = { name: '', software: false };
 function loop(now){
   requestAnimationFrame(loop);
   const dt = Math.min((now - lastT) / 1000, 0.1);
@@ -6251,6 +6281,13 @@ function loop(now){
   if (State.playing){
     if (State.animMode === 'day') setMinutes((State.minutes + dt * 60 * State.speed * 3) % 1440);
     else setDoy((State.doy + dt * State.speed * 6 - 1) % 365 + 1);
+  }
+  if (perfEl && now - perfT > 500){
+    const fps = Math.round(frames * 1000 / (now - perfT));
+    perfEl.textContent = fps + ' fps · ' + perfGpu.name +
+                         (perfGpu.software ? ' · SOFTWARE' : '');
+    perfEl.style.color = perfGpu.software ? '#e06c5a' : (fps < 30 ? '#d6a748' : '#7fb88c');
+    perfT = now; frames = 0;
   }
   const active = State.playing || now < renderUntil;
   if (active){
@@ -6264,7 +6301,25 @@ function loop(now){
  *  Init
  * ========================================================================== */
 function init(){
-  if (new URLSearchParams(location.search).has('embed')) document.body.classList.add('embed');
+  const params = new URLSearchParams(location.search);
+  if (params.has('embed')) document.body.classList.add('embed');
+
+  // Name the GPU once at boot. It costs nothing, and when a slow viewport gets
+  // reported it turns a guessing game into a one-line answer.
+  perfGpu = gpuReport();
+  console.info('Solar Analysis Lab v' + BUILD + ' — renderer: ' + perfGpu.name +
+    ' · WebGL' + (perfGpu.webgl2 ? '2' : '1') + ' · pixel ratio ' + perfGpu.pixelRatio +
+    (perfGpu.software
+      ? '\n⚠ Software rendering: this browser is not using the graphics card. Turn on ' +
+        'hardware acceleration (chrome://settings → System) and restart it.'
+      : ''));
+  if (params.has('perf')){
+    perfEl = document.createElement('div');
+    perfEl.style.cssText = 'position:fixed;left:8px;bottom:26px;z-index:60;font:11px ' +
+      'ui-monospace,Menlo,Consolas,monospace;background:rgba(0,0,0,.66);color:#7fb88c;' +
+      'padding:3px 7px;border-radius:3px;pointer-events:none;white-space:nowrap';
+    document.body.appendChild(perfEl);
+  }
 
   Selects.enhanceAll();
   renderPlaces();
@@ -6331,7 +6386,7 @@ function init(){
     Basemap, Mercator, TILE_SOURCES, loadBasemapTiles, pickPlace, runSearch, Selects,
     sourceAttribution, PROXY_URL, PROXY_ATTRIBUTION,
     loadPlaces, savePlace, removePlace, renderPlaces, PLACES_KEY,
-    requestRender, BUILD, setChartAt, armChartPlacement,
+    requestRender, BUILD, setChartAt, armChartPlacement, gpuReport,
     OsmBuildings, occluderTriangles, contextGroup, importOBJ, placeObj,
     placeModelAt, armPlacement, basemapGroup,
     objItems: () => objItems.map((i, n) => ({ name: i.name, scale: i.scale, rot: i.rot,
