@@ -177,7 +177,11 @@ button,input,select,textarea{font:inherit;color:inherit}
 }
 .brand-text{display:flex;flex-direction:column;line-height:1.12}
 .brand-text b{font-size:12.5px;font-weight:650;letter-spacing:.2px;white-space:nowrap}
-.brand-text span{font-size:9.5px;color:var(--text-faint);letter-spacing:.7px;text-transform:uppercase;white-space:nowrap}
+/* The tagline sits one step down from the app name, not two: --text-dim rather
+   than --text-faint, half a pixel larger and at 500. Tracking eases slightly as
+   the size goes up, which keeps the line roughly the width it was so the topbar
+   gains no pressure at middling widths. */
+.brand-text span{font-size:10.5px;color:var(--text-dim);font-weight:500;letter-spacing:.6px;text-transform:uppercase;white-space:nowrap}
 .tb-group{display:flex;align-items:center;gap:3px}
 .tb-spacer{flex:1 1 auto;min-width:0}
 .tb-btn{
@@ -6283,10 +6287,14 @@ function loop(now){
     else setDoy((State.doy + dt * State.speed * 6 - 1) % 365 + 1);
   }
   if (perfEl && now - perfT > 500){
+    // The viewport only draws when something changed, so a still scene renders
+    // no frames at all. Reporting that as "0 fps" reads like a stall; it is the
+    // opposite. Say idle, and give a rate only when there is one to give.
     const fps = Math.round(frames * 1000 / (now - perfT));
-    perfEl.textContent = fps + ' fps · ' + perfGpu.name +
-                         (perfGpu.software ? ' · SOFTWARE' : '');
-    perfEl.style.color = perfGpu.software ? '#e06c5a' : (fps < 30 ? '#d6a748' : '#7fb88c');
+    perfEl.textContent = (frames ? fps + ' fps' : 'idle — orbit to measure') +
+                         ' · ' + perfGpu.name + (perfGpu.software ? ' · SOFTWARE' : '');
+    perfEl.style.color = perfGpu.software ? '#e06c5a'
+                       : !frames ? '#9aa8b8' : (fps < 30 ? '#d6a748' : '#7fb88c');
     perfT = now; frames = 0;
   }
   const active = State.playing || now < renderUntil;
