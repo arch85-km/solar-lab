@@ -193,7 +193,7 @@ check('the old key Show button is gone',
 // A half-rename is worse than none, so this is asserted against the files
 {
   const files = ['index.html', 'tests/verify.mjs', 'tools/make-deploy.mjs',
-                 'server/tile-proxy.php', 'README.md', 'THIRD-PARTY-NOTICES.md',
+                 'server/tile-proxy.php', 'README.md', 'NOTICE',
                  'package.json'];
   // Assembled rather than written out, or this check would find itself in the
   // very file it is scanning.
@@ -217,23 +217,23 @@ check('the old key Show button is gone',
         Object.values(keys).join(', '));
 
   const lic = await readFile(join(ROOT, 'LICENSE'), 'utf8');
-  const content = await readFile(join(ROOT, 'DOCS-LICENCE.md'), 'utf8');
+  const notice = await readFile(join(ROOT, 'NOTICE'), 'utf8');
   const readme = await readFile(join(ROOT, 'README.md'), 'utf8');
   check('code is MIT and the accompanying material is CC BY 4.0, said in all three places',
         /MIT License/.test(lic) &&
-        /CC BY 4\.0/.test(content) &&
-        /creativecommons\.org\/licenses\/by\/4\.0/.test(content) &&
+        /CC BY 4\.0/.test(notice) &&
+        /creativecommons\.org\/licenses\/by\/4\.0/.test(notice) &&
         /The code is MIT/.test(readme) && /accompanying material is CC BY 4\.0/.test(readme));
   // LICENSE must stay the plain MIT text. GitHub identifies a licence by matching
   // the file against known templates; a scope preamble — however useful to a human
   // — drops the match below threshold and the repo shows "Other" instead of "MIT".
-  // The scope statement lives in DOCS-LICENCE.md and the README, which are free to
+  // The scope statement lives in NOTICE and the README, which are free to
   // say whatever they like. This guards a regression that actually happened.
   const licBody = lic.trimStart();
   check('LICENSE is the plain MIT text, so GitHub can identify it',
         licBody.startsWith('MIT License\n') &&
         /^MIT License\n+Copyright \(c\) \d{4}/.test(licBody) &&
-        !/CC BY|DOCS-LICENCE|Applies to/.test(lic),
+        !/CC BY|NOTICE|Applies to/.test(lic),
         'first line "' + licBody.split('\n')[0] + '", ' + lic.split('\n').length + ' lines');
   // And there must be exactly one file in the root that GitHub will read as a
   // licence. Its detector matches the *filename* before it looks inside, and the
@@ -241,13 +241,35 @@ check('the old key Show button is gone',
   // dual-licensed project can ship LICENSE-MIT and LICENSE-APACHE. A second match
   // makes the repository page report the licence as ambiguous ("MIT, License
   // licenses found") instead of naming it. That is why the CC BY file is called
-  // DOCS-LICENCE.md: same content, a name the detector does not collect.
+  // NOTICE: the same content under a name the detector does not collect.
   const rootNames = (await readdir(ROOT, { withFileTypes: true }))
         .filter(e => e.isFile()).map(e => e.name);
   const licenceLike = rootNames.filter(n => /^(licen[cs]e|copying|copyright)([-_.]|$)/i.test(n));
   check('only one file in the root reads as a licence, so the badge names MIT',
-        licenceLike.length === 1 && licenceLike[0] === 'LICENSE',
-        licenceLike.join(', ') || 'none found');
+        licenceLike.length === 1 && licenceLike[0] === 'LICENSE' &&
+        rootNames.includes('NOTICE'),
+        licenceLike.join(', ') + (rootNames.includes('NOTICE') ? ' + NOTICE' : ', NOTICE MISSING'));
+
+  // NOTICE absorbed two files, by hand. Three things in it are not ours to drop:
+  // two licences we are required to reproduce, and the attribution line the CC BY
+  // grant is conditional on. A block lost in that move would be silent otherwise —
+  // the file would still read perfectly well without it.
+  const required = {
+    'the three.js MIT grant': /Permission is hereby granted, free of charge/,
+    'the three.js warranty disclaimer': /THE SOFTWARE IS PROVIDED "AS IS"/,
+    'the Radiance licence and its three conditions':
+      /The Radiance Software License, Version 2\.0[\s\S]*\(1\) Redistributions of source code[\s\S]*\(2\) Redistributions in binary form[\s\S]*\(3\) Neither the name of the University of California/,
+    'the Radiance disclaimer': /THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"/,
+    'the CC BY attribution line':
+      /Solar Analysis Lab © 2026 Karam Al-Obaidi, licensed under CC BY 4\.0/,
+    'the OpenStreetMap credit': /© OpenStreetMap contributors/,
+  };
+  const absent = Object.entries(required).filter(([, re]) => !re.test(notice)).map(([k]) => k);
+  check('NOTICE still carries every notice that has to travel with the app',
+        absent.length === 0,
+        absent.length ? 'missing ' + absent.join('; ')
+                      : Object.keys(required).length + ' checked, ' +
+                        notice.split('\n').length + ' lines');
   const pkg = JSON.parse(await readFile(join(ROOT, 'package.json'), 'utf8'));
   check('package.json declares the code licence', pkg.license === 'MIT', pkg.license);
 

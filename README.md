@@ -519,7 +519,7 @@ pages, `docs/` and its screenshots, and the exercises and handouts distributed w
 app. Share and adapt it freely, including commercially, as long as you credit it, link the
 licence and say if you changed anything. MIT is a software licence and says nothing
 sensible about a worksheet or a screenshot, which is why those are covered separately; see
-[`DOCS-LICENCE.md`](DOCS-LICENCE.md). The attribution line to use:
+[`NOTICE`](NOTICE). The attribution line to use:
 
 > Solar Analysis Lab © 2026 Karam Al-Obaidi, licensed under
 > [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
@@ -541,7 +541,7 @@ Everything else — NOAA solar position, the Perez, Hottel, Liu–Jordan and Tre
 the EPW field layout — is published science and data, credited rather than licensed. No
 web fonts and no weather data are redistributed.
 
-Full texts and the complete credit list: [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md).
+Full texts and the complete credit list: [`NOTICE`](NOTICE).
 
 *Not legal advice. If your institution has an IP policy covering teaching materials, that
 policy governs and this licence choice should be checked against it.*
