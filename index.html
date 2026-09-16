@@ -2311,6 +2311,23 @@ function fitShadowCatcher(){
 
 // GridHelper bakes its colours into vertex data, so a theme change rebuilds it.
 let gridHelper = null;
+/**
+ * The one rule for the ground grid: show it when it is switched on and there is
+ * bare ground to show it on.
+ *
+ * Four places used to set `gridHelper.visible` independently, and one of them
+ * had drifted. refreshModelMetrics() set it from the toggle alone, so importing
+ * an OBJ — or anything else that recomputes the model — brought the grid back
+ * over a loaded basemap, which is exactly what Basemap.load() had just hidden it
+ * to avoid. Keeping the rule in one function is what stops that happening again.
+ *
+ * Not called from makeGrid(), which runs during module evaluation and would
+ * reach Basemap before it exists; makeGrid keeps its explicit argument.
+ */
+function syncGridVisibility(){
+  if (gridHelper) gridHelper.visible = State.disp.grid && !Basemap.mesh;
+}
+
 function makeGrid(visible = true){
   if (gridHelper){ scene.remove(gridHelper); gridHelper.geometry.dispose(); gridHelper.material.dispose(); }
   gridHelper = new THREE.GridHelper(200, 40, THEME.gridMajor, THEME.gridMinor);
@@ -2517,7 +2534,7 @@ const Basemap = (() => {
     if (mesh){ basemapGroup.remove(mesh); mesh.geometry.dispose(); mesh.material.dispose(); mesh = null; }
     if (texture){ texture.dispose(); texture = null; }
     state = { kind: 'none', attribution: '', extent: 0, tainted: false, note: '' };
-    if (gridHelper) gridHelper.visible = State.disp.grid;
+    syncGridVisibility();
     ground.visible = true;
     sunLight.shadow.needsUpdate = true;
     restyleChart();
@@ -2554,7 +2571,7 @@ const Basemap = (() => {
     state.extent = Math.max(width, height);
     // A survey grid over a real map is clutter, and it is the surface most
     // likely to fight the basemap for depth
-    if (gridHelper) gridHelper.visible = false;
+    syncGridVisibility();
     // The map replaces the ground it covers; leaving both means two coplanar
     // surfaces competing for depth on whatever GPU happens to be in use.
     ground.visible = false;
@@ -3568,7 +3585,7 @@ function refreshModelMetrics(){
   State.modelRadius = Math.max(Math.hypot(size.x, size.z) * 0.5, 12);
   sunPathRadius = clamp(Math.max(State.modelRadius * 1.9, size.y * 1.5, 26), 26, 240) * State.disp.radius;
 
-  gridHelper.visible = State.disp.grid;
+  syncGridVisibility();
   const kv = document.getElementById('model-kv');
   if (info.count){
     kv.innerHTML =
@@ -5563,7 +5580,7 @@ const DISP_IDS = { 'd-arcs':'arcs','d-analemma':'analemma','d-today':'today','d-
 for (const [id, key] of Object.entries(DISP_IDS)){
   on(id, 'change', (e) => {
     State.disp[key] = e.target.checked;
-    if (key === 'grid') gridHelper.visible = e.target.checked;
+    if (key === 'grid') syncGridVisibility();
     if (key === 'shadow') renderer.shadowMap.enabled = e.target.checked;
     if (key === 'dome') buildDomeMesh();
     else rebuildAll();

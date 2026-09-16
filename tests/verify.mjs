@@ -775,6 +775,18 @@ check('their separation is far outside depth-buffer precision',
       gaps.every(g => g >= 0.05), 'gaps ' + gaps.map(g => g.toFixed(2)).join(' / ') + ' m');
 check('the grid is hidden while a basemap is shown',
       layers.gridVisible === false);
+// ...and stays hidden. refreshModelMetrics() used to set the grid from the
+// toggle alone, so importing an OBJ over a loaded map brought back the survey
+// grid the basemap had just hidden. Anything that recomputes the model has to
+// leave that decision where it belongs.
+const gridAfterImport = await page.evaluate((obj) => {
+  const A = window.__SUNAPP;
+  A.importOBJ(obj, 'grid-check.obj');
+  return A.groundLayers().gridVisible;
+}, ['v 0 0 0','v 6 0 0','v 6 0 6','v 0 0 6','v 0 4 0','v 6 4 0','v 6 4 6','v 0 4 6',
+    'f 5 6 7','f 5 7 8','f 1 2 6','f 1 6 5'].join('\n'));
+check('importing a model over a basemap does not bring the grid back',
+      gridAfterImport === false, 'grid visible after import: ' + gridAfterImport);
 check('the shadow map is refreshed on change, not rebuilt every frame',
       layers.shadowAuto === false);
 
