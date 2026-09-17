@@ -328,11 +328,20 @@ check('the old key Show button is gone',
         readme.includes('doi     = {' + RELEASE + '}') &&
         (readme.match(new RegExp(RELEASE.replace('.', '\\.'), 'g')) || []).length >= 4,
         'badge ' + CONCEPT + ', cited ' + RELEASE);
-  check('the Method Notes cite the version DOI, not the bare site URL',
-        notes.includes('https://doi.org/' + RELEASE) &&
+  // The DOI must be a link, not just present. Every one of the twelve DOIs in the
+  // reference list is an anchor; this one — the tool's own, the one a reader is
+  // likeliest to click — was plain text for a day because it inherited the shape of
+  // the bare site URL it replaced. A string match could not see that, so match the
+  // anchor. The copy in the BibTeX block stays bare on purpose: that block is meant
+  // to be pasted into a .bib file.
+  const citeLink = new RegExp(
+    '<a href="https://doi\\.org/' + RELEASE.replace('.', '\\.').replace('/', '\\/') +
+    '"[^>]*>https://doi\\.org/' + RELEASE.replace('.', '\\.').replace('/', '\\/') + '</a>');
+  check('the Method Notes cite the version DOI, as a link, not the bare site URL',
+        citeLink.test(notes) &&
         notes.includes('doi     = {' + RELEASE + '}') &&
         !/\(Version [\d.]+\) \[Computer software\]\.\s*\n?\s*https:\/\/karam/.test(notes),
-        RELEASE);
+        RELEASE + ' linked');
 
 }
 
