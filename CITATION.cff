@@ -3,7 +3,7 @@ message: "If this tool informs a paper, a thesis, a lecture or a studio brief, p
 type: software
 title: "Solar Analysis Lab: A browser-based sun path and solar irradiance tool"
 version: 1.0.0
-date-released: 2026-09-16
+date-released: 2026-09-17
 abstract: >-
   A sun path and solar irradiance tool for architecture students that runs
   entirely in the browser, shipped as a single self-contained HTML file. The sun
