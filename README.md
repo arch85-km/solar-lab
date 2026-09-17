@@ -1,5 +1,7 @@
 # Solar Analysis Lab
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22812939.svg)](https://doi.org/10.5281/zenodo.22812939)
+
 **Solar Analysis Lab** is an interactive 3D sun-path and solar-radiation analysis tool for teaching environmental
 design to architecture students. It runs entirely in the browser from a **single
 responsive HTML file** that drops straight into a WordPress page.
@@ -501,6 +503,49 @@ tests/assets/         downloaded on demand (Chicago O'Hare TMY3, for validation)
 - Hottel, H. C. (1976); Liu, B. Y. H. & Jordan, R. C. (1960) — clear-sky correlations.
 - NOAA Global Monitoring Laboratory solar position algorithm.
 - Ladybug Tools — *Incident Radiation* and *Cumulative Sky Matrix* documentation.
+
+---
+
+## How to cite
+
+If the tool informs a paper, a thesis, a lecture or a studio brief, cite it as software.
+Attribution under the licence is a separate thing — keeping the copyright notice in the
+file satisfies that; a citation is the scholarly courtesy on top of it.
+
+**APA 7**
+
+> Al-Obaidi, K. M. (2026). *Solar Analysis Lab: A browser-based sun path and solar
+> irradiance tool* (Version 1.0.0) [Computer software]. Zenodo.
+> https://doi.org/10.5281/zenodo.22812940
+
+**Harvard**
+
+> Al-Obaidi, K.M. (2026) *Solar Analysis Lab: A browser-based sun path and solar
+> irradiance tool* (Version 1.0.0). Zenodo. Available at: https://doi.org/10.5281/zenodo.22812940
+
+**BibTeX**
+
+```bibtex
+@software{alobaidi2026solaranalysislab,
+  author  = {Al-Obaidi, Karam M.},
+  title   = {Solar Analysis Lab: A browser-based sun path and solar irradiance tool},
+  year    = {2026},
+  version = {1.0.0},
+  publisher = {Zenodo},
+  doi     = {10.5281/zenodo.22812940},
+  url     = {https://doi.org/10.5281/zenodo.22812940},
+  note    = {Code MIT licensed; accompanying material CC BY 4.0}
+}
+```
+
+Those entries name the **version DOI**, fixed to 1.0.0 — the right thing to cite in a
+paper, because it resolves to the exact build the figures came from. The badge at the top
+of this page is the **concept DOI** (10.5281/zenodo.22812939), which always resolves to the newest version.
+
+Anyone reporting a figure from the tool should also state the **climate file**, the
+**analysis period**, the **grid size**, the **sky model** and whether **context geometry**
+was included — all five change the numbers, and all five are written into the CSV export
+as header comments.
 
 ---
 

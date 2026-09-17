@@ -309,6 +309,31 @@ check('the old key Show button is gone',
         digits(cff) === digits(zen.creators[0].orcid),
         'cff ' + cffVersion + ', zenodo ' + zen.version + ', app ' + appVersion);
 
+  // Two DOIs, and they are not interchangeable. The concept DOI always resolves
+  // to the newest version and belongs on the badge; the version DOI is pinned to
+  // this release and is what a paper should cite, because it resolves to the
+  // exact build the figures came from. Swapping them is invisible until someone
+  // tries to reproduce a figure against a later version. Neither can be edited
+  // once minted, so they are pinned here and checked wherever they appear.
+  const CONCEPT = '10.5281/zenodo.22812939';
+  const RELEASE = '10.5281/zenodo.22812940';
+  const cffDoi = (cff.match(/^doi:\s*(\S+)/m) || [])[1];
+  const cffIds = (cff.match(/value:\s*(10\.5281\/zenodo\.\d+)/g) || [])
+        .map(m => m.replace(/value:\s*/, ''));
+  check('CITATION.cff carries the concept DOI, and both as identifiers',
+        cffDoi === CONCEPT && cffIds.includes(CONCEPT) && cffIds.includes(RELEASE),
+        'doi ' + cffDoi + ', identifiers ' + cffIds.join(' + '));
+  check('the README badge is the concept DOI and its citations are the version DOI',
+        readme.includes('zenodo.org/badge/DOI/' + CONCEPT + '.svg') &&
+        readme.includes('doi     = {' + RELEASE + '}') &&
+        (readme.match(new RegExp(RELEASE.replace('.', '\\.'), 'g')) || []).length >= 4,
+        'badge ' + CONCEPT + ', cited ' + RELEASE);
+  check('the Method Notes cite the version DOI, not the bare site URL',
+        notes.includes('https://doi.org/' + RELEASE) &&
+        notes.includes('doi     = {' + RELEASE + '}') &&
+        !/\(Version [\d.]+\) \[Computer software\]\.\s*\n?\s*https:\/\/karam/.test(notes),
+        RELEASE);
+
 }
 
 // Both halves of the brand, together: the name and the line under it. The tagline
