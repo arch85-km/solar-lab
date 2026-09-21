@@ -527,14 +527,14 @@ file satisfies that; a citation is the scholarly courtesy on top of it.
 
 ```bibtex
 @software{alobaidi2026solaranalysislab,
-  author  = {Al-Obaidi, Karam M.},
-  title   = {Solar Analysis Lab: A browser-based sun path and solar irradiance tool},
-  year    = {2026},
-  version = {1.0.0},
+  author    = {Al-Obaidi, Karam M.},
+  title     = {Solar Analysis Lab: A browser-based sun path and solar irradiance tool},
+  year      = {2026},
+  version   = {1.0.0},
   publisher = {Zenodo},
-  doi     = {10.5281/zenodo.22812940},
-  url     = {https://doi.org/10.5281/zenodo.22812940},
-  note    = {Code MIT licensed; accompanying material CC BY 4.0}
+  doi       = {10.5281/zenodo.22812940},
+  url       = {https://karam.me.uk/applications/solar-analysis-lab/},
+  note      = {Code MIT licensed; accompanying material CC BY 4.0}
 }
 ```
 
