@@ -1,0 +1,663 @@
+<!-- ======================================================================
+     SOLAR ANALYSIS LAB — "Method notes in brief"
+     A short companion to the full method notes.
+
+     Same design system as the full notes: the .sl-doc scope, the same custom
+     properties and class names, the same dark-mode block. Body type inherits
+     from the site.
+
+     IF YOU PASTE THIS ON THE SAME PAGE AS THE FULL NOTES, delete the <style>
+     block below — the full notes already define every rule it contains.
+
+     THE CITATION STRIP JUMPS HERE: the "How to cite" heading carries
+     id="how-to-cite". Only ONE element per page may hold that id.
+     ====================================================================== -->
+
+<style>
+
+.sl-doc{
+  --sl-paper:#F1F2EE; --sl-surface:#FBFBF9; --sl-surface2:#E8EAE4;
+  --sl-ink:#16191B; --sl-ink2:#4C555A; --sl-ink3:#5F696E;
+  --sl-rule:#D6D9D1; --sl-rule2:#E5E7E1;
+  --sl-accent:#1D5A73; --sl-accent-soft:rgba(29,90,115,.10);
+  --sl-ok:#3F6B47;  --sl-ok-soft:rgba(63,107,71,.12);
+  --sl-warn:#8A6410;--sl-warn-soft:rgba(138,100,16,.13);
+  --sl-no:#8E3A32;  --sl-no-soft:rgba(142,58,50,.11);
+  --sl-fd:"Poppins",system-ui,-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;
+  --sl-fb:inherit;
+  --sl-fm:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sl-measure:90ch; --sl-rail:4.75rem;
+
+  background:var(--sl-paper); color:var(--sl-ink);
+  font-family:var(--sl-fb); font-size:17px; line-height:1.65; font-weight:400;
+  max-width:1040px; margin:0 auto; padding:0 20px 3rem;
+  -webkit-font-smoothing:antialiased; text-align:left;
+}
+@media (prefers-color-scheme:dark){
+  .sl-doc.sl-auto-dark{
+    --sl-paper:#121517; --sl-surface:#191D20; --sl-surface2:#21262A;
+    --sl-ink:#E9EBE6; --sl-ink2:#A6AFB4; --sl-ink3:#79838A;
+    --sl-rule:#2C3235; --sl-rule2:#232829;
+    --sl-accent:#74B6D0; --sl-accent-soft:rgba(116,182,208,.14);
+    --sl-ok:#7FB88C;  --sl-ok-soft:rgba(127,184,140,.14);
+    --sl-warn:#D6A748;--sl-warn-soft:rgba(214,167,72,.15);
+    --sl-no:#DD8479;  --sl-no-soft:rgba(221,132,121,.14);
+  }
+}
+.sl-doc *,.sl-doc *::before,.sl-doc *::after{box-sizing:border-box;}
+.sl-doc h1,.sl-doc h2,.sl-doc h3,.sl-doc h4,.sl-doc p,.sl-doc ul,.sl-doc ol,
+.sl-doc dl,.sl-doc dt,.sl-doc dd{margin:0;padding:0;}
+.sl-doc ul,.sl-doc ol{list-style-position:outside;}
+.sl-doc li{margin:0;}
+.sl-doc a{color:var(--sl-accent);text-decoration:underline;text-underline-offset:2px;}
+.sl-doc code,.sl-doc .sl-mono{font-family:var(--sl-fm);font-size:.855em;}
+.sl-doc b,.sl-doc strong{font-weight:600;}
+.sl-doc code{background:var(--sl-accent-soft);color:var(--sl-accent);
+  padding:.1em .34em;border-radius:2px;border:0;}
+
+/* masthead */
+.sl-doc .sl-masthead{padding:2.75rem 0 1.9rem;border-bottom:2px solid var(--sl-ink);}
+.sl-doc .sl-eyebrow{font-family:var(--sl-fm);font-size:.70rem;font-weight:500;
+  letter-spacing:.16em;text-transform:uppercase;color:var(--sl-accent);margin:0 0 1.1rem;}
+.sl-doc h1{font-family:var(--sl-fd);font-weight:600;
+  font-size:clamp(1.9rem,5.2vw,2.75rem);line-height:1.04;letter-spacing:-.028em;
+  text-wrap:balance;margin:0 0 1.1rem;color:var(--sl-ink);}
+.sl-doc .sl-standfirst{max-width:var(--sl-measure);font-size:1.14rem;line-height:1.6;
+  color:var(--sl-ink2);margin:0;}
+.sl-doc .sl-standfirst strong{color:var(--sl-ink);font-weight:600;}
+.sl-doc .sl-byline{display:flex;flex-wrap:wrap;gap:.5rem 1.6rem;margin-top:1.9rem;
+  font-family:var(--sl-fm);font-size:.74rem;letter-spacing:.04em;color:var(--sl-ink3);}
+.sl-doc .sl-byline b{color:var(--sl-ink2);font-weight:500;}
+
+/* trap notice */
+.sl-doc .sl-traps{margin:2.5rem 0;border:1px solid var(--sl-rule);
+  border-left:4px solid var(--sl-no);background:var(--sl-surface);padding:1.5rem 1.6rem;}
+.sl-doc .sl-traps h2{font-family:var(--sl-fd);font-size:.82rem;font-weight:600;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--sl-no);margin:0 0 .9rem;}
+.sl-doc .sl-traps ol{margin:0;padding-left:1.15rem;display:grid;gap:.6rem;}
+.sl-doc .sl-traps li{max-width:var(--sl-measure);}
+
+/* sections */
+.sl-doc .sl-sec{padding:2.5rem 0 0;}
+.sl-doc .sl-sechead{display:grid;grid-template-columns:var(--sl-rail) 1fr;
+  align-items:baseline;gap:0 1rem;border-top:1px solid var(--sl-rule);
+  padding-top:1.4rem;margin-bottom:1.6rem;}
+.sl-doc .sl-secnum{font-family:var(--sl-fm);font-size:.95rem;font-weight:600;
+  color:var(--sl-accent);letter-spacing:.02em;font-variant-numeric:tabular-nums;}
+.sl-doc .sl-sechead h2{font-family:var(--sl-fd);font-weight:600;
+  font-size:clamp(1.3rem,2.9vw,1.7rem);line-height:1.12;letter-spacing:-.02em;
+  text-wrap:balance;margin:0;color:var(--sl-ink);}
+.sl-doc .sl-secbody{display:grid;grid-template-columns:var(--sl-rail) minmax(0,1fr);gap:0 1rem;}
+.sl-doc .sl-secbody>*{grid-column:2;}
+.sl-doc .sl-secbody>p,.sl-doc .sl-secbody>ul,.sl-doc .sl-secbody>ol{max-width:var(--sl-measure);}
+.sl-doc .sl-secbody>p{margin:0 0 1.05rem;}
+.sl-doc .sl-secbody>ul,.sl-doc .sl-secbody>ol{margin:0 0 1.15rem;padding-left:1.15rem;
+  display:grid;gap:.5rem;}
+.sl-doc h3{font-family:var(--sl-fd);font-weight:600;font-size:1.06rem;
+  letter-spacing:-.005em;margin:1.9rem 0 .7rem;color:var(--sl-ink);}
+.sl-doc h4{font-family:var(--sl-fm);font-weight:600;font-size:.74rem;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--sl-ink3);margin:1.7rem 0 .7rem;}
+.sl-doc .sl-footer h4:first-of-type{margin-top:1.1rem;}
+.sl-doc .sl-note{font-size:.9rem;color:var(--sl-ink2);border-left:2px solid var(--sl-rule);
+  padding-left:.95rem;margin:0 0 1.2rem;max-width:var(--sl-measure);}
+
+/* chips + ledger */
+.sl-doc .sl-chip{display:inline-block;font-family:var(--sl-fm);font-size:.64rem;
+  font-weight:600;letter-spacing:.07em;text-transform:uppercase;padding:.15em .5em;
+  border-radius:2px;white-space:nowrap;}
+.sl-doc .sl-chip.is-in{background:var(--sl-ok-soft);color:var(--sl-ok);}
+.sl-doc .sl-chip.is-part{background:var(--sl-warn-soft);color:var(--sl-warn);}
+.sl-doc .sl-chip.is-out{background:var(--sl-no-soft);color:var(--sl-no);}
+.sl-doc .sl-ledger{display:grid;gap:0;border:1px solid var(--sl-rule);
+  background:var(--sl-surface);margin-bottom:1.4rem;}
+.sl-doc .sl-ledger>div{display:grid;grid-template-columns:7.5rem minmax(0,1fr);
+  gap:.2rem .9rem;padding:.8rem 1rem;border-bottom:1px solid var(--sl-rule2);}
+.sl-doc .sl-ledger>div:last-child{border-bottom:0;}
+.sl-doc .sl-ledger dt{font-family:var(--sl-fd);font-weight:600;font-size:.95rem;
+  grid-column:2;margin:0;color:var(--sl-ink);}
+.sl-doc .sl-ledger .sl-chip{grid-row:1;grid-column:1;align-self:start;margin-top:.18rem;}
+.sl-doc .sl-ledger dd{grid-column:2;margin:0;font-size:.93rem;color:var(--sl-ink2);
+  line-height:1.55;}
+
+/* footer */
+.sl-doc .sl-footer{margin-top:3rem;padding-top:1.6rem;border-top:2px solid var(--sl-ink);
+  font-size:.86rem;color:var(--sl-ink2);}
+.sl-doc .sl-footer p{max-width:var(--sl-measure);margin:0 0 .8rem;}
+.sl-doc .sl-cite{font-family:var(--sl-fm);font-size:.78rem;color:var(--sl-ink3);line-height:1.7;}
+.sl-doc .sl-ref{border-left:2px solid var(--sl-rule);padding-left:.95rem;margin:0 0 1rem;
+  max-width:var(--sl-measure);font-size:.92rem;color:var(--sl-ink2);}
+.sl-doc pre{margin:0 0 1rem;padding:.9rem 1rem;background:var(--sl-surface);
+  border:1px solid var(--sl-rule);overflow-x:auto;font-family:var(--sl-fm);
+  font-size:.78rem;line-height:1.6;color:var(--sl-ink);white-space:pre;}
+
+/* exercises */
+.sl-doc .sl-ex{border:1px solid var(--sl-rule);background:var(--sl-surface);
+  padding:1.5rem 1.6rem;margin-bottom:1.5rem;}
+.sl-doc .sl-ex-n{font-family:var(--sl-fm);font-size:.7rem;font-weight:600;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--sl-accent);
+  display:block;margin-bottom:.35rem;}
+.sl-doc .sl-ex h3{margin:0 0 .9rem;font-size:1.18rem;}
+.sl-doc .sl-steps{margin:0;padding-left:1.2rem;display:grid;gap:.5rem;font-size:.95rem;}
+.sl-doc .sl-principle{font-size:.93rem;color:var(--sl-ink2);
+  border-top:1px solid var(--sl-rule2);padding-top:.85rem;margin:.95rem 0 0;}
+.sl-doc .sl-principle b{color:var(--sl-ink);font-weight:600;}
+
+/* diagrams. The SVGs paint from the same custom properties as everything
+   else, so they invert with the page instead of staying light in dark mode. */
+.sl-doc .sl-fig{margin:0 0 1.2rem;}
+.sl-doc .sl-fig svg{display:block;width:100%;height:auto;
+  background:var(--sl-paper);border:1px solid var(--sl-rule);}
+.sl-doc .sl-fig figcaption{font-family:var(--sl-fm);font-size:.68rem;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--sl-ink3);margin-top:.55rem;}
+
+/* Large screens. Most sizes here are in rem, which is relative to the ROOT
+   font size, not to .sl-doc — so raising .sl-doc alone would scale the body
+   copy and leave the byline, notes and references behind. They are stepped up
+   together. */
+@media (min-width:1280px){
+  .sl-doc{font-size:18.5px;max-width:1140px;}
+  .sl-doc .sl-standfirst{font-size:1.22rem;}
+  .sl-doc .sl-byline{font-size:.84rem;}
+  .sl-doc h3{font-size:1.14rem;}
+  .sl-doc .sl-note{font-size:.97rem;}
+  .sl-doc .sl-ref{font-size:1rem;}
+  .sl-doc .sl-cite{font-size:.86rem;}
+  .sl-doc pre{font-size:.86rem;}
+  .sl-doc .sl-ledger dt{font-size:1.02rem;}
+  .sl-doc .sl-ledger dd{font-size:1rem;}
+  .sl-doc .sl-chip{font-size:.70rem;}
+  .sl-doc .sl-traps h2{font-size:.88rem;}
+  .sl-doc .sl-steps{font-size:1rem;}
+  .sl-doc .sl-principle{font-size:.99rem;}
+  .sl-doc .sl-ex-n{font-size:.76rem;}
+}
+@media (max-width:720px){
+  .sl-doc{--sl-rail:0px;font-size:16px;}
+  .sl-doc .sl-sechead{grid-template-columns:1fr;gap:.35rem;}
+  .sl-doc .sl-secbody{grid-template-columns:minmax(0,1fr);}
+  .sl-doc .sl-secbody>*{grid-column:1;}
+  .sl-doc .sl-traps,.sl-doc .sl-ex{padding:1.15rem;}
+}
+@media (max-width:560px){
+  .sl-doc .sl-ledger>div{grid-template-columns:1fr;}
+  .sl-doc .sl-ledger .sl-chip{grid-row:auto;grid-column:1;justify-self:start;margin-bottom:.3rem;}
+  .sl-doc .sl-ledger dt,.sl-doc .sl-ledger dd{grid-column:1;}
+}
+</style>
+
+<div class="sl-doc sl-auto-dark">
+
+  <div class="sl-masthead">
+    <p class="sl-eyebrow">Solar Analysis Lab &middot; In brief</p>
+    <h1>Method notes in brief</h1>
+    <p class="sl-standfirst">The short version: what the tool computes, and &mdash; the part that
+      matters most when you cite it &mdash; <strong>what it does not model at all</strong>. It
+      traces sun and sky against your geometry; it does not bounce light, and that single absence
+      shapes every limitation below. The
+      <a href="https://github.com/arch85-km/solar-lab" target="_blank" rel="noopener">full method
+      notes</a> give the measurements, the source values and the references behind every statement
+      here.</p>
+    <div class="sl-byline">
+      <span><b>Audience</b> Architecture students and staff</span>
+      <span><b>Engines</b> Perez all-weather sky &middot; BVH ray tracing</span>
+      <span><b>Runs</b> Entirely in the browser</span>
+      <span><b>Version</b> 1.0.0 &middot; 17 September 2026</span>
+    </div>
+  </div>
+
+  <div class="sl-traps">
+    <h2>Four things to know before you cite a number</h2>
+    <ol>
+      <li><b>What the eye sees and what the number reports are two different machineries.</b> The
+        shadows in the viewport are a GPU shadow map; the analysis is a ray test against a
+        bounding-volume hierarchy, run in a worker. They can disagree at the edges, and when they
+        do <b>the number is the one to trust</b>.</li>
+      <li><b>With no climate file loaded, every figure is a synthetic clear day.</b> The fallback
+        is a fair-weather upper bound with no cloud in it at all. A kWh/m&sup2; total produced that
+        way is not a climate result and must never be quoted as one.</li>
+      <li><b>The OpenStreetMap context shades the analysis but is never measured.</b> Sensors come
+        from your model alone, so the neighbours cast onto it and receive nothing. The switch that
+        lets them shade is <b>on by default</b> &mdash; so a run with context loaded is already a
+        shaded run.</li>
+      <li><b>Only the near ring of context casts a viewport shadow.</b> Buildings within 160&nbsp;m
+        are in the shadow map; the rest are not. The ray tracer sees all of them regardless, so the
+        numbers account for buildings whose shadows you cannot see.</li>
+    </ol>
+  </div>
+
+  <section class="sl-sec">
+    <div class="sl-sechead"><span class="sl-secnum"></span><h2>What it calculates</h2></div>
+    <div class="sl-secbody">
+      <p>One quantity, reported two ways. <b>Irradiance</b> in W/m&sup2; for a single date and time,
+        and <b>cumulative radiation</b> in kWh/m&sup2; accumulated hour by hour over a period you
+        choose &mdash; full year, a season, a month, a day, or a custom range, with an hour window
+        on top.</p>
+      <p>Every analysis reduces to the same problem: a set of directions, each carrying an amount
+        of energy, plus a visibility test per sensor. The sky patches, the reflecting ground and
+        the sun are folded into <b>one flat source list</b> so the ray tracer has a single code
+        path, and a sensor's value is a cosine-weighted sum over that list with blocked directions
+        dropped.</p>
+      <p class="sl-note"><b>The beam is deliberately kept out of the sky patches.</b> Smearing a
+        low-altitude sun across 145 patches is a known artefact of the coarse
+        <span class="sl-mono">gendaymtx</span> default, and the code says it is avoiding exactly
+        that. The direct term keeps its angular sharpness at low sun &mdash; which is precisely
+        where overshadowing studies live.</p>
+    </div>
+  </section>
+
+  <section class="sl-sec">
+    <div class="sl-sechead"><span class="sl-secnum"></span><h2>Not modelled at all</h2></div>
+    <div class="sl-secbody">
+      <div class="sl-ledger">
+        <div><span class="sl-chip is-out">The big one</span><dt>No interreflection of any kind</dt>
+          <dd>A ray that meets a surface is blocked, never bounced. Every fa&ccedil;ade opposite
+            yours takes light away and returns none, so courtyards, light wells, atria and urban
+            canyons read <b>systematically low, in one direction</b>, by an amount the tool cannot
+            estimate.</dd></div>
+        <div><span class="sl-chip is-out">Out</span><dt>Material properties, and transparency</dt>
+          <dd>No absorptance, reflectance, colour or emissivity: a sensor reports the irradiance
+            arriving, never what the surface does with it. Nothing is transparent either &mdash; a
+            window is a solid triangle that blocks the beam completely.</dd></div>
+        <div><span class="sl-chip is-out">Out</span><dt>Turbidity, spectrum, snow, vegetation</dt>
+          <dd>Broadband throughout, with no turbidity control anywhere in the interface. Ground
+            reflectance is one number for the whole run, so a winter figure for a snow-covered site
+            is wrong in a direction the tool cannot correct. Overpass is queried for buildings
+            alone, and a tree modelled as a solid would shade the whole year identically.</dd></div>
+        <div><span class="sl-chip is-part">Partly</span><dt>Terrain, and context</dt>
+          <dd>The ground is a flat plane for the reflected term only &mdash; a sloping or sunken
+            site is not represented unless you import it as geometry. Context shades but never
+            receives: you cannot read a number off a neighbour.</dd></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sl-sec">
+    <div class="sl-sechead"><span class="sl-secnum"></span><h2>How exact the numbers are</h2></div>
+    <div class="sl-secbody">
+      <div class="sl-ledger">
+        <div><span class="sl-chip is-part">&minus;0.19%</span><dt>Mid-hour sampling</dt>
+          <dd>The sun is sampled at the midpoint of each hour rather than integrated across it.
+            Measured over a full year against the climate file's own global horizontal. Systematic
+            and small, but it is the floor on any annual total.</dd></div>
+        <div><span class="sl-chip is-part">2.5&deg;</span><dt>Sun-bin resolution</dt>
+          <dd>Over a period, sun-up hours are binned onto a 2.5&deg; grid and each bin becomes one
+            energy-weighted direction. Cumulative shadow edges are quantised at roughly ten minutes
+            of solar movement.</dd></div>
+        <div><span class="sl-chip is-out">binary</span><dt>No penumbra</dt>
+          <dd>Visibility is a hard 0 or 1 per direction, with no sun disc and no partial occlusion
+            &mdash; so there is no <i>penumbra</i>, the soft band along a real shadow edge where the
+            sun, being a disc about half a degree wide, is only partly hidden. A sensor near an edge
+            can differ sharply from its neighbour. <b>Read the field, never the point.</b></dd></div>
+        <div><span class="sl-chip is-part">120,000</span><dt>Sensor ceiling</dt>
+          <dd>Above it the tool coarsens the grid rather than freeze, and says so in a toast. If
+            that fired, <b>the grid size in your CSV is the one you asked for, not the one that
+            ran</b>.</dd></div>
+      </div>
+      <p class="sl-note"><b>These figures are internal consistency, not validation.</b> They come
+        from the tool's own suite driving the shipped file in headless Chromium. There is no
+        Radiance cross-run behind any number, and no comparison against measured site data. That
+        establishes agreement with closed-form geometry, which is a weaker claim than validation
+        and should be described as such.</p>
+    </div>
+  </section>
+
+  <section class="sl-sec">
+    <div class="sl-sechead"><span class="sl-secnum"></span><h2>Against Radiance and Ladybug</h2></div>
+    <div class="sl-secbody">
+      <p class="sl-note"><b>Provenance.</b> Everything else here is read from the source. This
+        section is not, and cannot be: the code says nothing about how those tools behave. It
+        reasons from what the code does &mdash; check it against their documentation before relying
+        on it.</p>
+      <p><b>Should agree</b> on the diffuse term. The Perez coefficient table and its parameter
+        equations are transcribed from <span class="sl-mono">gendaymtx.c</span>, and the sky patch
+        construction is <span class="sl-mono">rh_init()</span>'s, to the same formula.</p>
+      <p><b>Will diverge</b> on anything relying on reflection &mdash; the single largest source of
+        divergence, and one-directional. Also on the direct term at low sun, where this tool bins
+        the beam separately at 2.5&deg; while a default
+        <span class="sl-mono">gendaymtx</span> run smears it across the patches, so a comparison
+        must say which Radiance configuration is on the other side.</p>
+    </div>
+  </section>
+
+  <section class="sl-sec">
+    <div class="sl-sechead"><span class="sl-secnum"></span><h2>Three exercises</h2></div>
+    <div class="sl-secbody">
+      <p>Each isolates one variable and holds everything else fixed. Unless told otherwise, work in
+        London at the default coordinates, grid size 1.0&nbsp;m, sky <b>Tregenza (145)</b>, ground
+        reflectance 0.20, and let each run finish before reading the legend.</p>
+
+      <div class="sl-ex">
+        <span class="sl-ex-n">Exercise 01</span>
+        <h3>A neighbour that costs you nothing in June can take your winter entirely</h3>
+        <figure class="sl-fig">
+<svg viewBox="0 0 720 280" role="img" aria-label="Section through a facade and the tower opposite. In June the noon sun is about 62 degrees above the horizon and passes over the neighbour, leaving the facade lit. In December it is about 15 degrees, and the same neighbour blocks almost the whole facade.">
+  <defs>
+    <marker id="sl-f1-s" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="var(--sl-warn)"/></marker>
+  </defs>
+  <line x1="360" y1="14" x2="360" y2="266" stroke="var(--sl-rule)" stroke-width="1"/>
+  <g font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="11" fill="var(--sl-ink)">
+    <text x="16" y="24">21 JUNE &#183; noon sun about 62&#176;</text>
+    <text x="376" y="24">21 DECEMBER &#183; noon sun about 15&#176;</text>
+  </g>
+
+  <!-- JUNE -->
+  <line x1="20" y1="230" x2="340" y2="230" stroke="var(--sl-ink)" stroke-width="1.5"/>
+  <rect x="60" y="120" width="54" height="110" fill="var(--sl-surface2)" stroke="var(--sl-ink)" stroke-width="1.6"/>
+  <rect x="240" y="60" width="60" height="170" fill="var(--sl-surface2)" stroke="var(--sl-ink)" stroke-width="1.6"/>
+  <rect x="114" y="132" width="7" height="98" fill="var(--sl-ok-soft)" stroke="var(--sl-ok)" stroke-width="1.8"/>
+  <g stroke="var(--sl-warn)" stroke-width="2" marker-end="url(#sl-f1-s)">
+    <line x1="196" y1="40" x2="128" y2="168"/><line x1="228" y1="70" x2="160" y2="198"/>
+  </g>
+  <g font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="10">
+    <text x="62" y="112" fill="var(--sl-ink3)">your facade</text>
+    <text x="242" y="52" fill="var(--sl-ink3)">neighbour</text>
+    <text x="20" y="250" fill="var(--sl-ok)">steep sun clears the neighbour &#183; facade lit</text>
+  </g>
+
+  <!-- DECEMBER -->
+  <line x1="380" y1="230" x2="700" y2="230" stroke="var(--sl-ink)" stroke-width="1.5"/>
+  <rect x="420" y="120" width="54" height="110" fill="var(--sl-surface2)" stroke="var(--sl-ink)" stroke-width="1.6"/>
+  <rect x="600" y="60" width="60" height="170" fill="var(--sl-surface2)" stroke="var(--sl-ink)" stroke-width="1.6"/>
+  <rect x="474" y="132" width="7" height="98" fill="var(--sl-no-soft)" stroke="var(--sl-no)" stroke-width="1.8"/>
+  <line x1="600" y1="60" x2="474" y2="94" stroke="var(--sl-no)" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <g stroke="var(--sl-warn)" stroke-width="2" marker-end="url(#sl-f1-s)">
+    <line x1="694" y1="36" x2="608" y2="59"/><line x1="694" y1="92" x2="608" y2="115"/>
+  </g>
+  <g font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="10">
+    <text x="486" y="112" fill="var(--sl-ink3)">shadow line</text>
+    <text x="380" y="250" fill="var(--sl-no)">shallow sun is blocked &#183; facade in shade all day</text>
+  </g>
+  <text x="16" y="272" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="10.5" fill="var(--sl-ink)">Same geometry, same neighbour. Only the solar altitude changed.</text>
+</svg>
+<figcaption>Section. The obstruction subtends a far larger part of the winter sky.</figcaption>
+        </figure>
+        <ol class="sl-steps">
+          <li>Load the <b>Tower with context</b> sample. Date <b>21 June</b>, time 12:00. Run an
+            instant analysis and record the mean and minimum W/m&sup2; on the lower south
+            fa&ccedil;ade.</li>
+          <li>Change to <b>21 December</b>, same time, re-run, record both again.</li>
+          <li>Switch to <b>cumulative</b>, <b>Cooling season</b> (May&ndash;Sep), kWh/m&sup2;. Run
+            and record the fa&ccedil;ade mean. Then switch to <b>Heating season</b>
+            (Oct&ndash;Apr) and run again.</li>
+          <li>Finally, turn <b>Surfaces shade each other</b> off and re-run the heating season.
+            That is the same fa&ccedil;ade with the neighbour removed.</li>
+        </ol>
+        <p class="sl-principle"><b>Principle.</b> Overshadowing is a function of solar altitude, and
+          altitude collapses in winter &mdash; at London's latitude noon sun falls from about
+          62&deg; in June to about 15&deg; in December. The same obstruction subtends a far larger
+          part of the winter sky, so <b>a tower that is invisible to a summer study can remove most
+          of the heating-season gain</b>. The last step separates the neighbour's contribution from
+          the fa&ccedil;ade's own self-shading, which is the number you actually want when arguing
+          about a site boundary.</p>
+      </div>
+
+      <div class="sl-ex">
+        <span class="sl-ex-n">Exercise 02</span>
+        <h3>Overhang depth is set by the summer altitude, not the equinox</h3>
+        <figure class="sl-fig">
+<svg viewBox="0 0 720 260" role="img" aria-label="One overhang against three solar altitudes. At the June altitude of about 62 degrees it shades the whole glazed area. At the equinox, about 38 degrees, it shades roughly half. In December, about 15 degrees, it shades almost none.">
+  <defs>
+    <marker id="sl-f2-s" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="var(--sl-warn)"/></marker>
+  </defs>
+  <g stroke="var(--sl-rule)" stroke-width="1"><line x1="243" y1="12" x2="243" y2="246"/><line x1="483" y1="12" x2="483" y2="246"/></g>
+  <g font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="10.5" fill="var(--sl-ink)">
+    <text x="14" y="24">21 JUNE &#183; 62&#176;</text><text x="254" y="24">EQUINOX &#183; 38&#176;</text><text x="494" y="24">21 DEC &#183; 15&#176;</text>
+  </g>
+
+  <!-- JUNE: fully shaded -->
+  <line x1="30" y1="212" x2="230" y2="212" stroke="var(--sl-ink)" stroke-width="1.4"/>
+  <line x1="80" y1="70" x2="80" y2="212" stroke="var(--sl-ink)" stroke-width="2"/>
+  <line x1="80" y1="96" x2="128" y2="96" stroke="var(--sl-ink)" stroke-width="4"/>
+  <rect x="76" y="100" width="8" height="78" fill="var(--sl-ok-soft)" stroke="var(--sl-ok)" stroke-width="1.8"/>
+  <line x1="128" y1="96" x2="80" y2="186" stroke="var(--sl-ok)" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <g stroke="var(--sl-warn)" stroke-width="2" marker-end="url(#sl-f2-s)">
+    <line x1="186" y1="36" x2="133" y2="92"/><line x1="214" y1="66" x2="161" y2="122"/>
+  </g>
+  <text x="30" y="236" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="10" fill="var(--sl-ok)">glass fully shaded</text>
+
+  <!-- EQUINOX: half -->
+  <line x1="270" y1="212" x2="470" y2="212" stroke="var(--sl-ink)" stroke-width="1.4"/>
+  <line x1="320" y1="70" x2="320" y2="212" stroke="var(--sl-ink)" stroke-width="2"/>
+  <line x1="320" y1="96" x2="368" y2="96" stroke="var(--sl-ink)" stroke-width="4"/>
+  <rect x="316" y="100" width="8" height="40" fill="var(--sl-ok-soft)" stroke="var(--sl-ok)" stroke-width="1.6"/>
+  <rect x="316" y="140" width="8" height="38" fill="var(--sl-no-soft)" stroke="var(--sl-no)" stroke-width="1.6"/>
+  <line x1="368" y1="96" x2="320" y2="134" stroke="var(--sl-ink3)" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <g stroke="var(--sl-warn)" stroke-width="2" marker-end="url(#sl-f2-s)">
+    <line x1="452" y1="60" x2="373" y2="93"/><line x1="452" y1="120" x2="330" y2="152"/>
+  </g>
+  <text x="270" y="236" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="10" fill="var(--sl-ink3)">about half shaded</text>
+
+  <!-- DECEMBER: none -->
+  <line x1="510" y1="212" x2="710" y2="212" stroke="var(--sl-ink)" stroke-width="1.4"/>
+  <line x1="560" y1="70" x2="560" y2="212" stroke="var(--sl-ink)" stroke-width="2"/>
+  <line x1="560" y1="96" x2="608" y2="96" stroke="var(--sl-ink)" stroke-width="4"/>
+  <rect x="556" y="100" width="8" height="78" fill="var(--sl-no-soft)" stroke="var(--sl-no)" stroke-width="1.8"/>
+  <line x1="608" y1="96" x2="560" y2="109" stroke="var(--sl-no)" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <g stroke="var(--sl-warn)" stroke-width="2" marker-end="url(#sl-f2-s)">
+    <line x1="700" y1="120" x2="570" y2="155"/><line x1="700" y1="150" x2="570" y2="185"/>
+  </g>
+  <text x="510" y="236" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="10" fill="var(--sl-no)">glass almost fully lit</text>
+  <text x="14" y="256" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="10.5" fill="var(--sl-ink)">One overhang, three altitudes. Size it at the equinox and it is wrong in both directions.</text>
+</svg>
+<figcaption>Section. The question is not how deep the overhang should be, but at what altitude it should stop shading.</figcaption>
+        </figure>
+        <ol class="sl-steps">
+          <li>Load the <b>Shaded facade study</b> sample, grid size 0.5&nbsp;m. Set <b>21 March</b>,
+            12:00, run an instant analysis, and note how much of the glazed area the overhang
+            shades.</li>
+          <li>Repeat at <b>21 June</b>, then <b>21 December</b>, noting the shaded fraction each
+            time.</li>
+          <li>Run three cumulative passes on the same geometry &mdash; <b>Cooling season</b>, then
+            <b>Heating season</b>, then <b>Full year</b> &mdash; recording the fa&ccedil;ade mean
+            for each.</li>
+          <li>Turn on <b>Cast shadows</b> and animate a June day, then a December day, watching
+            where the shadow line sits at noon.</li>
+        </ol>
+        <p class="sl-principle"><b>Principle.</b> A horizontal overhang intercepts sun in proportion
+          to how steeply it arrives. Sized at the equinox it will be far too shallow in June and
+          needlessly obstructive in December; sized at the summer solstice it does the work when
+          cooling load is highest and steps out of the way when the sun drops. <b>The right question
+          is never &ldquo;how deep should an overhang be&rdquo; but &ldquo;at what altitude should
+          it stop shading&rdquo;</b> &mdash; and the two seasons pull in opposite directions.</p>
+      </div>
+
+      <div class="sl-ex">
+        <span class="sl-ex-n">Exercise 03</span>
+        <h3>East and west are identical under a clear sky and unequal under a real climate</h3>
+        <figure class="sl-fig">
+<svg viewBox="0 0 720 260" role="img" aria-label="Irradiance on an east and a west facade through one day. Under the synthetic clear sky the two curves are mirror images about noon and the areas beneath them are equal. Under a real climate file, morning cloud suppresses the east peak, so the areas differ.">
+  <line x1="360" y1="14" x2="360" y2="240" stroke="var(--sl-rule)" stroke-width="1"/>
+  <g font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="10.5" fill="var(--sl-ink)">
+    <text x="16" y="24">CLEAR-SKY FALLBACK &#183; no EPW</text>
+    <text x="384" y="24">REAL CLIMATE &#183; EPW loaded</text>
+  </g>
+
+  <!-- clear sky: mirror-image curves -->
+  <path d="M40 180 C 70 120, 100 104, 130 104 C 160 104, 180 132, 200 180 Z" fill="var(--sl-accent-soft)" stroke="var(--sl-accent)" stroke-width="1.6"/>
+  <path d="M170 180 C 190 132, 210 104, 240 104 C 270 104, 300 120, 330 180 Z" fill="var(--sl-ink3)" opacity=".18"/>
+  <path d="M170 180 C 190 132, 210 104, 240 104 C 270 104, 300 120, 330 180" fill="none" stroke="var(--sl-ink3)" stroke-width="1.6" stroke-dasharray="5 3"/>
+  <line x1="30" y1="180" x2="340" y2="180" stroke="var(--sl-ink)" stroke-width="1.3"/>
+  <line x1="185" y1="180" x2="185" y2="188" stroke="var(--sl-ink3)" stroke-width="1"/>
+  <g font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="9.5" fill="var(--sl-ink3)">
+    <text x="34" y="198">06:00</text><text x="168" y="198">noon</text><text x="310" y="198">18:00</text>
+  </g>
+  <text x="30" y="220" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="10" fill="var(--sl-ok)">equal areas &#183; east = west</text>
+
+  <!-- real climate: morning suppressed -->
+  <path d="M400 180 C 424 156, 448 148, 470 154 C 500 162, 520 168, 560 180 Z" fill="var(--sl-accent-soft)" stroke="var(--sl-accent)" stroke-width="1.6"/>
+  <path d="M530 180 C 550 130, 570 100, 600 100 C 630 100, 660 118, 690 180 Z" fill="var(--sl-ink3)" opacity=".18"/>
+  <path d="M530 180 C 550 130, 570 100, 600 100 C 630 100, 660 118, 690 180" fill="none" stroke="var(--sl-ink3)" stroke-width="1.6" stroke-dasharray="5 3"/>
+  <line x1="390" y1="180" x2="700" y2="180" stroke="var(--sl-ink)" stroke-width="1.3"/>
+  <line x1="545" y1="180" x2="545" y2="188" stroke="var(--sl-ink3)" stroke-width="1"/>
+  <g font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="9.5" fill="var(--sl-ink3)">
+    <text x="394" y="198">06:00</text><text x="528" y="198">noon</text><text x="670" y="198">18:00</text>
+  </g>
+  <text x="404" y="140" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="10" fill="var(--sl-no)">morning cloud</text>
+  <text x="390" y="220" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="10" fill="var(--sl-no)">east loses what west keeps</text>
+
+  <g font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="10">
+    <line x1="30" y1="240" x2="58" y2="240" stroke="var(--sl-accent)" stroke-width="1.8"/><text x="64" y="244" fill="var(--sl-ink3)">east facade</text>
+    <line x1="168" y1="240" x2="196" y2="240" stroke="var(--sl-ink3)" stroke-width="1.8" stroke-dasharray="5 3"/><text x="202" y="244" fill="var(--sl-ink3)">west facade</text>
+    <text x="390" y="244" fill="var(--sl-ink)">Geometry is symmetric about noon. Weather is not.</text>
+  </g>
+</svg>
+<figcaption>Irradiance through one day. The two answers differ by a shape, not by a scale factor.</figcaption>
+        </figure>
+        <ol class="sl-steps">
+          <li>Load the <b>Single box (reference)</b> sample with <b>no EPW loaded</b>, so the
+            clear-sky fallback is running &mdash; the panel says so.</li>
+          <li>Run <b>cumulative</b>, <b>Full year</b>, kWh/m&sup2;. Record the mean on the east
+            fa&ccedil;ade and on the west. They will be close to equal: the synthetic day is
+            symmetric about solar noon.</li>
+          <li>Import a real EPW for the same city, re-run the identical analysis, and record east
+            and west again. Take the difference as a percentage of the east value.</li>
+          <li>Repeat for a climate from a different region &mdash; somewhere with a monsoon, or with
+            morning coastal fog &mdash; and compare the sign and size of the asymmetry.</li>
+        </ol>
+        <p class="sl-principle"><b>Principle.</b> Solar geometry is symmetric about noon; weather is
+          not. Morning cloud, afternoon convective build-up, coastal fog and urban haze all break
+          the symmetry, and the direction they break it in is a property of the climate rather than
+          of the latitude. This is the clearest demonstration of why a clear-sky result cannot stand
+          in for a climate result &mdash; <b>the two disagree not by a scale factor but by a
+          shape</b>, and no correction applied to the symmetric answer would recover the real
+          one.</p>
+      </div>
+
+      <p class="sl-note"><b>A caution for all three: read the field, not the point.</b> Sensors sit
+        at sub-triangle centroids, and a single one near a shadow edge can differ sharply from its
+        neighbours. Quote means over a fa&ccedil;ade, and quote differences between runs rather than
+        absolute values.</p>
+    </div>
+  </section>
+
+  <section class="sl-sec">
+    <div class="sl-sechead"><span class="sl-secnum"></span><h2>Where it stops</h2></div>
+    <div class="sl-secbody">
+      <p>The tool is for teaching relationships and orders of magnitude &mdash; how overshadowing
+        moves with the season, why a device that works on one orientation fails on another, what a
+        real climate does to a symmetric geometry. For a compliance submission, an energy model, or
+        any figure a consultant will stake a recommendation on, use a validated tool.
+        <b>The absence of interreflection alone is too large for this one to serve that
+        purpose.</b></p>
+    </div>
+  </section>
+
+  <div class="sl-footer">
+
+    <h3>Licence</h3>
+    <p>&copy; Karam Al-Obaidi. The code is licensed <b>MIT</b>; the accompanying material &mdash;
+      this page, the documentation, the screenshots and the exercises &mdash; is
+      <b><a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a></b>.
+      Both permit any use, including commercial, and ask only that you credit the author.</p>
+    <p><b>Two further notices travel with the work.</b> three.js (also MIT) is loaded from a CDN at
+      runtime rather than bundled, so none of it is redistributed with the file &mdash; but if you
+      self-host it, its notice must travel with your copy. And the Perez sky coefficients and the
+      Tregenza/Reinhart patch construction are reimplemented from <b>Radiance</b>, under the
+      Radiance Software License v2.0, &copy; 1990&ndash;2025 The Regents of the University of
+      California through Lawrence Berkeley National Laboratory; the full notice is in the project's
+      NOTICE file. Screenshots that include a basemap additionally carry
+      &copy; OpenStreetMap contributors under the Open Database License.</p>
+    <p>A model you make with the tool is <b>yours</b>. None of these licences claims anything over
+      your geometry, your results, your CSV or the images you export.</p>
+
+    <h3 id="how-to-cite" style="scroll-margin-top:100px;">How to cite</h3>
+    <p>Cite it as software. Keeping the copyright notice in the file satisfies the licence; a
+      citation is the scholarly act on top of that.</p>
+    <p class="sl-ref">Al-Obaidi, K. M. (2026). <i>Solar Analysis Lab: A browser-based sun path and
+      solar irradiance tool</i> (Version 1.0.0) [Computer software]. Zenodo.
+      <a href="https://doi.org/10.5281/zenodo.22812940" target="_blank" rel="noopener">https://doi.org/10.5281/zenodo.22812940</a></p>
+<pre>@software{alobaidi2026solaranalysislab,
+  author    = {Al-Obaidi, Karam M.},
+  title     = {Solar Analysis Lab: A browser-based sun path and solar irradiance tool},
+  year      = {2026},
+  version   = {1.0.0},
+  publisher = {Zenodo},
+  doi       = {10.5281/zenodo.22812940},
+  url       = {https://karam.me.uk/applications/solar-analysis-lab/},
+  note      = {Code MIT licensed; accompanying material CC BY 4.0}
+}</pre>
+    <p>That DOI names this release. To cite the software in general rather than version 1.0.0, use
+      the concept DOI
+      <a href="https://doi.org/10.5281/zenodo.22812939" target="_blank" rel="noopener">10.5281/zenodo.22812939</a>,
+      which always resolves to the newest version.</p>
+    <p><b>Report five things alongside any figure:</b> the climate file (or that the clear-sky
+      fallback was used), the sky density, the ground reflectance, whether OpenStreetMap context
+      was shading the run, and the grid size. All five are written into the CSV export as header
+      comments, so the simplest way to satisfy this is to keep the CSV. Add one thing the file
+      cannot record for you: <b>whether the grid was coarsened.</b></p>
+
+    <h3>References</h3>
+    <p>The sources the code itself names, and the methods it names by name alone. The code names
+      each source but rarely its bibliographic detail, so that was added from the published record.</p>
+
+    <h4>Solar position</h4>
+    <p class="sl-ref">Meeus, J. (1998). <i>Astronomical Algorithms</i>, 2nd edn. Willmann-Bell.
+      ISBN 978-0-943396-61-3, chapters 25 and 28.
+      <span style="color:var(--sl-ink3)">&mdash; The most specific citation in the file, naming
+      edition and chapters. Every sun position the tool computes.</span></p>
+    <p class="sl-ref"><b>NOAA Global Monitoring Laboratory Solar Calculator.</b>
+      <span style="color:var(--sl-ink3)">&mdash; The low-precision arrangement of Meeus's algorithm,
+      and the three-branch refraction fit.</span></p>
+
+    <h4>The sky</h4>
+    <p class="sl-ref">Perez, R., Seals, R. &amp; Michalsky, J. (1993). &lsquo;All-weather model for
+      sky luminance distribution&rsquo;, <i>Solar Energy</i>, 50(3), pp. 235&ndash;245.
+      <span style="color:var(--sl-ink3)">&mdash; The eight-bin, twenty-coefficient table is that
+      paper's Table 1, and the code names the table explicitly. Every sky the tool builds uses
+      it.</span></p>
+    <p class="sl-ref">Tregenza, P. R. (1987). <i>Lighting Research &amp; Technology</i>, 19(1),
+      pp. 13&ndash;14; and Reinhart, C. F. &amp; Walkenhorst, O. (2001). <i>Energy and Buildings</i>,
+      33(7), pp. 683&ndash;697.
+      <span style="color:var(--sl-ink3)">&mdash; The 145-patch subdivision and its refinement to
+      577. <b>Named by name only:</b> the code says &ldquo;Tregenza (145)&rdquo; and
+      &ldquo;Reinhart (577)&rdquo; with no year and no paper, so these are attributions supplied
+      from the published record rather than citations the code makes.</span></p>
+
+    <h4>The clear-sky fallback</h4>
+    <p class="sl-ref">Hottel, H. C. (1976). <i>Solar Energy</i>, 18, pp. 129&ndash;134; and
+      Liu, B. Y. H. &amp; Jordan, R. C. (1960). <i>Solar Energy</i>, 4(3), pp. 1&ndash;19.
+      <span style="color:var(--sl-ink3)">&mdash; Beam transmittance for the 23&nbsp;km visibility
+      atmosphere, and the diffuse correlation. Together these are the synthetic clear day.</span></p>
+    <p class="sl-ref">Kasten, F. (1965). <i>Archiv f&uuml;r Meteorologie, Geophysik und
+      Bioklimatologie B</i>, 14, pp. 206&ndash;223.
+      <span style="color:var(--sl-ink3)">&mdash; Relative optical air mass. <b>The edition
+      matters:</b> the code implements Kasten's 1965 coefficients, <i>not</i> the widely cited
+      Kasten &amp; Young 1989 revision, which uses different constants.</span></p>
+
+    <h4>Implementation</h4>
+    <p class="sl-ref"><b>Radiance</b> &mdash; Ward, G. J. (1994). &lsquo;The RADIANCE lighting
+      simulation and rendering system&rsquo;, <i>Proceedings of SIGGRAPH &rsquo;94</i>,
+      pp. 459&ndash;472.
+      <span style="color:var(--sl-ink3)">&mdash; The code names the source files and functions
+      rather than the paper: the coefficient table is transcribed from
+      <span class="sl-mono">gendaymtx.c</span> and the patch construction from
+      <span class="sl-mono">rh_init()</span>.</span></p>
+    <p class="sl-ref">M&ouml;ller, T. &amp; Trumbore, B. (1997). <i>Journal of Graphics Tools</i>,
+      2(1), pp. 21&ndash;28.
+      <span style="color:var(--sl-ink3)">&mdash; The ray-triangle test at every leaf of the
+      bounding-volume hierarchy, reduced to its occlusion form. Named by name only.</span></p>
+
+    <h4>Data and services</h4>
+    <p class="sl-ref"><b>EnergyPlus Weather (EPW) format</b>, U.S. Department of Energy; <b>Ladybug
+      Tools</b> (<span class="sl-mono">ladybug/epw.py</span>); <b>OpenStreetMap</b> and the
+      <b>Overpass API</b> under ODbL; <b>Nominatim</b>.
+      <span style="color:var(--sl-ink3)">&mdash; The climate file layout and the column positions
+      verified against it, the building footprints and heights, and place search. Nominatim takes no
+      part in any calculation.</span></p>
+
+    <h4>Named, but not cited</h4>
+    <p class="sl-ref"><span style="color:var(--sl-ink3)">Three works sit outside both lists and it
+      is better to say why. <b>Perez et al. (1990)</b> is the usual source for the clearness and
+      brightness parameterisation the code computes, but the code cites only the 1993 paper.
+      <b>Bourgeois, Reinhart &amp; Ward (2008)</b> is where the MF:<i>n</i> generalisation the code
+      implements was formalised, and the code names only &ldquo;Reinhart&rdquo;. And <b>ASHRAE is
+      deliberately absent</b>: until version 1.0.0 the export header described the clear-sky
+      fallback as &ldquo;ASHRAE/Hottel&rdquo;, which was wrong &mdash; the ASHRAE model uses
+      tabulated optical depths, none of which is present. The label has been corrected and no
+      ASHRAE method is claimed anywhere.</span></p>
+
+  </div>
+
+</div>
