@@ -144,11 +144,18 @@
 
 /* diagrams. The SVGs paint from the same custom properties as everything
    else, so they invert with the page instead of staying light in dark mode. */
-.sl-doc .sl-fig{margin:0 0 1.2rem;}
-.sl-doc .sl-fig svg{display:block;width:100%;height:auto;
+/* Figures. A host theme usually styles <figure> and <figcaption> itself, and
+   its rules can be specific enough to win here — which is where an italic
+   caption and a caption sitting hard against the next paragraph come from.
+   The four properties that decide that are pinned, so the caption keeps this
+   page's own monospace label style wherever the fragment is pasted. */
+.sl-doc .sl-fig{margin:0 0 1.9rem !important;font-style:normal;}
+.sl-doc .sl-fig svg{display:block;width:100%;height:auto;font-style:normal;
   background:var(--sl-paper);border:1px solid var(--sl-rule);}
-.sl-doc .sl-fig figcaption{font-family:var(--sl-fm);font-size:.68rem;letter-spacing:.06em;
-  text-transform:uppercase;color:var(--sl-ink3);margin-top:.55rem;}
+.sl-doc .sl-fig figcaption{font-family:var(--sl-fm) !important;
+  font-style:normal !important;font-size:.68rem;letter-spacing:.06em;line-height:1.5;
+  text-align:left;text-transform:uppercase;color:var(--sl-ink3);
+  margin:.7rem 0 0 !important;}
 
 /* Large screens. Most sizes here are in rem, which is relative to the ROOT
    font size, not to .sl-doc — so raising .sl-doc alone would scale the body
