@@ -8,8 +8,9 @@
   "type": "module",
   "scripts": {
     "vendor": "node tests/fetch-vendor.mjs",
-    "test": "node tests/verify.mjs",
-    "serve": "npx http-server . -p 8080 -c-1"
+    "test": "node tools/check-release-metadata.mjs && node tests/verify.mjs",
+    "serve": "npx http-server . -p 8080 -c-1",
+    "check-release": "node tools/check-release-metadata.mjs"
   },
   "devDependencies": {
     "playwright": "^1.56.1"
