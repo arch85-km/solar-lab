@@ -930,21 +930,43 @@ out geom;</div>
 
       <div class="sl-ex">
         <span class="sl-ex-n">Exercise 01</span>
-        <h3>A neighbour that costs you nothing in June can take your winter entirely</h3>
+        <h3>A neighbour that costs you nothing at noon can still take your afternoon</h3>
         <ol class="sl-steps">
-          <li>Load the <code>Tower with context</code> sample. Set the date to <code>21 June</code>, time <code>12:00</code>.</li>
-          <li>Run an <b>instant</b> analysis. Record the mean and minimum W/m² on the lower south façade.</li>
-          <li>Change the date to <code>21 December</code>, keep the time at <code>12:00</code>, and re-run. Record both figures again.</li>
-          <li>Now switch to <b>cumulative</b>, <code>Cooling season (May – Sep)</code>, unit <code>kWh/m²</code>. Run, and record the façade mean.</li>
-          <li>Switch the period to <code>Heating season (Oct – Apr)</code> and run again.</li>
-          <li>Finally, turn <b>Surfaces shade each other</b> off and re-run the heating season. That is the same façade with the neighbour removed.</li>
+          <li>Load the <code>Tower with context</code> sample. Set the date to <code>21 June</code>,
+            time <code>12:00</code>, mode <b>Instant W/m²</b>, and run.</li>
+          <li>Open <b>Results</b> and find the <b>By orientation</b> table. Read its columns before
+            anything else: <code>Face</code>, <code>Area m²</code>, <code>Mean</code>,
+            <code>Max</code>. There is no per-face minimum — the <code>Minimum</code> in the list
+            above is over the whole model — and there is no way to isolate part of a face. Note too
+            that the <code>S</code> row pools every south-facing surface in the scene: on this
+            sample that is 1,742 m², of which only 784 m² is the tower. Record the
+            <code>S</code> row's <code>Mean</code>.</li>
+          <li>Change the date to <code>21 December</code>, keep the time at <code>12:00</code>, and
+            re-run. Record the <code>S</code> row again, then look at the tower's own south face on
+            the model. At London's latitude the noon sun falls from 62.0° in June to 15.1° in
+            December — and on <em>both</em> dates the neighbours cast nothing on that face. What you
+            have just recorded is the change in altitude and irradiance, not overshadowing.</li>
+          <li>Switch to <b>Cumulative</b>, period <code>Heating season (Oct – Apr)</code>, unit
+            <code>kWh/m² total</code>, and set <code>From hour</code> 11 and <code>To hour</code> 14.
+            Run, then turn <b>Surfaces shade each other</b> off and run again. Over those three
+            midday hours the tower's own south face differs between the two runs by about half a
+            per cent.</li>
+          <li>Now set <code>From hour</code> 14 and <code>To hour</code> 17 and repeat both runs.
+            This time the tower's south face loses about 23% of its beam to the neighbours.</li>
+          <li>Finally put the hours back to 0 and 24, run the heating season and then the cooling
+            season both ways, and compare the two drops.</li>
         </ol>
-        <p class="sl-principle"><b>Principle.</b> Overshadowing is a function of solar altitude,
-          and altitude collapses in winter — at London's latitude noon sun falls from about 62° in
-          June to about 15° in December. The same obstruction subtends a far larger part of the
-          winter sky, so a tower that is invisible to a summer study can remove most of the
-          heating-season gain. Step 6 separates the neighbour's contribution from the façade's own
-          self-shading, which is the number you actually want when arguing about a site boundary.</p>
+        <p class="sl-principle"><b>Principle.</b> Overshadowing is a function of altitude
+          <em>and</em> azimuth, and it is the azimuth that decides whether a neighbour is your
+          problem at all. At noon the sun is due south, so an obstruction that is not due south
+          throws its shadow past you. The four neighbours in this sample sit north-west, north,
+          south-east and south-west of the tower, and none of them is on the noon line: they take
+          the morning and the late afternoon instead. A noon check is therefore not an
+          overshadowing check — it is the one hour of the day most likely to report that everything
+          is fine. What winter adds is length: at 15° the same block throws a shadow nearly four
+          times its own height, and at 5° nearly ten times, so the hours either side of noon are
+          where a low sun and an off-axis neighbour meet. Over the whole heating season these four
+          take 15% of the south-facing total in the scene, against 10% over the cooling season.</p>
       </div>
 
       <div class="sl-ex">
@@ -952,18 +974,29 @@ out geom;</div>
         <h3>Overhang depth is set by the summer altitude, not the equinox</h3>
         <ol class="sl-steps">
           <li>Load the <code>Shaded facade study</code> sample. Grid size <code>0.5 m</code>.</li>
-          <li>Set the date to <code>21 March</code> (day 80), time <code>12:00</code>, and run an <b>instant</b> analysis. Note how much of the glazed area the overhang shades.</li>
-          <li>Change to <code>21 June</code>, same time, and re-run. Note the shaded fraction again.</li>
-          <li>Change to <code>21 December</code> and re-run. Note it a third time.</li>
+          <li>Look at the sample before running anything: the south face carries five horizontal
+            louvres 2.2 m deep at 3 m centres, and five vertical fins. There is no glazing anywhere
+            in this tool — the analysis surface is the face itself.</li>
+          <li>Set the date to <code>21 March</code> (day 80), time <code>12:00</code>, and run an
+            <b>instant</b> analysis. Note what fraction of the south face the array leaves in
+            shadow. It is about 65%.</li>
+          <li>Change to <code>21 June</code>, same time, and re-run: about 85%.</li>
+          <li>Change to <code>21 December</code> and re-run: about 32%.</li>
           <li>Now run three <b>cumulative</b> passes on the same geometry — <code>Cooling season</code>, then <code>Heating season</code>, then <code>Full year</code> — and record the façade mean for each.</li>
-          <li>Turn on <b>Cast shadows</b> and animate a June day, then a December day, watching where the shadow line sits at noon.</li>
+          <li>Turn on <b>Cast shadows</b>, set <b>Animate day</b> and play a June day, then a
+            December day, watching where the shadow line sits at noon.</li>
         </ol>
-        <p class="sl-principle"><b>Principle.</b> A horizontal overhang intercepts sun in
-          proportion to how steeply it arrives. Sized at the equinox it will be far too shallow in
-          June and needlessly obstructive in December; sized at the summer solstice it does the
-          work when cooling load is highest and steps out of the way when the sun drops. The right
-          question is never "how deep should an overhang be" but "at what altitude should it stop
-          shading", and steps 5 and 6 show the two seasons pulling in opposite directions.</p>
+        <p class="sl-principle"><b>Principle.</b> A horizontal louvre intercepts sun in proportion
+          to how steeply it arrives, which is why the shaded fraction here tracks the noon altitude
+          almost exactly: 15° in December, 39° at the equinox, 62° in June, giving 32%, 65% and 85%.
+          An array sized at the equinox will be far too shallow in June and needlessly obstructive
+          in December; sized at the summer solstice it does the work when cooling load is highest
+          and steps out of the way when the sun drops. The right question is never "how deep should
+          an overhang be" but "at what altitude should it stop shading". The seasonal totals say the
+          same thing from the other end: this array removes about 80% of the clear-sky beam over the
+          cooling season and about 57% over the heating season. The vertical fins are part of that
+          figure — they catch the low morning and afternoon sun that passes under every horizontal
+          louvre, which is exactly the sun a horizontal device cannot reach.</p>
       </div>
 
       <div class="sl-ex">
@@ -972,7 +1005,11 @@ out geom;</div>
         <ol class="sl-steps">
           <li>Load the <code>Single box (reference)</code> sample with <b>no EPW loaded</b>, so the clear-sky fallback is running. The panel says so.</li>
           <li>Run <b>cumulative</b>, <code>Full year</code>, <code>kWh/m²</code>. Record the mean on the east façade and on the west façade.</li>
-          <li>They will be close to equal. Satisfy yourself that this is geometry: the synthetic day is symmetric about solar noon, so morning and afternoon deliver the same energy.</li>
+          <li>They will be close to equal — about 0.15% apart, and that residue is only because the
+            run steps whole hours of standard time while solar noon drifts through the year. Satisfy
+            yourself that this is geometry: the clear-sky model reads nothing but the sun's
+            altitude, so the synthetic day is symmetric about solar noon and morning and afternoon
+            deliver the same energy.</li>
           <li>Now import a real EPW for the same city and re-run the identical analysis.</li>
           <li>Record east and west again, and take the difference as a percentage of the east value.</li>
           <li>Repeat for a second climate from a different region — somewhere with a monsoon, or with morning coastal fog — and compare the sign and size of the asymmetry.</li>
