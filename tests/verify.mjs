@@ -179,11 +179,38 @@ const stamp = await page.evaluate(() => ({
 {
   const src = await readFile(join(ROOT, 'index.html'), 'utf8');
   const inComment = (src.match(/^  Version ([\d.]+)$/m) || [])[1];
-  check('the version is recorded in the file, not shown on screen',
+  check('the version agrees across the header comment, the meta tag and the tooltip',
         !!stamp.build && stamp.meta === stamp.build && inComment === stamp.build &&
-        !stamp.onScreen && stamp.credit.trim() === '© Karam Al-Obaidi' &&
-        stamp.tip === 'Solar Analysis Lab v' + stamp.build,
-        'v' + stamp.build + ' in the header comment, the meta tag and the credit tooltip');
+        stamp.credit.trim() === '© Karam Al-Obaidi' &&
+        stamp.tip.startsWith('Solar Analysis Lab v' + stamp.build),
+        'v' + stamp.build + ' in all three');
+  /* It used to be a deliberate choice that the version never appeared on screen.
+     It now does, in the About panel the credit opens - so the assertion is that
+     the panel reports the same version the file records, rather than that nothing
+     reports it at all. */
+  const about = await page.evaluate(async () => {
+    document.getElementById('credit').click();
+    await new Promise(r => setTimeout(r, 150));
+    const line = (document.getElementById('about-rel') || {}).textContent || '';
+    const apa  = (document.getElementById('about-apa') || {}).textContent || '';
+    const bib  = (document.getElementById('about-bib') || {}).textContent || '';
+    const open = !document.getElementById('about-card').hidden;
+    document.getElementById('about-close').click();
+    return { line, apa, bib, open, closed: document.getElementById('about-card').hidden };
+  });
+  check('the credit opens an About panel, and it closes again',
+        about.open && about.closed, 'opens on click, closes on Close');
+  check('the About panel reports the same version the file records',
+        about.line.startsWith(stamp.build + ' \u00b7 ') &&
+        about.apa.includes('Version ' + stamp.build) &&
+        about.bib.includes('version = {' + stamp.build + '}'),
+        'release line "' + about.line + '", and the same version in both citations');
+  check('the About panel carries the licence and the bundled-library credit',
+        await page.evaluate(() => {
+          const t = document.getElementById('about-card').innerText;
+          return /MIT/.test(t) && /CC BY 4\.0/.test(t) && /three\.js/.test(t) && /bundled/i.test(t);
+        }),
+        'MIT, CC BY 4.0, and three.js named as bundled');
 }
 check('the old key Show button is gone',
       await page.evaluate(() => !document.getElementById('b-bm-key-show')));
