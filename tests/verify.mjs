@@ -307,7 +307,11 @@ check('the old key Show button is gone',
   const src = await readFile(join(ROOT, 'index.html'), 'utf8');
   const appVersion = src.match(/const BUILD = '([^']+)';/)[1];
   const stated = {
-    masthead: (notes.match(/class="sl-brow">Version ([\d.]+) ·/) || [])[1],
+    // Matched on the byline's own markup, not on a wrapper class. It was pinned to
+    // `class="sl-brow">Version …`, a shape the page stopped using when the byline
+    // was restructured, so this silently read undefined and the check had been
+    // failing on nothing ever since. Allow the middot as entity or character.
+    masthead: (notes.match(/<b>Version<\/b>\s*([\d.]+)\s*(?:&middot;|\u00b7)/) || [])[1],
     harvard:  (notes.match(/\(Version ([\d.]+)\) \[Computer software\]/) || [])[1],
     bibtex:   (notes.match(/version\s*=\s*\{([\d.]+)\}/) || [])[1],
     closing:  (notes.match(/describes Solar Analysis Lab version ([\d.]+)/) || [])[1],
@@ -334,25 +338,56 @@ check('the old key Show button is gone',
         digits(cff) === digits(zen.creators[0].orcid),
         'cff ' + cffVersion + ', zenodo ' + zen.version + ', app ' + appVersion);
 
-  // Two DOIs, and they are not interchangeable. The concept DOI always resolves
-  // to the newest version and belongs on the badge; the version DOI is pinned to
-  // this release and is what a paper should cite, because it resolves to the
-  // exact build the figures came from. Swapping them is invisible until someone
-  // tries to reproduce a figure against a later version. Neither can be edited
-  // once minted, so they are pinned here and checked wherever they appear.
-  const CONCEPT = '10.5281/zenodo.22812939';
-  const RELEASE = '10.5281/zenodo.22812940';
+  // Two DOIs, and they are not interchangeable. The concept DOI always resolves to
+  // the newest version and belongs on the badge; a version DOI is frozen on one
+  // release and is what a paper should cite, because it resolves to the exact
+  // build the figures came from. Swapping them is invisible until someone tries to
+  // reproduce a figure against a later version.
+  //
+  // Neither is hard-coded here any more. They were, and the pinned version DOI went
+  // stale the moment the version was bumped: the documents went on printing 1.0.0's
+  // DOI inside a citation labelled 1.1.0, and this test asserted that they should.
+  // A test that pins a fact which moves will eventually defend the wrong answer.
+  //
+  // So CITATION.cff is the source of truth, and the rule is derived from it. Zenodo
+  // mints a version DOI only when the release is archived, which happens after the
+  // tag is cut — so between bumping the version and archiving it, no version DOI for
+  // this release exists and the documents cannot cite one. They fall back to the
+  // concept DOI, and must say that they are doing so. Adding the new identifier to
+  // CITATION.cff after the release flips this test back to demanding the version
+  // DOI, and it fails until the documents are updated to match. That is the point:
+  // the test is what remembers.
   const cffDoi = (cff.match(/^doi:\s*(\S+)/m) || [])[1];
-  const cffIds = (cff.match(/value:\s*(10\.5281\/zenodo\.\d+)/g) || [])
-        .map(m => m.replace(/value:\s*/, ''));
-  check('CITATION.cff carries the concept DOI, and both as identifiers',
-        cffDoi === CONCEPT && cffIds.includes(CONCEPT) && cffIds.includes(RELEASE),
-        'doi ' + cffDoi + ', identifiers ' + cffIds.join(' + '));
-  check('the README badge is the concept DOI and its citations are the version DOI',
+  const idEntries = [...cff.matchAll(
+    /value:\s*(10\.5281\/zenodo\.\d+)\s*\n\s*description:\s*"([^"]*)"/g)]
+    .map(m => ({ doi: m[1], desc: m[2] }));
+  const concept = idEntries.find(e => /concept doi/i.test(e.desc));
+  // The version DOI for THIS release, if it has one. Its description names the
+  // release it is frozen on: "Version DOI — 1.0.0; ...".
+  const verRe = new RegExp('version doi\\s*[\\u2014-]\\s*' +
+                           String(cffVersion).replace(/\./g, '\\.') + '(?!\\d)', 'i');
+  const release = idEntries.find(e => verRe.test(e.desc));
+  const CONCEPT = concept ? concept.doi : '';
+  const RELEASE = release ? release.doi : '';
+  // What every citation in the documents must point at.
+  const CITED = RELEASE || CONCEPT;
+  const esc = d => d.replace(/[.\/]/g, c => '\\' + c);
+
+  check('CITATION.cff carries the concept DOI, and a version DOI for some release',
+        cffDoi === CONCEPT && CONCEPT !== '' &&
+        idEntries.some(e => /version doi/i.test(e.desc)),
+        'doi ' + cffDoi + ', identifiers ' + idEntries.map(e => e.doi).join(' + '));
+
+  // The BibTeX field is matched on whitespace rather than one exact run of spaces.
+  // It was written as `doi     = {` against a file that aligns to `doi       = {`,
+  // so the assertion silently never matched and the check passed on nothing.
+  const bibDoi = new RegExp('doi\\s*=\\s*\\{' + esc(CITED) + '\\}');
+  check('the README badge is the concept DOI and its citations are the DOI that exists',
         readme.includes('zenodo.org/badge/DOI/' + CONCEPT + '.svg') &&
-        readme.includes('doi     = {' + RELEASE + '}') &&
-        (readme.match(new RegExp(RELEASE.replace('.', '\\.'), 'g')) || []).length >= 4,
-        'badge ' + CONCEPT + ', cited ' + RELEASE);
+        bibDoi.test(readme) &&
+        (readme.match(new RegExp('https://doi\\.org/' + esc(CITED), 'g')) || []).length >= 2,
+        'badge ' + CONCEPT + ', cited ' + CITED + (RELEASE ? ' (version)' : ' (concept, interim)'));
+
   // The DOI must be a link, not just present. Every one of the twelve DOIs in the
   // reference list is an anchor; this one — the tool's own, the one a reader is
   // likeliest to click — was plain text for a day because it inherited the shape of
@@ -360,13 +395,25 @@ check('the old key Show button is gone',
   // anchor. The copy in the BibTeX block stays bare on purpose: that block is meant
   // to be pasted into a .bib file.
   const citeLink = new RegExp(
-    '<a href="https://doi\\.org/' + RELEASE.replace('.', '\\.').replace('/', '\\/') +
-    '"[^>]*>https://doi\\.org/' + RELEASE.replace('.', '\\.').replace('/', '\\/') + '</a>');
-  check('the Method Notes cite the version DOI, as a link, not the bare site URL',
+    '<a href="https://doi\\.org/' + esc(CITED) +
+    '"[^>]*>https://doi\\.org/' + esc(CITED) + '</a>');
+  check('the Method Notes cite that same DOI, as a link, not the bare site URL',
         citeLink.test(notes) &&
-        notes.includes('doi     = {' + RELEASE + '}') &&
+        new RegExp('doi\\s*=\\s*\\{' + esc(CITED) + '\\}').test(notes) &&
         !/\(Version [\d.]+\) \[Computer software\]\.\s*\n?\s*https:\/\/karam/.test(notes),
-        RELEASE + ' linked');
+        CITED + ' linked');
+
+  // Falling back silently would be its own error: a reader has no way to tell a
+  // concept DOI used as a stand-in from one chosen on purpose. The documents have
+  // to say that this release's version DOI is still to come.
+  if (!RELEASE) {
+    // Tolerant of line wrapping: the same sentence is hard-wrapped at different
+    // points in a Markdown file and an HTML paragraph.
+    const says = t => /minted\s+when\s+this\s+release\s+is\s+archived/.test(t);
+    check('with no version DOI yet for ' + cffVersion + ', the documents say so',
+          says(notes) && says(readme),
+          'interim note present in the Method Notes and the README');
+  }
 
 }
 
