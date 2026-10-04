@@ -1,6 +1,6 @@
 # Solar Analysis Lab
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22812939.svg)](https://doi.org/10.5281/zenodo.22812939)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22812939.svg)](https://doi.org/10.5281/zenodo.23141695)
 
 **Solar Analysis Lab** is an interactive 3D sun-path and solar-radiation analysis tool for teaching environmental
 design to architecture students. It runs entirely in the browser from a **single
@@ -518,12 +518,12 @@ file satisfies that; a citation is the scholarly courtesy on top of it.
 
 > Al-Obaidi, K. M. (2026). *Solar Analysis Lab: A browser-based sun path and solar
 > irradiance tool* (Version 1.1.0) [Computer software]. Zenodo.
-> https://doi.org/10.5281/zenodo.22812939
+> https://doi.org/10.5281/zenodo.23141695
 
 **Harvard**
 
 > Al-Obaidi, K.M. (2026) *Solar Analysis Lab: A browser-based sun path and solar
-> irradiance tool* (Version 1.1.0). Zenodo. Available at: https://doi.org/10.5281/zenodo.22812939
+> irradiance tool* (Version 1.1.0). Zenodo. Available at: https://doi.org/10.5281/zenodo.23141695
 
 **BibTeX**
 
@@ -534,18 +534,16 @@ file satisfies that; a citation is the scholarly courtesy on top of it.
   year      = {2026},
   version   = {1.1.0},
   publisher = {Zenodo},
-  doi       = {10.5281/zenodo.22812939},
+  doi       = {10.5281/zenodo.23141695},
   url       = {https://karam.me.uk/applications/solar-analysis-lab/},
   note      = {Code MIT licensed; accompanying material CC BY 4.0}
 }
 ```
 
-Those entries name the **concept DOI** (10.5281/zenodo.22812939), which always resolves to
-the newest version. Each release also gets a **version DOI**, frozen on that release, and
-that is the better thing to cite in a paper because it resolves to the exact build the
-figures came from. 10.5281/zenodo.22812940 is version 1.0.0's; 1.1.0's is minted when this
-release is archived on Zenodo, and this page will name it once it exists. Until then, cite
-the concept DOI and give the version number.
+Those entries name the **version DOI**, frozen on 1.1.0 — the right thing to cite in a
+paper, because it resolves to the exact build the figures came from. The badge at the top
+of this page is the **concept DOI** (10.5281/zenodo.22812939), which always resolves to the
+newest version.
 
 Anyone reporting a figure from the tool should also state the **climate file**, the
 **analysis period**, the **grid size**, the **sky model** and whether **context geometry**
