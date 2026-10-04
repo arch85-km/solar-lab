@@ -16,7 +16,7 @@ import { existsSync } from 'node:fs';
 import { join, dirname, extname, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
-import { ensureVendor, ensureEpw, THREE_VERSION } from './fetch-vendor.mjs';
+import { ensureEpw, THREE_VERSION } from './fetch-vendor.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..');
@@ -47,7 +47,6 @@ function serve(root){
 }
 
 /* ------------------------------------------------------------------ main --- */
-const vendorRoot = await ensureVendor();
 const epwPath = await ensureEpw();
 const server = await serve(ROOT);
 const port = server.address().port;
@@ -55,19 +54,17 @@ const port = server.address().port;
 const browser = await chromium.launch({ args: ['--no-sandbox', '--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
 
-const cdnHits = new Set();
-await ctx.route('**://cdn.jsdelivr.net/**', async (route) => {
-  const url = new URL(route.request().url());
-  const m = url.pathname.match(/^\/npm\/three@([^/]+)\/(.+)$/);
-  if (!m) return route.fulfill({ status: 404, body: 'unexpected CDN path: ' + url.pathname });
-  if (m[1] !== THREE_VERSION)
-    return route.fulfill({ status: 404, body: 'version mismatch: page asked for ' + m[1] });
-  const file = join(vendorRoot, m[2]);
-  if (!existsSync(file))
-    return route.fulfill({ status: 404, body: 'not in published package: ' + m[2] });
-  cdnHits.add(m[2]);
-  await route.fulfill({ status: 200, contentType: 'text/javascript',
-                        headers: { 'access-control-allow-origin': '*' }, body: await readFile(file, 'utf8') });
+/* three.js is bundled into the page, so the app should reach for nothing beyond
+   its own origin. Every off-origin request is recorded and refused: if a CDN
+   dependency is ever reintroduced the app will fail here rather than quietly
+   start needing the network again. */
+const offOrigin = new Set();
+await ctx.route('**', async (route) => {
+  const url = route.request().url();
+  if (url.startsWith('http://127.0.0.1') || url.startsWith('http://localhost') ||
+      url.startsWith('data:') || url.startsWith('blob:')) return route.continue();
+  offOrigin.add(url.split('?')[0]);
+  return route.abort();
 });
 
 /**
@@ -163,6 +160,7 @@ const boot = await page.evaluate(() => {
     title: document.title,
     brand: document.querySelector('.brand-text b').textContent,
     tagline: document.querySelector('.brand-text span').textContent,
+    threeRevision: (window.THREE && window.THREE.REVISION) || null,
   };
 });
 check('every panel section starts collapsed',
@@ -352,11 +350,15 @@ check('app is titled Solar Analysis Lab, and says what it does',
       boot.title === 'Solar Analysis Lab' && boot.brand === 'Solar Analysis Lab' &&
       boot.tagline === 'Sun path · Shadows · Irradiance',
       'title "' + boot.title + '", brand "' + boot.brand + '", tagline "' + boot.tagline + '"');
-check('importmap resolves against the real published package',
-      cdnHits.has('build/three.module.js') &&
-      cdnHits.has('examples/jsm/controls/OrbitControls.js') &&
-      cdnHits.has('examples/jsm/loaders/OBJLoader.js'),
-      [...cdnHits].join(', '));
+check('the app runs without reaching off its own origin',
+      offOrigin.size === 0,
+      offOrigin.size ? [...offOrigin].join(', ') : 'no off-origin requests');
+check('the bundled three.js is the version the project declares',
+      boot.threeRevision === THREE_VERSION.split('.')[1],
+      'app reports r' + boot.threeRevision + ', package.json pins ' + THREE_VERSION);
+check('no CDN URL survives anywhere in the page',
+      !(await readFile(join(ROOT, 'index.html'), 'utf8')).includes('cdn.jsdelivr.net'),
+      'index.html is free of jsDelivr references');
 
 // First-load appearance: London, clear-sky model, demo massing, nothing imported
 { const { mkdir } = await import('node:fs/promises');
@@ -1194,13 +1196,6 @@ check('leaving the source takes the volumes and their occluders with it',
 // separate load with PROXY_URL patched in, since the committed file has none.
 {
   const proxCtx = await browser.newContext({ viewport: { width: 1100, height: 800 } });
-  await proxCtx.route('**://cdn.jsdelivr.net/**', async (route) => {
-    const m = new URL(route.request().url()).pathname.match(/^\/npm\/three@[^/]+\/(.+)$/);
-    const f = m && join(vendorRoot, m[1]);
-    if (!f || !existsSync(f)) return route.fulfill({ status: 404, body: 'missing' });
-    await route.fulfill({ status: 200, contentType: 'text/javascript',
-                          headers: { 'access-control-allow-origin': '*' }, body: await readFile(f, 'utf8') });
-  });
   const proxied = [];
   await proxCtx.route('**/tile-proxy.php*', async (route) => {
     proxied.push(route.request().url());
@@ -2253,13 +2248,6 @@ console.log('\n=== guided tour ===');
 // A fresh context has no localStorage flag, so the tour must auto-start there
 {
   const tourCtx = await browser.newContext({ viewport: { width: 1280, height: 820 } });
-  await tourCtx.route('**://cdn.jsdelivr.net/**', async (route) => {
-    const m = new URL(route.request().url()).pathname.match(/^\/npm\/three@[^/]+\/(.+)$/);
-    const f = m && join(vendorRoot, m[1]);
-    if (!f || !existsSync(f)) return route.fulfill({ status: 404, body: 'missing' });
-    await route.fulfill({ status: 200, contentType: 'text/javascript',
-                          headers: { 'access-control-allow-origin': '*' }, body: await readFile(f, 'utf8') });
-  });
   const tp = await tourCtx.newPage();
   const tourErrors = [];
   tp.on('pageerror', e => tourErrors.push(e.message));

@@ -44,10 +44,10 @@ Below: the first-load state (London, clear-sky model) and the phone layout.
 
 ## Putting it on a WordPress page
 
-The app is one self-contained file. `three.js` is loaded from a CDN, so the page needs
-internet access — which any live WordPress site has. If you want MapTiler imagery with
-the key kept off the page, build the two-file pair first (see *Keeping the key out of the
-page entirely* below) and upload both files into the same folder.
+The app is one self-contained file, `three.js` included, so the page needs no internet
+access to run. If you want MapTiler imagery with the key kept off the page, build the
+two-file pair first (see *Keeping the key out of the page entirely* below) and upload
+both files into the same folder.
 
 ### Option 1 — iframe (recommended)
 
@@ -77,8 +77,10 @@ viewport (`100dvh`) and needs no theme CSS.
 
 ### Option 3 — offline / intranet
 
-If the site has no route to the CDN, download the three files the importmap
-requests and change the two importmap URLs to local paths:
+Nothing to do: three.js is bundled into `index.html`, so the app runs with no network
+at all. Only the optional MapTiler basemap and place search need a route out; without
+one the sun path, the model and every analysis still work. For reference, the bundle
+contains:
 
 ```
 build/three.module.js  +  build/three.core.js
@@ -448,16 +450,16 @@ if those disagree with the `BUILD` constant, so they cannot drift apart.
 
 ```bash
 npm install          # playwright, for the test suite only
-npm run vendor       # fetch three.js and the validation EPW
+npm run vendor       # fetch the validation EPW
 npm test             # 204 headless checks, screenshots and sample export sheets
 npm run serve        # serve the folder at http://localhost:8080
 ```
 
-The test suite intercepts every jsDelivr request and serves it from the copy of the
-**published npm package** in `tests/.vendor/`, which doubles as a check that the
-importmap URLs point at paths that really exist in `three@0.185.1`. `npm run vendor`
-also downloads the Chicago TMY3 EPW used for the physics validation; neither is
-committed, so the repository stays small and text-only.
+The test suite refuses every off-origin request and asserts that the app makes none,
+which is how the bundled three.js is kept honest: if a CDN dependency is ever
+reintroduced the suite fails rather than quietly starting to need the network again.
+`npm run vendor` downloads the Chicago TMY3 EPW used for the physics validation; it is
+not committed, so the repository stays small and text-only.
 
 Screenshots land in `tests/screenshots/`.
 
@@ -468,7 +470,7 @@ index.html            the entire app — this is the deliverable
 tools/make-deploy.mjs builds the files to upload, keeping the map key out of the page
 server/tile-proxy.php optional tile proxy, holds the key server-side
 tests/verify.mjs      headless verification and screenshots
-tests/fetch-vendor.mjs downloads three.js from the npm registry
+tests/fetch-vendor.mjs downloads the validation EPW
 tests/assets/         downloaded on demand (Chicago O'Hare TMY3, for validation)
 ```
 
@@ -515,13 +517,13 @@ file satisfies that; a citation is the scholarly courtesy on top of it.
 **APA 7**
 
 > Al-Obaidi, K. M. (2026). *Solar Analysis Lab: A browser-based sun path and solar
-> irradiance tool* (Version 1.0.0) [Computer software]. Zenodo.
+> irradiance tool* (Version 1.1.0) [Computer software]. Zenodo.
 > https://doi.org/10.5281/zenodo.22812940
 
 **Harvard**
 
 > Al-Obaidi, K.M. (2026) *Solar Analysis Lab: A browser-based sun path and solar
-> irradiance tool* (Version 1.0.0). Zenodo. Available at: https://doi.org/10.5281/zenodo.22812940
+> irradiance tool* (Version 1.1.0). Zenodo. Available at: https://doi.org/10.5281/zenodo.22812940
 
 **BibTeX**
 
@@ -530,7 +532,7 @@ file satisfies that; a citation is the scholarly courtesy on top of it.
   author    = {Al-Obaidi, Karam M.},
   title     = {Solar Analysis Lab: A browser-based sun path and solar irradiance tool},
   year      = {2026},
-  version   = {1.0.0},
+  version   = {1.1.0},
   publisher = {Zenodo},
   doi       = {10.5281/zenodo.22812940},
   url       = {https://karam.me.uk/applications/solar-analysis-lab/},
@@ -538,7 +540,7 @@ file satisfies that; a citation is the scholarly courtesy on top of it.
 }
 ```
 
-Those entries name the **version DOI**, fixed to 1.0.0 — the right thing to cite in a
+Those entries name the **version DOI**, fixed to 1.1.0 — the right thing to cite in a
 paper, because it resolves to the exact build the figures came from. The badge at the top
 of this page is the **concept DOI** (10.5281/zenodo.22812939), which always resolves to the newest version.
 
@@ -572,8 +574,8 @@ sensible about a worksheet or a screenshot, which is why those are covered separ
 The code builds on three pieces of licensed work, all permissive and all compatible with
 the above:
 
-- **three.js** (MIT) — the only runtime dependency, loaded from a CDN. If you switch to
-  self-hosting it, ship its licence file alongside.
+- **three.js** r185 (MIT) — the only runtime dependency, bundled into `index.html`
+  with its licence headers intact, so the file carries its own copy and needs no CDN.
 - **OpenStreetMap** (ODbL) — optional map tiles and place search, credited on screen and in
   exports, used within the OSMF tile and Nominatim policies. There is deliberately **no
   Google Maps option**: its terms forbid using Maps content without a Google map present.

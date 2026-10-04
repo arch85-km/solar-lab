@@ -103,10 +103,12 @@ which carry their own licences and remain under them.
 three.js — the only runtime dependency
 --------------------------------------------------------------------------------
 
-Loaded from jsDelivr at https://cdn.jsdelivr.net/npm/three@0.185.1/ — the app
-itself contains no three.js code. If you self-host three.js instead (the offline
-option in the README), you are redistributing copies and this notice must ship
-alongside them.
+Bundled into index.html as of 1.1.0 — r185 (0.185.1), minified, with its
+@license headers intact. The app therefore contains and redistributes three.js
+code, so this notice travels with every copy of the file, as the licence
+requires. Nothing is fetched from a CDN at runtime.
+
+Add-ons included: OrbitControls and OBJLoader.
 
 Project: https://github.com/mrdoob/three.js
 
