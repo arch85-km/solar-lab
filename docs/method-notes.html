@@ -1048,9 +1048,11 @@ out geom;</div>
       <b><a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a></b>.
       Both permit any use, including commercial, and ask only that you credit the author:
       <span class="sl-mono">Solar Analysis Lab © 2026 Karam Al-Obaidi, licensed under CC BY 4.0</span>.
-      The tool loads <a href="https://threejs.org" target="_blank" rel="noopener">three.js</a>
-      (also MIT) from jsDelivr at runtime rather than bundling it, so none of it is redistributed
-      with the file; if you self-host it instead, its notice must travel with your copy.</p>
+      As of 1.1.0 the tool <b>bundles</b> <a href="https://threejs.org" target="_blank" rel="noopener">three.js</a>
+      r185 (also MIT) into the file rather than fetching it from a CDN, so the app runs with no
+      network &mdash; and so every copy of the file redistributes three.js code. Its notice
+      therefore travels with the file: it is reproduced in <span class="sl-mono">NOTICE</span> and
+      its <span class="sl-mono">@license</span> headers survive inside the bundled block.</p>
 
     <p>One further licence applies. The Perez sky coefficients and the Tregenza/Reinhart patch
       construction are reimplemented from <b>Radiance</b>, under the Radiance Software License
@@ -1220,9 +1222,10 @@ out geom;</div>
 
       <li><span class="sl-chip is-in">names it</span><b>three.js</b>, version 0.185.1 —
         <a href="https://threejs.org" target="_blank" rel="noopener">threejs.org</a>. MIT
-        licensed, © 2010–2026 three.js authors. Loaded from jsDelivr at runtime.<br>
-        <b>Code:</b> named in the file header as the only runtime dependency, and imported by
-        the importmap. Rendering, the shadow map and the OBJ loader. It takes no part in the
+        licensed, © 2010–2026 three.js authors. Bundled into the file as of 1.1.0, minified,
+        with its licence headers intact.<br>
+        <b>Code:</b> named in the file header as the only runtime dependency, and reaching the
+        application as a global rather than through an import map. Rendering, the shadow map and the OBJ loader. It takes no part in the
         irradiance calculation — the ray-tracing worker is written without it and receives raw
         triangle data, which the worker's own header says is deliberate.</li>
     </ul>
@@ -1290,8 +1293,8 @@ out geom;</div>
     <ul class="sl-refs">
       <li><b>Grasshopper</b> — named once, only to say which environment students will recognise
         the default colour ramp from. Nothing is taken from it.</li>
-      <li><b>jsDelivr</b> — the CDN three.js is fetched from. A delivery mechanism, not a
-        source.</li>
+      <li><b>jsDelivr</b> — the CDN three.js was fetched from before 1.1.0 bundled it into
+        the file. A delivery mechanism, not a source, and no longer used at all.</li>
       <li><b>The Radiance Software License v2.0</b> and the <b>MIT License</b> — named in the
         file header as licences. They govern reuse and are set out in the Licence note below; they are not
         methodological sources.</li>
