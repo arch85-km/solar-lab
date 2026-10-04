@@ -1049,8 +1049,8 @@ out geom;</div>
       Both permit any use, including commercial, and ask only that you credit the author:
       <span class="sl-mono">Solar Analysis Lab © 2026 Karam Al-Obaidi, licensed under CC BY 4.0</span>.
       As of 1.1.0 the tool <b>bundles</b> <a href="https://threejs.org" target="_blank" rel="noopener">three.js</a>
-      r185 (also MIT) into the file rather than fetching it from a CDN, so the app runs with no
-      network &mdash; and so every copy of the file redistributes three.js code. Its notice
+      r185 (also MIT) into the file rather than fetching it from a CDN, so no library is loaded
+      at run time &mdash; and so every copy of the file redistributes three.js code. Its notice
       therefore travels with the file: it is reproduced in <span class="sl-mono">NOTICE</span> and
       its <span class="sl-mono">@license</span> headers survive inside the bundled block.</p>
 
@@ -1071,20 +1071,25 @@ out geom;</div>
       citation is the scholarly act on top of that.</p>
     <p class="sl-ref">Al-Obaidi, K. M. (2026). <i>Solar Analysis Lab: A browser-based sun path and solar irradiance tool</i>
       (Version 1.1.0) [Computer software]. Zenodo.
-      <a href="https://doi.org/10.5281/zenodo.22812940" target="_blank" rel="noopener">https://doi.org/10.5281/zenodo.22812940</a></p>
+      <a href="https://doi.org/10.5281/zenodo.22812939" target="_blank" rel="noopener">https://doi.org/10.5281/zenodo.22812939</a></p>
 <pre>@software{alobaidi2026solaranalysislab,
   author    = {Al-Obaidi, Karam M.},
   title     = {Solar Analysis Lab: A browser-based sun path and solar irradiance tool},
   year      = {2026},
   version   = {1.1.0},
   publisher = {Zenodo},
-  doi       = {10.5281/zenodo.22812940},
+  doi       = {10.5281/zenodo.22812939},
   url       = {https://karam.me.uk/applications/solar-analysis-lab/},
   note      = {Code MIT licensed; accompanying material CC BY 4.0}
 }</pre>
-    <p>That DOI names this release. To cite the software in general rather than version 1.1.0, use
-      the concept DOI <a href="https://doi.org/10.5281/zenodo.22812939" target="_blank" rel="noopener">10.5281/zenodo.22812939</a>,
-      which always resolves to the newest version.</p>
+    <p>That is the <b>concept DOI</b>: it always resolves to the newest version, so a citation
+      written against it keeps pointing at the living work. Each release also gets a
+      <b>version DOI</b>, frozen on that release, and it is the better one to quote when you
+      are reporting figures someone should be able to reproduce.
+      <a href="https://doi.org/10.5281/zenodo.22812940" target="_blank" rel="noopener">10.5281/zenodo.22812940</a>
+      is version 1.0.0's. Version 1.1.0's is minted when this release is archived on Zenodo,
+      and this page will name it once it exists &mdash; until then, cite the concept DOI above
+      and give the version number, which the app reports in its own Licence and credits panel.</p>
 
     <h4>What to report alongside any figure</h4>
     <p>Five settings change the numbers, and a value quoted without them cannot be reproduced.
