@@ -76,5 +76,39 @@ for (const doc of docs) {
   }
 }
 
+/* The citation the app itself hands a reader. It is the copy most likely to be
+   pasted straight into a bibliography, and it sat for two releases naming a
+   title no record anywhere carried: "An interactive sun path, shadow and
+   irradiance tool", against CITATION.cff's "A browser-based sun path and solar
+   irradiance tool". The DOI resolved, so the mistake survived every check that
+   looked at DOIs. Compare the title too.
+
+   The panel builds its strings by concatenating source literals across lines,
+   so the literal punctuation is stripped before comparing: `\n' +` joins, the
+   quotes around each fragment, and the indentation BibTeX uses to wrap a long
+   title field. */
+const cffTitle = cff
+  ? ((cff.match(/^title:[ \t]*(.+)$/m) || [])[1] || '').trim().replace(/^["']|["']$/g, '')
+  : null;
+if (cffTitle && has('index.html')) {
+  const app = read('index.html');
+  const flat = (block) => block
+    .replace(/\\n/g, ' ')          // the newlines the panel renders
+    .replace(/'\s*\+\s*'/g, '')    // fragment joins
+    .replace(/'/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  for (const [what, re] of [
+    ['APA', /about-apa'\)\.textContent\s*=([\s\S]{0,400}?);/],
+    ['BibTeX', /about-bib'\)\.textContent\s*=([\s\S]{0,900}?);/],
+  ]) {
+    const m = app.match(re);
+    ok(`the app's ${what} citation names the title CITATION.cff declares`,
+      !!m && flat(m[1]).includes(cffTitle),
+      m ? `found "${(flat(m[1]).match(/Solar Analysis Lab[^(}]*/) || ['?'])[0].trim()}"`
+        : 'citation block not found');
+  }
+}
+
 console.log(`\n  ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
