@@ -894,6 +894,7 @@ body.embed{--topbar-h:44px}
               <div class="row col"><label for="i-tz">Time zone (UTC)</label><input type="number" id="i-tz" step="0.5" min="-12" max="14" value="0"></div>
               <div class="row col"><label for="i-elev">Elevation m</label><input type="number" id="i-elev" step="1" value="25"></div>
             </div>
+            <p class="hint tz-note" id="tz-note" hidden></p>
             <div class="row col">
               <div class="lbl-row">
                 <label for="i-north">Project north rotation &mdash; <span id="v-north" class="num">0&deg;</span></label>
@@ -21187,6 +21188,10 @@ function applySiteFields(){
   rebuildAll();
 }
 ['i-lat','i-lon','i-tz','i-elev'].forEach(id => on(id, 'change', applySiteFields));
+// Setting the zone by hand, or choosing a preset city, is a confirmation:
+// the estimate note belongs only to a zone nobody has looked at yet.
+on('i-tz', 'change', () => markTzEstimated(false));
+on('i-city', 'change', () => markTzEstimated(false));
 
 on('i-city', 'change', (e) => {
   const v = e.target.value;
@@ -21697,22 +21702,68 @@ async function runSearch(input = $('i-search'), out = $('search-results')){
 }
 
 /**
- * Move the site to a searched place. Time zone is *not* guessed — it cannot be
- * derived from coordinates without another service, and a wrong zone silently
- * shifts every sun position, so the user is told to check it.
+ * The nominal zone for a longitude: the sun is overhead at 12:00 in a zone
+ * whose meridian is lon, and zones are 15 degrees wide.
+ *
+ * It is an estimate, not a lookup. It is right for most of the world — New York
+ * -5, Tokyo +9, Sydney +10 — and wrong wherever a country has chosen a zone its
+ * longitude does not imply: France and Spain run an hour ahead of theirs, India
+ * is on a half hour, China keeps one zone across five. A real answer needs a
+ * timezone-boundary lookup, which is a service this app deliberately does not
+ * depend on.
+ *
+ * Estimating is still much better than not setting it. What this replaced was
+ * the zone from wherever the site happened to be before, which in the case that
+ * prompted this was +1 against New York — a five-hour error that drew the
+ * morning sun at half past twelve and looked entirely plausible.
+ */
+function zoneFromLongitude(lon){
+  return clamp(Math.round(lon / 15), -12, 14);
+}
+
+/**
+ * Move the site to a searched place.
+ *
+ * The time zone is estimated from the longitude and flagged as an estimate,
+ * rather than left at whatever the previous site used. Geocoding returns no
+ * zone, and a stale one silently shifts every sun position in the file: the
+ * numbers stay plausible, the shadows stay crisp, and nothing says anything is
+ * wrong. An estimate is wrong by at most an hour or so where it is wrong at
+ * all, and the note below the field says it is a guess until confirmed.
  */
 function pickPlace(lat, lon, name){
+  const tz = zoneFromLongitude(lon);
   State.site.lat = lat; State.site.lon = lon; State.site.name = name;
+  State.site.tz = tz;
   $('i-lat').value = lat.toFixed(4);
   $('i-lon').value = lon.toFixed(4);
+  $('i-tz').value = tz;
   $('i-city').value = '';
   $('search-results').innerHTML = '';
   $('tb-results-list').innerHTML = '';
   $('tb-results').hidden = true;
   $('tb-q').value = '';
+  markTzEstimated(true);
   rebuildAll();
   if (State.basemap.source === 'osm') loadBasemapTiles();
-  toast('Moved to ' + name + ' — check the time zone is right for this location.', 'info', 6500);
+  toast('Moved to ' + name + ' — time zone estimated as UTC' +
+        (tz >= 0 ? '+' : '') + tz + ' from the longitude. Check it.', 'info', 7000);
+}
+
+/**
+ * Say, next to the field, whether the zone was estimated or confirmed. The
+ * toast that used to carry this alone is gone in six seconds; a sun path quoted
+ * in a report is not.
+ */
+function markTzEstimated(estimated){
+  const note = $('tz-note');
+  if (!note) return;
+  note.hidden = !estimated;
+  note.textContent = estimated
+    ? 'Estimated from the longitude — geocoding does not return a time zone. '
+      + 'Correct it if this place keeps a zone its longitude does not imply '
+      + '(France, Spain, India, China), then save the location to keep it.'
+    : '';
 }
 on('b-search', 'click', () => runSearch($('i-search'), $('search-results')));
 on('i-search', 'keydown', (e) => {
