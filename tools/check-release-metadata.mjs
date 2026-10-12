@@ -82,10 +82,38 @@ ok(`a version DOI for ${VERSION} ${releaseDoi ? 'is declared' : 'is not minted y
   true,
   releaseDoi || `documents cite the concept DOI ${conceptDoi} until Zenodo mints one`);
 
+/* --- the date that goes with it ----------------------------------------
+   The version was checked in every file that prints it and the date in none,
+   so 1.2.0 shipped showing "1.2.0 · 4 October 2026" in the About panel: the
+   version bumped, the date left behind. RELEASED is a second stamp in
+   index.html that no test read and nothing builds from, which is exactly the
+   drift this file exists to catch. */
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
+                'August', 'September', 'October', 'November', 'December'];
+const cffDate = cff
+  ? ((cff.match(/^date-released:[ \t]*"?(\d{4}-\d{2}-\d{2})"?/m) || [])[1] || null)
+  : null;
+const longDate = (iso) => {
+  const d = new Date(iso + 'T00:00:00Z');
+  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+};
+if (cffDate && has('index.html')) {
+  const released = (read('index.html').match(/const RELEASED\s*=\s*'([^']+)'/) || [])[1];
+  ok("index.html's RELEASED agrees with CITATION.cff",
+    released === cffDate, `index.html ${released}, CITATION.cff ${cffDate}`);
+}
+
 for (const doc of docs) {
   const html = read(doc);
   const byline = (html.match(/Version<\/b>[^0-9]*([0-9][0-9.]*)/) || [])[1];
   ok(`${doc} byline names ${VERSION}`, byline === VERSION, `byline ${byline}`);
+
+  if (cffDate) {
+    const bylineDate = (html.match(/Version<\/b>[^0-9]*[0-9][0-9.]*\s*(?:&middot;|\u00b7)\s*([^<]+)/) || [])[1];
+    ok(`${doc} byline is dated ${longDate(cffDate)}`,
+      (bylineDate || '').trim() === longDate(cffDate),
+      `byline dated ${(bylineDate || '(none)').trim()}`);
+  }
 
   const bibDoi = (html.match(/doi\s*=\s*\{([^}]+)\}/) || [])[1];
   if (bibDoi) {
