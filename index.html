@@ -19257,6 +19257,17 @@ function lineFromPoints(points, color, opacity = 1, width = 1, over = false){
  * to be laid over the site to make the chart readable.
  */
 const CHART_W = { arc: 0.0060, solstice: 0.0082, today: 0.0090 };
+/*
+ * The same, for the dome over a map. The flattened chart leaves its hairlines
+ * one pixel wide because at that scale, flat on the ground, they read; the dome
+ * cannot, because WebGL gives every line one pixel however far away it is. Zoom
+ * out and hundreds of them converge into a mass that looks solid; zoom in and
+ * each has to hold on its own against a street map, which is when the chart
+ * appeared to fade. So on the dome every stroke gets a real width, the fine
+ * ones thinner than an arc as they are on a printed chart.
+ */
+const CHART_W_DOME = { grid: 0.0016, tick: 0.0018, rim: 0.0030, hour: 0.0022,
+                       arc: 0.0045, solstice: 0.0060, today: 0.0066 };
 // Calibrated against the default top-view framing, where the chart spans most
 // of the viewport: a month arc lands near 2 px and a solstice near 3, with a
 // crisp outline either side. The first attempt was twice this with a casing at
@@ -19365,7 +19376,10 @@ function setChartAt(x, z){
 
 /** Redraw the flattened chart after the ground under it changes. */
 function restyleChart(){
-  if (!isStereo()) return;
+  // Both projections now draw against what is behind them: the flattened chart
+  // picks its ink from the map, and the dome widens its strokes into ribbons
+  // over one. So arriving or leaving imagery rebuilds either, where this used
+  // to return early on the dome and leave it drawn for the wrong background.
   todayArc = null;
   buildSunPath();
 }
@@ -19406,26 +19420,68 @@ const CHART_ORDER = { casing: 810, hair: 815, ink: 820 };
 const CHART_HAIRLINE = new Set(['grid', 'tick', 'rim', 'hour']);
 
 /**
- * A flat polyline as a triangle strip in the ground plane.
+ * Does this curve sit on the dome, or flat on the ground?
  *
- * Every point is at the same height in stereographic mode, so the offset
- * direction is simply the 2D normal of the path in XZ — no need for a general
- * fat-line implementation or the extra CDN modules that would come with it.
+ * A ribbon has to be widened in the surface the curve lies in, or it is seen
+ * edge-on and vanishes. For the flattened chart that surface is always the
+ * ground. On the dome it is the sphere, except for the pieces that are drawn on
+ * the ground anyway — the compass rose, and the horizon rim where the dome
+ * meets it. Mean height decides: a curve hugging the ground is widened about
+ * the vertical, anything standing clear of it about the radius it sits on.
  */
-function ribbonFromPoints(points, color, widthM, opacity = 1, renderOrder = 0){
+function ribbonLiesOnDome(points){
+  let sumY = 0, maxR = 0;
+  for (const p of points){
+    sumY += Math.abs(p.y);
+    maxR = Math.max(maxR, Math.hypot(p.x, p.y, p.z));
+  }
+  return maxR > 1e-6 && (sumY / points.length) / maxR > 0.02;
+}
+
+/**
+ * A polyline as a triangle strip, widened in the surface it lies in.
+ *
+ * For the flattened chart every point is at the same height, so the offset is
+ * the 2D normal of the path in XZ. On the dome the offset is taken about the
+ * radial direction instead, which lays the ribbon tangent to the sphere — the
+ * same thing a globe does with a flight path. Either way this is a handful of
+ * triangles rather than a general fat-line implementation and the extra modules
+ * that would come with it.
+ */
+function ribbonFromPoints(points, color, widthM, opacity = 1, renderOrder = 0,
+                          onDome = false){
   const n = points.length;
   const pos = new Float32Array(n * 6);
   const idx = [];
   const half = Math.max(widthM, 1e-4) / 2;
+  const radial = onDome && ribbonLiesOnDome(points);
   for (let i = 0; i < n; i++){
     const prev = points[Math.max(i - 1, 0)], next = points[Math.min(i + 1, n - 1)];
-    let tx = next.x - prev.x, tz = next.z - prev.z;
-    const len = Math.hypot(tx, tz);
-    if (len < 1e-9){ tx = 1; tz = 0; } else { tx /= len; tz /= len; }
-    const nx = -tz * half, nz = tx * half;       // 2D normal, scaled to half width
     const p = points[i];
-    pos[i * 6 + 0] = p.x + nx; pos[i * 6 + 1] = p.y; pos[i * 6 + 2] = p.z + nz;
-    pos[i * 6 + 3] = p.x - nx; pos[i * 6 + 4] = p.y; pos[i * 6 + 5] = p.z - nz;
+    let ox, oy, oz;
+    if (radial){
+      // offset = tangent x up, with up the outward radius through this point
+      let tx = next.x - prev.x, ty = next.y - prev.y, tz = next.z - prev.z;
+      let tl = Math.hypot(tx, ty, tz);
+      if (tl < 1e-9){ tx = 1; ty = 0; tz = 0; tl = 1; }
+      tx /= tl; ty /= tl; tz /= tl;
+      let ux = p.x, uy = p.y, uz = p.z;
+      let ul = Math.hypot(ux, uy, uz);
+      if (ul < 1e-9){ ux = 0; uy = 1; uz = 0; ul = 1; }
+      ux /= ul; uy /= ul; uz /= ul;
+      ox = ty * uz - tz * uy; oy = tz * ux - tx * uz; oz = tx * uy - ty * ux;
+      const ol = Math.hypot(ox, oy, oz);
+      if (ol < 1e-9){ ox = -tz; oy = 0; oz = tx; }   // curve along the radius
+      else { ox /= ol; oy /= ol; oz /= ol; }
+      ox *= half; oy *= half; oz *= half;
+    } else {
+      let tx = next.x - prev.x, tz = next.z - prev.z;
+      const len = Math.hypot(tx, tz);
+      if (len < 1e-9){ tx = 1; tz = 0; } else { tx /= len; tz /= len; }
+      ox = -tz * half; oy = 0; oz = tx * half;     // 2D normal, scaled to half width
+    }
+    pos[i * 6 + 0] = p.x + ox; pos[i * 6 + 1] = p.y + oy; pos[i * 6 + 2] = p.z + oz;
+    pos[i * 6 + 3] = p.x - ox; pos[i * 6 + 4] = p.y - oy; pos[i * 6 + 5] = p.z - oz;
     if (i < n - 1){
       const a = i * 2;
       idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
@@ -19449,13 +19505,30 @@ function ribbonFromPoints(points, color, widthM, opacity = 1, renderOrder = 0){
 }
 
 /**
- * Add one chart stroke to a group: a cased ribbon in stereographic mode, the
- * original hairline in the 3D dome, which is unchanged by any of this.
+ * Add one chart stroke to a group: a cased ribbon over a map, in either
+ * projection, and the original hairline on the theme's own ground.
+ *
+ * Over the theme's ground the dome keeps its one-pixel lines: there is nothing
+ * behind them to compete with, and widening them there would change every view
+ * anyone has ever framed. It is only imagery and street maps that a hairline
+ * cannot survive.
  */
 function addChartLine(group, points, color, weightKey, opacity3d = 1){
   if (points.length < 2) return;
   if (!isStereo()){
-    group.add(lineFromPoints(points, color, opacity3d));
+    if (!overBasemap() || !CHART_W_DOME[weightKey]){
+      group.add(lineFromPoints(points, color, opacity3d));
+      return;
+    }
+    const kd = sunPathRadius * State.disp.chart;
+    const wd = CHART_W_DOME[weightKey] * kd;
+    const casd = chartCasing();
+    group.add(ribbonFromPoints(points, casd.color, wd + CASING_EXTRA * kd * 0.55,
+                               casd.alpha * 0.8, CHART_ORDER.casing, true));
+    const inkd = ribbonFromPoints(points, color, wd, opacity3d,
+                                  CHART_ORDER.ink, true);
+    inkd.name = 'chartInk';
+    group.add(inkd);
     return;
   }
   if (CHART_HAIRLINE.has(weightKey)){
@@ -21290,7 +21363,9 @@ function refresh(force = false){
   if (force || now - statusThrottle > 110){ statusThrottle = now; updateStatusBar(); }
   Selects.syncAll();
   // The clarity slider only does anything to the flattened chart
-  $('row-chart').style.display = isStereo() ? '' : 'none';
+  // The weight slider does something wherever the strokes have a width: the
+  // flattened chart always, and the dome once it is drawn over a map.
+  $('row-chart').style.display = (isStereo() || overBasemap()) ? '' : 'none';
   if (State.disp.today) rebuildTodayArc();
 }
 

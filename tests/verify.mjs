@@ -1243,6 +1243,113 @@ check('an incomplete template is refused before any request is made',
       /Enter the tile URL template/.test(customFail.refused),
       customFail.refused);
 
+/* ------------------------------------------ the dome over a map as well --- */
+console.log('\n=== the 3D dome over a map ===');
+
+/*
+ * WebGL ignores line width: every THREE.Line is one pixel however far away it
+ * is. The flattened chart solved that years ago by drawing each stroke as a
+ * ribbon of real width with a casing under it, but the dome never got the same
+ * treatment — onMap was `flat && overBasemap()` — so over a street map or an
+ * aerial its hairlines had to hold on their own against all that detail, which
+ * is what "the sun path is faded when I zoom in" meant.
+ *
+ * Two things have to be true. Over a map the dome must lay down more ink than
+ * hairlines did. On the theme's own ground it must be untouched, because there
+ * is nothing behind it to compete with and widening it there would change every
+ * view anyone has framed.
+ */
+const domeOnMap = await page.evaluate(async () => {
+  const A = window.__SUNAPP;
+  const settle = () => new Promise(r => requestAnimationFrame(() =>
+                          requestAnimationFrame(() => setTimeout(r, 300))));
+  const busyMap = async () => {
+    const c = document.createElement('canvas'); c.width = c.height = 256;
+    const g = c.getContext('2d');
+    g.fillStyle = '#efeadf'; g.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 600; i++){
+      g.fillStyle = ['#d9cfc0', '#cfd9c6', '#e6d7d7', '#c9d4e2'][i % 4];
+      g.fillRect(Math.random()*256, Math.random()*256, 4 + Math.random()*20, 4 + Math.random()*20);
+    }
+    const img = new Image();
+    await new Promise(res => { img.onload = res; img.src = c.toDataURL(); });
+    return img;
+  };
+  const ribbons = () => {
+    let n = 0, widest = 0;
+    A.sunPathGroup.traverse(o => {
+      if (!(o.isMesh && o.name === 'chartInk')) return;
+      n++;
+      // the strip is built as paired vertices either side of the path, so the
+      // distance between the first pair is the stroke width in metres
+      const p = o.geometry.getAttribute('position');
+      if (p && p.count >= 2){
+        const dx = p.getX(0) - p.getX(1), dy = p.getY(0) - p.getY(1), dz = p.getZ(0) - p.getZ(1);
+        widest = Math.max(widest, Math.hypot(dx, dy, dz));
+      }
+    });
+    return { n, widest: +widest.toFixed(3) };
+  };
+  const cnv = document.querySelector('canvas');
+  const grab = () => {
+    const t = document.createElement('canvas'); t.width = cnv.width; t.height = cnv.height;
+    t.getContext('2d').drawImage(cnv, 0, 0);
+    return t.getContext('2d').getImageData(0, 0, t.width, t.height).data;
+  };
+  const CHART = ['d-arcs', 'd-analemma', 'd-today', 'd-compass', 'd-rings'];
+  const chart = async (on) => {
+    for (const id of CHART){
+      const e = document.getElementById(id);
+      e.checked = on; e.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    await settle();
+  };
+  const ink = async () => {
+    await chart(true); const on = grab();
+    await chart(false); const off = grab();
+    await chart(true);
+    let d = 0;
+    for (let i = 0; i < on.length; i += 4)
+      d += Math.abs((0.2126*on[i] + 0.7152*on[i+1] + 0.0722*on[i+2])
+                  - (0.2126*off[i] + 0.7152*off[i+1] + 0.0722*off[i+2]));
+    return +(d / (on.length / 4)).toFixed(2);
+  };
+
+  document.querySelector('[data-p="3d"]').click();
+  await settle();
+  // on the theme's own ground
+  A.State.basemap.source = 'none';
+  A.Basemap.clear();
+  A.refresh(true);
+  await settle();
+  const bare = { ribbons: ribbons(), ink: await ink() };
+  // over a map
+  A.State.basemap.source = 'image';
+  A.Basemap.loadImage(await busyMap(), 300, 'street.png');
+  A.refresh(true);
+  await settle();
+  const onMap = { ribbons: ribbons(), ink: await ink(), radius: A.State.disp.chart };
+  A.State.basemap.source = 'none';
+  A.Basemap.clear();
+  A.refresh(true);
+  return { bare, onMap };
+});
+check('over the theme\'s own ground the dome is still hairlines, as it was',
+      domeOnMap.bare.ribbons.n === 0, 'no ribbon meshes in the dome without a map');
+check('over a map the dome strokes become ribbons instead of one-pixel lines',
+      domeOnMap.onMap.ribbons.n > 0, domeOnMap.onMap.ribbons.n + ' ribbon strokes');
+/*
+ * The width is what the whole change is for, and it is the one thing that can
+ * be asserted without comparing two different backgrounds: a one-pixel line has
+ * no width in metres at all, so a positive one means the stroke now scales with
+ * the chart rather than with the screen. The first version of this check
+ * compared ink over a map against ink on bare ground, which measures the
+ * backgrounds as much as the chart and tells you nothing about either.
+ */
+check('and those ribbons have a real width in metres, which a line never had',
+      domeOnMap.onMap.ribbons.widest > 0.02,
+      'widest stroke ' + domeOnMap.onMap.ribbons.widest + ' m');
+
 /* --------------------------------------- the chart over a map it can read --- */
 console.log('\n=== the chart reads on a dark map as well as a pale one ===');
 

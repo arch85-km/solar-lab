@@ -217,12 +217,18 @@ way a map draws a road over a photograph. (WebGL ignores line width, so a ribbon
 only way to get a line thicker than a pixel — but a ribbon *narrower* than a pixel cannot
 be rasterised cleanly, which is why the two are mixed rather than one or the other.)
 
+The **3D dome gets the same treatment over a map**, and only there. Off a map its hairlines
+have nothing to compete with and are left alone; over one they become ribbons too, because a
+one-pixel line that reads when the whole dome is small on screen has to hold on its own once
+you zoom in and the lines separate over all that detail.
+
 The palette follows what is behind the chart rather than the interface: off a map it uses
-the dome's own greys, and on a map — pale in both presentations, since street maps have no
-dark mode — it switches to print ink with a white halo. Nothing is ever laid behind the
-chart: the site stays visible between the lines. The *Chart line weight* slider scales the
-sun paths from 0.5× to 2.5× for a projector or a handout; it appears only in the flattened
-view, since that is the only place it does anything.
+the dome's own greys, and on a map it switches to ink the map can carry — dark with a white
+halo on a street map, light with a dark one over an aerial, decided by measuring the map
+rather than assuming. Nothing is ever laid behind the chart: the site stays visible between
+the lines. The *Chart line weight* slider scales the sun paths from 0.5× to 2.5× for a
+projector or a handout; it appears wherever the strokes have a width — the flattened view
+always, and the dome once there is a map under it.
 
 **Place on site** — the chart normally sits on the model centre. Press *Place on site* in
 Sun Path Display and click the spot you want it over: a courtyard, a roof, a street corner.
