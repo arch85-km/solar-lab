@@ -277,6 +277,54 @@ owner's quota.
 
 
 --------------------------------------------------------------------------------
+Time-zone boundaries — public domain
+--------------------------------------------------------------------------------
+
+Searching for a place reads its standard UTC offset from a grid embedded in
+index.html: one value for every 0.25 degree cell on Earth, rasterised from the
+time-zone boundaries of the IANA Time Zone Database by tools/build-tz-grid.py.
+
+    https://www.iana.org/time-zones
+
+The database is in the public domain, as its own licence states, so no
+attribution is required. It is recorded here because knowing which boundaries a
+lookup came from matters more than the licence does.
+
+
+--------------------------------------------------------------------------------
+Earth topography — CC BY 4.0 over a public-domain source
+--------------------------------------------------------------------------------
+
+Searching for a place also reads its elevation from a grid embedded in
+index.html: height above mean sea level for every 0.25 degree cell on Earth, in
+50 m steps clamped to 0-2500 m, rasterised by tools/build-elevation-grid.py
+from
+
+    Uieda, L. and the Fatiando a Terra project (2022). Earth topography grid at
+    10 arc-minute resolution. Zenodo.   doi:10.5281/zenodo.5882203
+
+which is licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/).
+Attribution is a condition of that licence, and this notice provides it, as does
+the data-sources list in the method notes. Changes made: resampled to a 0.25
+degree grid, quantised to 50 m, clamped to 0-2500 m, run-length encoded.
+
+That grid derives in turn from ETOPO1, which is US Government work in the public
+domain:
+
+    Amante, C. & Eakins, B. W. (2009). ETOPO1 1 Arc-Minute Global Relief Model:
+    Procedures, Data Sources and Analysis. NOAA Technical Memorandum NESDIS
+    NGDC-24.   doi:10.7289/V5C8276M
+
+The ice-surface heights were expanded in spherical harmonics to degree 720 by
+the ICGEM calculation service, which smooths the result over roughly 28 km. The
+method notes say what that costs and why it is the right trade here.
+
+If you redistribute this app, the CC BY attribution above has to travel with it.
+Keeping this file beside index.html satisfies that, as does keeping the method
+notes; dropping both does not.
+
+
+--------------------------------------------------------------------------------
 Weather data, colour schemes and fonts
 --------------------------------------------------------------------------------
 

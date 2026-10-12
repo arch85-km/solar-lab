@@ -2333,6 +2333,153 @@ check('at solar noon the sun sits on the meridian everywhere in the table',
                          : meridian.length + ' place-days, worst ' +
                            Math.max(...meridian.map(r => r.off)).toFixed(2) + ' deg off');
 
+/* ------------------------------------------------------- site elevation --- */
+console.log('\n=== elevation from coordinates ===');
+
+/*
+ * Searching a place used to leave the elevation field at the previous site's
+ * value, which fed Hottel's A term and so the clear-sky beam. The elevations
+ * below are the app's own hand-checked preset values, so the grid is measured
+ * against the same numbers the dropdown has always carried.
+ */
+const ELEVS = [
+  ['London',       51.48,   -0.45,   25],
+  ['Edinburgh',    55.95,   -3.35,   41],
+  ['Oslo',         59.91,   10.75,   17],     // fjord city, the grid's worst
+  ['Berlin',       52.47,   13.40,   37],
+  ['Paris',        48.73,    2.40,   96],
+  ['Madrid',       40.45,   -3.55,  582],
+  ['Rome',         41.80,   12.23,    3],
+  ['Athens',       37.90,   23.73,   15],
+  ['Moscow',       55.75,   37.63,  156],
+  ['Cairo',        30.13,   31.40,   74],
+  ['Dubai',        25.25,   55.33,    5],
+  ['Mumbai',       19.12,   72.85,   14],
+  ['Singapore',     1.37,  103.98,   16],
+  ['Beijing',      39.93,  116.28,   55],
+  ['Tokyo',        35.68,  139.77,   36],
+  ['Sydney',      -33.95,  151.18,    3],
+  ['Nairobi',      -1.32,   36.92, 1624],
+  ['Cape Town',   -33.98,   18.60,   42],
+  ['Sao Paulo',   -23.62,  -46.65,  803],
+  ['New York',     40.78,  -73.97,   40],
+  ['Chicago',      41.98,  -87.92,  201],
+  ['Denver',       39.83, -104.66, 1650],
+  ['Los Angeles',  33.93, -118.40,   32],
+  ['Reykjavik',    64.13,  -21.90,   61],
+];
+const elevRead = await page.evaluate((places) => {
+  const A = window.__SUNAPP;
+  return places.map(([n, lat, lon]) => A.elevationFromGrid(lat, lon));
+}, ELEVS);
+const elevErr = ELEVS.map((p, i) => ({ n: p[0], want: p[3], got: elevRead[i],
+                                       e: Math.abs(elevRead[i] - p[3]) }));
+const elevOver = elevErr.filter(r => r.e > 200);
+const elevMedian = elevErr.map(r => r.e).sort((a, b) => a - b)[Math.floor(ELEVS.length / 2)];
+check('every preset city reads its own elevation to within 200 m',
+      elevOver.length === 0,
+      elevOver.length ? elevOver.map(r => `${r.n} ${r.got} not ${r.want}`).join(', ')
+                      : `median error ${elevMedian} m, worst ` +
+                        Math.max(...elevErr.map(r => r.e)) + ' m');
+check('the grid decoded, so the field is not keeping the previous site\'s value',
+      elevRead[ELEVS.findIndex(p => p[0] === 'Nairobi')] >= 1400,
+      'Nairobi reads ' + elevRead[ELEVS.findIndex(p => p[0] === 'Nairobi')] + ' m');
+
+/*
+ * What the elevation is actually for. Carrying London's 25 m to Nairobi cost a
+ * quarter of the clear-sky beam; the grid has to get that back, so compare the
+ * DNI at the looked-up elevation with the DNI at the hand-checked one.
+ */
+const beam = await page.evaluate((places) => {
+  const A = window.__SUNAPP;
+  return places.map(([n, lat, lon, want]) => {
+    const got = A.elevationFromGrid(lat, lon);
+    const dniGot = A.ClearSky.irradiance(30, 172, got).dni;
+    const dniWant = A.ClearSky.irradiance(30, 172, want).dni;
+    const dniStale = A.ClearSky.irradiance(30, 172, 25).dni;      // London's default
+    return { n, pct: 100 * (dniGot - dniWant) / dniWant,
+             stalePct: 100 * (dniStale - dniWant) / dniWant };
+  });
+}, ELEVS);
+const beamWorst = beam.slice().sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct))[0];
+const staleWorst = beam.slice().sort((a, b) => Math.abs(b.stalePct) - Math.abs(a.stalePct))[0];
+check('clear-sky beam is within 5 per cent of the hand-checked elevation everywhere',
+      Math.abs(beamWorst.pct) <= 5,
+      `worst ${beamWorst.n} ${beamWorst.pct.toFixed(1)}%`);
+check('which is the error the stale elevation used to cause, and much larger',
+      Math.abs(staleWorst.stalePct) > 20 && Math.abs(beamWorst.pct) < Math.abs(staleWorst.stalePct) / 4,
+      `stale was ${staleWorst.stalePct.toFixed(1)}% at ${staleWorst.n}`);
+
+/*
+ * Nothing is stored below sea level, because the app clamps elevation to
+ * 0-2500 m anyway and it makes every ocean one run. Note what the Dead Sea
+ * reads: not 0 but a few hundred metres, because the rift is about 15 km wide
+ * and the source grid is smoothed over roughly 28 km, so it cannot resolve it
+ * at all. That is the source's limit rather than the clamp's, and it is the
+ * reason the field is flagged for checking.
+ */
+const elevEdges = await page.evaluate(() => {
+  const A = window.__SUNAPP;
+  const deep = [[0, -140], [30, -40], [-50, 0], [31.5, 35.5], [36.3, -116.8], [41.5, 53]];
+  return {
+    ocean:     A.elevationFromGrid(0, -140),       // mid-Pacific
+    deadSea:   A.elevationFromGrid(31.5, 35.5),
+    belowZero: deep.map(([a, o]) => A.elevationFromGrid(a, o)).filter(v => v < 0).length,
+    altiplano: A.elevationFromGrid(-16.5, -68.15), // La Paz, near the 2500 m ceiling
+    antimer:   A.elevationFromGrid(-17.5, 180),
+    wrapped:   A.elevationFromGrid(51.48, -360.45),
+    pole:      A.elevationFromGrid(-90, 0),
+    nan:       A.elevationFromGrid(NaN, 0),
+  };
+});
+check('the open sea reads zero and no reading is ever below it',
+      elevEdges.ocean === 0 && elevEdges.belowZero === 0,
+      'ocean ' + elevEdges.ocean + ' m; the Dead Sea rift reads ' +
+      elevEdges.deadSea + ' m, too narrow for a grid smoothed over 28 km');
+check('elevation is clamped to the 2500 m Hottel ceiling, not beyond it',
+      elevEdges.altiplano > 2000 && elevEdges.altiplano <= 2500,
+      'La Paz reads ' + elevEdges.altiplano + ' m');
+check('wrapped longitudes find the same cell, and a bad coordinate returns null',
+      elevEdges.wrapped === 50 && elevEdges.nan === null && elevEdges.pole !== null,
+      JSON.stringify(elevEdges));
+
+const elevPick = await page.evaluate(() => {
+  const A = window.__SUNAPP;
+  const out = [];
+  for (const [n, lat, lon] of [['Nairobi', -1.292, 36.822], ['Mexico City', 19.43, -99.13],
+                               ['Rotterdam', 51.92, 4.48]]) {
+    A.pickPlace(lat, lon, n);
+    out.push({ n, field: document.getElementById('i-elev').value, state: A.State.site.el,
+               flagged: !document.getElementById('el-note').hidden });
+  }
+  const f = document.getElementById('i-elev');
+  f.value = '1624'; f.dispatchEvent(new Event('change', { bubbles: true }));
+  out.push({ n: 'edited', field: f.value, state: A.State.site.el,
+             flagged: !document.getElementById('el-note').hidden });
+  return out;
+});
+check('picking a place writes the elevation to the field and to the site',
+      elevPick.slice(0, 3).every(r => String(r.state) === r.field)
+      && Number(elevPick[0].field) >= 1400,
+      elevPick.slice(0, 3).map(r => r.n + ' ' + r.field + ' m').join(', '));
+check('a looked-up elevation is flagged for checking under the field',
+      elevPick.slice(0, 3).every(r => r.flagged), 'note shown for all three');
+check('editing the elevation clears the flag and takes the user\'s value',
+      elevPick[3].flagged === false && elevPick[3].state === 1624,
+      'note hidden, elevation now ' + elevPick[3].state + ' m');
+
+const epwClears = await page.evaluate((t) => {
+  const A = window.__SUNAPP;
+  A.pickPlace(-1.292, 36.822, 'Nairobi');                 // both flags up
+  A.applyEPW(A.EPW.parse(t, 'chicago.epw'));              // the file carries both
+  return { tz: !document.getElementById('tz-note').hidden,
+           el: !document.getElementById('el-note').hidden,
+           siteEl: A.State.site.el, siteTz: A.State.site.tz };
+}, epwText);
+check('loading a climate file clears both flags, because the file carries both',
+      epwClears.tz === false && epwClears.el === false,
+      'site now ' + epwClears.siteEl + ' m, UTC' + epwClears.siteTz);
+
 // Put the site back, as the place-search section does, so later checks are clean
 await page.evaluate((t) => {
   const A = window.__SUNAPP;

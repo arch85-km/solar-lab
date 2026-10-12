@@ -122,11 +122,12 @@ the building shadows, and is excluded from the radiation analysis.
 
 **Find a place** — there is a search box in the toolbar (or press `/`); the Location panel
 has the same one next to the coordinates. Type an address, postcode or building name and
-press Enter. The **time zone follows the place**: a geocoder returns no zone, so the app
-reads the standard offset from a time-zone map built into the page — no key, no network, and
-right for all but a few hundred border towns worldwide. It flags it for checking under the
-field until you confirm or save it, because a wrong zone silently shifts every sun position
-while every one of them still looks plausible.
+press Enter. The **time zone and the elevation follow the place**: a geocoder returns
+neither, so the app reads the standard offset from a time-zone map and the height above sea
+level from a topography map, both built into the page — no key, no network. Each is flagged
+for checking under its field until you confirm or save it. Both matter silently: a wrong
+zone shifts every sun position, and a wrong elevation moves the clear-sky beam by a quarter
+at a highland site, with every number still looking plausible.
 
 **Save this location** — once the time zone is right, give the site a name and press Save.
 It joins a *Saved locations* group at the top of the city list, carrying its coordinates,
@@ -420,6 +421,10 @@ bookkeeping are all consistent.
   boundary, too close for a cell that size to separate. Check it if the site is near one, and
   save the location to keep the correction. The lookup is standard time — summer time is the
   separate daylight-saving switch.
+- **So is the elevation**, from a topography grid smoothed over about 28 km: median error 26 m
+  against the preset cities, worst 183 m, and no below-sea-level ground at all. It feeds the
+  clear-sky model only — an EPW supplies its own — and it is flagged for checking like the
+  zone. Type the real figure for a mountain or valley site.
 - **Large meshes are slow.** Above ~200 000 triangles the app warns; decimate or use a
   coarser grid. Analysis points are capped at 120 000, with the grid coarsened
   automatically (and a notice) if a setting would exceed that.
