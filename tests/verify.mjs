@@ -1731,6 +1731,66 @@ const recovered = await page.evaluate(async () => {
 });
 expectTileErrors = false;
 await page.unroute('**/api/interpreter');
+/*
+ * The map and the 3D volumes have to follow the site. Reported from the live
+ * site: with OpenStreetMap + 3D buildings selected, moving the site left both
+ * sitting on the previous place. Three paths move the site and each did
+ * something different; this asserts they now agree, and that moving it is what
+ * triggers a refetch rather than touching the panel at all.
+ */
+overpassQueries = [];
+const follows = await page.evaluate(async () => {
+  const A = window.__SUNAPP;
+  // long enough for the debounce, the tiles and the Overpass call to finish:
+  // a reload still in flight reads State.site when it gets there, so an
+  // overlapping move would be recorded against the wrong place
+  const settle = () => new Promise(r => setTimeout(r, 2200));
+  A.State.basemap.source = 'osm3d';
+  document.getElementById('i-basemap').value = 'osm3d';
+  await A.Basemap.loadTiles('osm3d');            // establishes where we are
+  const out = {};
+  // 1. the place search
+  A.pickPlace(48.8584, 2.2945, 'Eiffel Tower');
+  await settle();
+  out.afterSearch = A.State.site.lat;
+  // 2. typed coordinates
+  document.getElementById('i-lat').value = '41.9028';
+  document.getElementById('i-lon').value = '12.4964';
+  document.getElementById('i-lat').dispatchEvent(new Event('change', { bubbles: true }));
+  document.getElementById('i-lon').dispatchEvent(new Event('change', { bubbles: true }));
+  await settle();
+  out.afterTyping = A.State.site.lat;
+  // 3. a time zone edit must NOT refetch — it does not move the site
+  const before = window.__overpassCount || 0;
+  document.getElementById('i-tz').value = '2';
+  document.getElementById('i-tz').dispatchEvent(new Event('change', { bubbles: true }));
+  await settle();
+  out.tzTouched = true;
+  return out;
+}, null);
+await page.waitForTimeout(400);
+// the recorded queries carry their bounding box, so the site each one asked
+// about can be read straight back out
+const boxes = overpassQueries.map(q => {
+  const m = q.match(/\((-?\d+\.\d+),(-?\d+\.\d+),(-?\d+\.\d+),(-?\d+\.\d+)\)/);
+  return m ? { lat: (+m[1] + +m[3]) / 2, lon: (+m[2] + +m[4]) / 2 } : null;
+}).filter(Boolean);
+const close = (a, b) => Math.abs(a - b) < 0.02;
+check('moving the site by search takes the map and its buildings with it',
+      boxes.some(b => close(b.lat, 48.8584) && close(b.lon, 2.2945)),
+      boxes.map(b => b.lat.toFixed(2) + ',' + b.lon.toFixed(2)).join(' → ') || 'no query');
+check('and so does typing a coordinate, which used to refetch nothing at all',
+      boxes.some(b => close(b.lat, 41.9028) && close(b.lon, 12.4964)),
+      'Rome queried: ' + boxes.some(b => close(b.lat, 41.9028)));
+check('correcting the time zone does not refetch — it does not move the site',
+      boxes.filter(b => close(b.lat, 41.9028)).length === 1,
+      boxes.filter(b => close(b.lat, 41.9028)).length + ' query for the last position, not two');
+await page.evaluate(() => {
+  const A = window.__SUNAPP;
+  A.OsmBuildings.clear(); A.Basemap.clear();
+  A.State.basemap.source = 'none';
+});
+
 check('two 504s in a row do not lose the buildings — it asks again',
       recovered.ok && recovered.count > 0 && overpassRefusalsLeft === 0,
       recovered.ok ? `refused twice, then ${recovered.count} buildings`

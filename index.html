@@ -21444,6 +21444,7 @@ function applySiteFields(){
   State.site.tz  = clamp(parseFloat($('i-tz').value) || 0, -12, 14);
   State.site.el  = parseFloat($('i-elev').value) || 0;
   rebuildAll();
+  refreshBasemapForSite();
 }
 ['i-lat','i-lon','i-tz','i-elev'].forEach(id => on(id, 'change', applySiteFields));
 // Setting the zone by hand, or choosing a preset city, is a confirmation:
@@ -21463,7 +21464,7 @@ on('i-city', 'change', (e) => {
   $('i-lat').value = c.lat; $('i-lon').value = c.lon;
   $('i-tz').value = c.tz;   $('i-elev').value = State.site.el;
   rebuildAll();
-  if (State.basemap.source !== 'none' && State.basemap.source !== 'image') loadBasemapTiles();
+  refreshBasemapForSite();
 });
 
 function resetNorth(){
@@ -21922,7 +21923,38 @@ on('i-bm-opacity', 'input', (e) => {
   $('v-bm-opacity').textContent = Math.round(State.basemap.opacity * 100) + '%';
 });
 
+/*
+ * The map and its volumes belong to the site, so they follow it wherever it
+ * goes. Three things moved the site and all three did something different: the
+ * city list reloaded every tiled source, the place search reloaded only plain
+ * OpenStreetMap, and typing a coordinate reloaded nothing at all. With
+ * OpenStreetMap + 3D buildings selected that left the map and the buildings
+ * sitting on the place you had just left, with nothing on screen to say so.
+ *
+ * An uploaded site image is not refetched: it is the user's own file at their
+ * own scale, not something fetched for a location.
+ *
+ * Only a change of coordinates counts. Editing the time zone or the elevation
+ * runs through the same handler, and refetching tiles — and a heavy Overpass
+ * query with them — because somebody corrected a time zone would be rude to
+ * both services and useless to the user. The short delay coalesces the two
+ * changes that typing a latitude and then a longitude produces.
+ */
+let basemapAt = null, basemapTimer = 0;
+
+function refreshBasemapForSite(){
+  const src = State.basemap.source;
+  if (src === 'none' || src === 'image') return;
+  const { lat, lon } = State.site;
+  if (basemapAt && Math.abs(basemapAt.lat - lat) < 1e-6
+                && Math.abs(basemapAt.lon - lon) < 1e-6) return;
+  clearTimeout(basemapTimer);
+  basemapTimer = setTimeout(loadBasemapTiles, 350);
+}
+
 async function loadBasemapTiles(){
+  clearTimeout(basemapTimer);
+  basemapAt = { lat: State.site.lat, lon: State.site.lon };
   const btn = $('b-bm-load');
   if (State.basemap.source === 'custom'){
     const problem = customTilesProblem();
@@ -22222,7 +22254,7 @@ function pickPlace(lat, lon, name){
   markTzEstimated(true);
   markElevEstimated(el !== null);
   rebuildAll();
-  if (State.basemap.source === 'osm') loadBasemapTiles();
+  refreshBasemapForSite();
   toast('Moved to ' + name + ' \u2014 standard time zone UTC' +
         (tz >= 0 ? '+' : '') + tz +
         (el !== null ? ', elevation ' + el + ' m' : '') + '. Check both.',
