@@ -300,12 +300,37 @@
           <dd>Above it the tool coarsens the grid rather than freeze, and says so in a toast. If
             that fired, <b>the grid size in your CSV is the one you asked for, not the one that
             ran</b>.</dd></div>
+        <div><span class="sl-chip is-part">99.6%</span><dt>Looked-up time zone</dt>
+          <dd>Searching for a place reads its <i>standard</i> UTC offset from a 0.25&deg; raster of
+            the IANA boundaries carried in the page &mdash; no network, no key. It agrees with the
+            recorded zone for 99.6 per cent of the 34,006 cities of GeoNames
+            <span class="sl-mono">cities15000</span>, against 58.9 per cent for the
+            <span class="sl-mono">round(lon&nbsp;/&nbsp;15)</span> estimate it replaces. The residue
+            is towns within a few kilometres of a boundary, which a 28&nbsp;km cell cannot separate.
+            A wrong offset shifts <b>every</b> sun position in the file by a whole hour while
+            leaving all of them looking entirely plausible.</dd></div>
+        <div><span class="sl-chip is-part">26 m</span><dt>Looked-up elevation</dt>
+          <dd>Read from the same grid: ETOPO1 topography in 50&nbsp;m steps, clamped to
+            0&ndash;2,500&nbsp;m, the range Hottel's fit covers. Median error against the 24 preset
+            cities is 26&nbsp;m and the worst 183&nbsp;m, at most 4.8 per cent of the beam. ETOPO1
+            is smoothed over roughly 28&nbsp;km, so summits are flattened and valley floors lifted
+            &mdash; it gives the height of a <i>region</i>, not of a site. It matters only under the
+            clear-sky fallback, where elevation enters through Hottel's
+            <span class="sl-mono">A</span> term; a climate file carries its own.</dd></div>
       </div>
       <p class="sl-note"><b>These figures are internal consistency, not validation.</b> They come
         from the tool's own suite driving the shipped file in headless Chromium. There is no
         Radiance cross-run behind any number, and no comparison against measured site data. That
         establishes agreement with closed-form geometry, which is a weaker claim than validation
         and should be described as such.</p>
+      <p class="sl-note"><b>The two site lookups are flagged, not trusted.</b> They are also the
+        only rows above measured against outside reference data rather than against the tool itself
+        &mdash; recorded zones and hand-checked elevations &mdash; which is why they carry a hit
+        rate and an error rather than a bias. A searched place shows a note under the time-zone
+        field and another under the elevation field until you edit the value or save the location,
+        because a 0.25&deg; cell can neither separate the two sides of a zone boundary nor tell a
+        valley floor from the ridge above it. <b>Both are starting points to confirm, not readings
+        to cite.</b> The full notes give the derivation of each.</p>
     </div>
   </section>
 
