@@ -1462,6 +1462,28 @@ const shellHeld = await page.evaluate(async () => {
 });
 check('the shell is pinned to the viewport, not laid out in the document',
       shellHeld.appPosition === 'fixed', '#app is position:' + shellHeld.appPosition);
+/*
+ * The reading that finally identified this, from the browser it happened in:
+ *   app:    ["fixed", 0, 0, 1395, 919]      the shell exactly where it belongs
+ *   topbar: [-52, 0, 1395, 50]              the toolbar 52px above it
+ *   scroll: [0,0]   vv: [0,0,1,...]         page not scrolled, no zoom offset
+ * A child above its container's top edge means the container is scrolled, and
+ * overflow:hidden makes an element a scroll container even when it shows no
+ * scrollbar — so the browser could scroll the shell and nobody could scroll it
+ * back. overflow:clip clips the same way without being a scroll container.
+ */
+const shellClip = await page.evaluate(() => {
+  const app = document.getElementById('app');
+  const tb = document.getElementById('topbar');
+  app.scrollTop = 52; app.scrollLeft = 30;
+  return { overflow: getComputedStyle(app).overflowY,
+           scrollTop: app.scrollTop, scrollLeft: app.scrollLeft,
+           topbar: Math.round(tb.getBoundingClientRect().top) };
+});
+check('and cannot be scrolled within itself, which is what hid the toolbar',
+      shellClip.scrollTop === 0 && shellClip.scrollLeft === 0 && shellClip.topbar === 0,
+      `overflow ${shellClip.overflow}; scrollTop forced to 52 reads ` +
+      `${shellClip.scrollTop}, toolbar at ${shellClip.topbar}`);
 check('a document that becomes scrollable cannot take the toolbar with it',
       shellHeld.scrollable > 1000 && shellHeld.scrolled.topbar === 0 && shellHeld.scrolled.scrollTop === 0,
       `scrollable by ${shellHeld.scrollable}px, scrollTop forced to 400 and reset to ` +

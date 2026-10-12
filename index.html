@@ -177,7 +177,16 @@ button,input,select,textarea{font:inherit;color:inherit}
      removes the scrollable overflow entirely, so there is nothing to move. */
   position:fixed;
   inset:0;
+  /* `hidden` clips, but it also makes this a scroll container, and a scroll
+     container can be scrolled by the browser even when no scrollbar is offered
+     — which is what was happening: the shell sat correctly at the top of the
+     window while the toolbar inside it measured -52px, meaning the shell had
+     been scrolled down by 52 within itself, with no way to put it back. `clip`
+     clips identically and is NOT a scroll container, so there is no offset to
+     hold. The `hidden` above it is the fallback for anything too old for
+     `clip`, where the listener in the script below does the same job. */
   overflow:hidden;
+  overflow:clip;
   display:grid;
   grid-template-rows:var(--topbar-h) minmax(0,1fr) auto;
   height:100dvh;
@@ -22515,6 +22524,21 @@ addEventListener('keydown', (e) => { if (e.key === 'Escape' && placingTarget) ar
 addEventListener('scroll', () => {
   if (scrollX || scrollY) scrollTo(0, 0);
 }, { passive: true });
+
+/*
+ * And the same for the shell itself, which is the one that actually happened:
+ * #app measured correctly at the top of the window while the toolbar inside it
+ * sat at -52px, so the shell had been scrolled within itself. overflow:clip
+ * above makes that impossible in any browser that has it; this catches the
+ * rest, and fires on the element rather than on the window, which is why the
+ * window listener never saw it.
+ */
+{
+  const shell = document.getElementById('app');
+  if (shell) shell.addEventListener('scroll', () => {
+    if (shell.scrollTop || shell.scrollLeft){ shell.scrollTop = 0; shell.scrollLeft = 0; }
+  }, { passive: true });
+}
 
 on('i-ctx-osm', 'change', (e) => {
   State.analysis.osmShade = e.target.checked;
