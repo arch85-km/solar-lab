@@ -1738,6 +1738,33 @@ await page.unroute('**/api/interpreter');
  * something different; this asserts they now agree, and that moving it is what
  * triggers a refetch rather than touching the panel at all.
  */
+/*
+ * Reported from the live site: the basemap reloaded for the new place and the
+ * 3D buildings did not. The volumes were cleared only once replacements had
+ * arrived, so a refused Overpass query — or a place with nothing mapped — left
+ * the previous town's buildings standing on the new town's map. The basemap had
+ * moved; they had not; and nothing said which place they belonged to.
+ */
+overpassStatus = 503;
+expectTileErrors = true;
+const stale = await page.evaluate(async () => {
+  const A = window.__SUNAPP;
+  const standing = () => {
+    let n = 0;
+    A.contextGroup.traverse(o => { if (o.isMesh) n++; });
+    return n;
+  };
+  A.State.basemap.extent = 400;
+  const before = standing();                       // the buildings already loaded
+  try { await A.OsmBuildings.load(); } catch (e) { /* the 503 */ }
+  return { before, after: standing() };
+});
+expectTileErrors = false;
+overpassStatus = 200;
+check('a refused refetch leaves no buildings behind from the last place',
+      stale.before > 0 && stale.after === 0,
+      `${stale.before} volumes standing, ${stale.after} after the refetch was refused`);
+
 overpassQueries = [];
 const follows = await page.evaluate(async () => {
   const A = window.__SUNAPP;
@@ -2806,6 +2833,51 @@ check('a search returns results and picking one moves the site',
 check('the coordinate fields and site name follow the pick',
       /53\.38/.test(search.latField) && /Sheffield/.test(search.name) && search.cleared === 0,
       'lat field "' + search.latField + '", name "' + search.name + '"');
+
+/*
+ * Coordinates typed into the place box must go to that point and nowhere else.
+ * Reported from the live site: pasting 51.414, -2.497 — Keynsham — moved the
+ * site to a hospice in Leeds at 53.81, -1.52, because Nominatim is a text
+ * matcher and that is what it matched. The app went there faithfully. The fix
+ * is not to ask it: a coordinate pair is an answer, not a search term.
+ *
+ * Asserted against the geocoder request count as well as the position, since
+ * the point is that no request is made at all.
+ */
+const coordsBefore = geocodeRequests;
+const typedCoords = await page.evaluate(async () => {
+  const A = window.__SUNAPP;
+  const out = [];
+  for (const q of ['51.41402563529854, -2.4970608870',   // as pasted, full precision
+                   '53.3811 -1.4701',                     // whitespace, no comma
+                   '40.7128°, -74.0060°',                 // degree signs
+                   '-33.8688, 151.2093']){                // southern, eastern
+    document.getElementById('i-search').value = q;
+    await A.runSearch();
+    await new Promise(r => setTimeout(r, 120));
+    out.push({ q, lat: +A.State.site.lat.toFixed(4), lon: +A.State.site.lon.toFixed(4),
+               name: A.State.site.name });
+  }
+  // and these are NOT coordinates, so they must still reach the geocoder
+  const notCoords = ['Sheffield', '12', 'Flat 3, 21 Acacia Avenue', '91, 200']
+    .map(t => A.coordsFromQuery(t));
+  return { out, notCoords };
+});
+check('a pasted coordinate pair goes to that point, not to a text match',
+      typedCoords.out[0].lat === 51.4140 && typedCoords.out[0].lon === -2.4971,
+      typedCoords.out[0].q + ' → ' + typedCoords.out[0].lat + ', ' + typedCoords.out[0].lon);
+check('without asking the geocoder at all, which is what sent it to Leeds',
+      geocodeRequests === coordsBefore, geocodeRequests - coordsBefore + ' requests made');
+check('whitespace, degree signs and southern coordinates all parse',
+      typedCoords.out[1].lat === 53.3811 && typedCoords.out[2].lon === -74.0060
+      && typedCoords.out[3].lat === -33.8688 && typedCoords.out[3].lon === 151.2093,
+      typedCoords.out.slice(1).map(o => o.lat + ',' + o.lon).join(' · '));
+check('the site is named by its coordinates, no geocoder having been asked',
+      /51\.4140°N/.test(typedCoords.out[0].name) && /2\.4971°W/.test(typedCoords.out[0].name),
+      typedCoords.out[0].name);
+check('a place name, a bare number and an out-of-range pair are not coordinates',
+      typedCoords.notCoords.every(v => v === null),
+      'Sheffield, 12, an address and 91,200 all fall through to the geocoder');
 
 const shortQuery = await page.evaluate(async () => {
   document.getElementById('i-search').value = 'ab';

@@ -19139,6 +19139,17 @@ const OsmBuildings = (() => {
   /** Fetch and extrude the buildings around the current site. */
   async function load(){
     const { lat, lon } = State.site;
+    /*
+     * The volumes standing on screen belong to wherever they were fetched for,
+     * so they go before anything is asked about the new place. They used to be
+     * cleared only once replacements had arrived, which meant that a refused
+     * Overpass query — or a site with no footprints mapped — left the previous
+     * town's buildings sitting on the new town's map: the basemap moved, the
+     * buildings did not, and nothing on screen said which place they belonged
+     * to. Showing none is honest; showing somewhere else's is not.
+     */
+    clear();
+    requestRender();
     const radius = clamp(State.basemap.extent / 2, 120, MAX_RADIUS);
     const dLat = radius / 111320;
     const dLon = radius / (111320 * Math.max(Math.cos(lat * D2R), 0.05));
@@ -22031,8 +22042,47 @@ let lastSearchAt = 0;
  * @param {HTMLInputElement} input  which box the query came from
  * @param {HTMLElement} out         where to render the results
  */
+/**
+ * A pair of numbers typed into the place box, or null.
+ *
+ * Nominatim is a text matcher. Handed "51.414, -2.497" it does not go to that
+ * point — it looks for places whose text resembles the string, and the answer
+ * can be anywhere: that query moved the site to a hospice in Leeds, 200 km from
+ * the coordinates asked for, and the app faithfully went there because the
+ * search said so. Coordinates are not a search term, they are an answer, so
+ * they skip the geocoder entirely.
+ *
+ * Accepts a comma or whitespace between them, and a degree sign after either,
+ * which is how coordinates arrive when they are pasted from somewhere else.
+ */
+function coordsFromQuery(q){
+  const m = String(q).trim()
+    .match(/^(-?\d{1,3}(?:\.\d+)?)\s*°?\s*[,;\s]\s*(-?\d{1,3}(?:\.\d+)?)\s*°?$/);
+  if (!m) return null;
+  const lat = parseFloat(m[1]), lon = parseFloat(m[2]);
+  if (!isFinite(lat) || !isFinite(lon)) return null;
+  if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+  return { lat, lon };
+}
+
+/** How a coordinate pair names itself, since no geocoder was asked. */
+function coordLabel(lat, lon){
+  const d = (v, pos, neg) => Math.abs(v).toFixed(4) + '\u00b0' + (v < 0 ? neg : pos);
+  return d(lat, 'N', 'S') + ' ' + d(lon, 'E', 'W');
+}
+
 async function runSearch(input = $('i-search'), out = $('search-results')){
   const q = input.value.trim();
+
+  // Coordinates go straight to the point, without asking a text matcher
+  const here = coordsFromQuery(q);
+  if (here){
+    out.innerHTML = '';
+    if (out === $('tb-results-list')) $('tb-results').hidden = true;
+    pickPlace(here.lat, here.lon, coordLabel(here.lat, here.lon));
+    return;
+  }
+
   if (q.length < 3){ out.innerHTML = ''; toast('Type at least three characters.', 'info', 2500); return; }
   if (out === $('tb-results-list')) $('tb-results').hidden = false;
 
@@ -23304,7 +23354,7 @@ function init(){
     Basemap, Mercator, TILE_SOURCES, loadBasemapTiles, pickPlace, runSearch, Selects,
     zoneFromGrid, zoneFromLongitude, zoneForPlace, markTzEstimated,
     elevationFromGrid, markElevEstimated,
-    sourceAttribution, PROXY_URL, PROXY_ATTRIBUTION,
+    sourceAttribution, PROXY_URL, PROXY_ATTRIBUTION, coordsFromQuery, coordLabel,
     customTilesProblem, saveCustomTiles, loadCustomTiles, BASEMAP_CUSTOM_KEY,
     loadPlaces, savePlace, removePlace, renderPlaces, PLACES_KEY,
     requestRender, BUILD, setChartAt, armChartPlacement, gpuReport,
