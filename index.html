@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
   Solar Analysis Lab — 3D sun path and solar radiation analysis
-  Version 1.1.0
+  Version 1.2.0
   Copyright (c) 2026 Karam Al-Obaidi — code MIT (see LICENSE), accompanying material
   CC BY 4.0 (see NOTICE)
 
@@ -17,7 +17,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="author" content="Karam Al-Obaidi">
-<meta name="application-version" id="meta-version" content="1.1.0">
+<meta name="application-version" id="meta-version" content="1.2.0">
 <meta name="description" content="Interactive 3D sun path and solar radiation analysis for architectural design teaching. EPW climate import, OBJ model import, Perez sky model, W/m2 irradiance on all surfaces.">
 <title>Solar Analysis Lab</title>
 <link rel="icon" type="image/png" sizes="16x16" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAADMUlEQVR42l2Ty2ucVRyGn3O+833zzTWZTpIxsbEmjbY2xUCIUDEIbrIKbRXTXRf+DYKgQaZjF+LGuhBBRISGEgm0pGldGKJCKNhKL7Y0ITUhJp1cbMmkbS4z893OcWEdqs/y5cfDu/i98AxjY2MWUgJw9uxY18j45KVz45PjX49e2A8ghPjn5hkEQKFQkADFYlEbsEa/v/RBlG183/aDHIBUqry7vXXmvRODnwFhwRjJqVMUi0UtnkoMwMj41Nt2tfJRbuHPvkcNaSr72rUFbK6vyZpfoznfdt2OxU6fPD4wUW9gjBEjlye7SWc/dXcrg5ExeNVKmC2tWWG5LO4kFCqXM+25ligejysjJLGYO7H95MnwyXcGZqQQwnR88nnhpemrg9s69AOBdhxH/So88cP0JAdHL/DaX4+EdmPKE0JHYejPz94+ev7cN0UhhFEAiaX7fvrMl9GBw6/ImYE35dTc7yzem+UFyyG1UyX/xVfEe19l5q035NTsTbm+OB8ZgQ+gALRjKz+ZtPbMzoUba4v8kU+RSaaw/QijLMKGNM23Z3lQWmC+JcFzqbRV9TwJIAGiRDyQYYS2bWQqheM46DDEC0O8IMAKQkI3hkwmUZYiiiIc1w3qDYLGBlNpS+KUVtFeDaMVra3P09H5Mt5WjZ1bd2lcXiHyPGLxJlqb8uxUK9QF8eUV5WYyVJqbsPe4HO7tpq/jINnmFkIhKPX0oH67RXJ9iWzGZuPhA7Z2tu26wLgOVq0WOUvL5HczdO4/gN+cp2oJEpGhtreNy/cX2JwrU94OSCg7UkrpugBjnKRyrArGt6o13TZ6Xuor13j47jFmkzZXf/6Rx2urdBlLW6mYdhzHqVSrDoBlQKxm8jOeNu1JIQ9txJSIWypMlx8L58ZN8d3KHJvVHZNx3CiHtMoxyyKILkZaf1wqlTaUAMPKnbvA0ZnWnuNGm+GskX3GdQmk0cpSOLaSAqEi378eoE9fmZ6uv7IEKIA0ILvXb4+fmO844utoWBhdTiKltCyJ1huVKPzw231tR679Mj3xdHyS/2MYqk/1xt5DXT+92Dtx7PX+i339/Z3/5kNDQ/+Z899T2men3HRXcAAAAABJRU5ErkJggg==" />
@@ -18698,7 +18698,7 @@ const Mercator = (() => {
  * running build can be identified at a glance — a stale download that looks
  * almost right is otherwise very hard to tell apart from the current one.
  */
-const BUILD = '1.1.0';
+const BUILD = '1.2.0';
 /* Release date, beside the version so the two can only move together.
    tools/check-release-metadata.mjs holds both to CITATION.cff. */
 const RELEASED = '2026-10-04';
