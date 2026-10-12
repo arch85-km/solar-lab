@@ -26,7 +26,7 @@ Below: the first-load state (London, clear-sky model) and the phone layout.
 
 | | |
 |---|---|
-| **Site basemap** | Put the model on its real site: OpenStreetMap tiles, or an image you upload scaled by its real-world width. Shadows fall across the map, and the required credit appears on screen and in exports. The app holds no map key of its own — aerial imagery goes through a small proxy on your own server, so nothing secret is in the page. |
+| **Site basemap** | Put the model on its real site: OpenStreetMap tiles, **a tile service of your own**, or an image you upload scaled by its real-world width. Shadows fall across the map, and the required credit appears on screen and in exports. The app holds no map key of its own — aerial imagery goes through a small proxy on your own server, so nothing secret is in the page. |
 | **3D city context** | **OpenStreetMap + 3D buildings** extrudes the surrounding footprints from their `height` and `building:levels` tags, fetched from the Overpass API with no key. They cast shadows, and a switch decides whether they shade the analysis — so you can show the same massing with and without its neighbours. |
 | **Saved locations** | Search a place, check its time zone once, then save it by name — coordinates, time zone and elevation together — and it stays in the city list. |
 | **2D stereographic sun path** | The classic printed sun-path chart — horizon on the outer circle, zenith at the centre — laid flat on the site. Engages automatically in top view, or switch it on in any view. |
@@ -115,10 +115,19 @@ space. Open the ones you need.
 
 **Site basemap** — open **Site Basemap** in the left panel. *OpenStreetMap* fetches tiles
 for the latitude and longitude you have set; drag the extent slider for a wider or tighter
-site and press *Load map*. *Site image* takes any PNG or JPG and places it at true scale
-once you type its real-world width in metres — nothing is uploaded anywhere, and it works
-with no internet at all. Either way the map sits at true metre scale under the model, takes
-the building shadows, and is excluded from the radiation analysis.
+site and press *Load map*. *Custom tile service…* points the app at tiles of your own —
+your server, your institution's, or a provider you hold an account with — by giving a URL
+template with `{z}`, `{x}` and `{y}` in it and the credit line the provider asks for. It is
+kept in your browser, not in the file, and the credit is required: the app will not load
+tiles without one, because almost every provider's terms say it must be shown. Put no API
+key in that URL — this page is public. *Site image* takes any PNG or JPG and places it at
+true scale once you type its real-world width in metres — nothing is uploaded anywhere, and
+it works with no internet at all. Either way the map sits at true metre scale under the
+model, takes the building shadows, and is excluded from the radiation analysis.
+
+Pointing the app elsewhere is not an afterthought: the OpenStreetMap tile policy asks that
+an application not hard-code its tile URL, so that a deployment outgrowing the volunteer
+servers can be moved off them without a code change.
 
 **Find a place** — there is a search box in the toolbar (or press `/`); the Location panel
 has the same one next to the coordinates. Type an address, postcode or building name and

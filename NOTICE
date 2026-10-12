@@ -217,10 +217,12 @@ Foundation and both are used under their published policies.
     with at least 1.1 s between requests, to stay inside the Nominatim usage
     policy.
   - Both policies may change at any time, and both ask heavy users to run their
-    own servers. If your deployment grows beyond light teaching traffic, switch
-    to your own tile server or a commercial provider. The basemap source is a
-    small table (TILE_SOURCES in index.html) precisely so another provider can be
-    dropped in with its own attribution.
+    own servers, and ask that an application not hard-code its tile URL. If your
+    deployment grows beyond light teaching traffic, switch to your own tile
+    server or a commercial provider: the Custom tile service source takes a URL
+    template and the credit line that goes with it, with no edit to this file,
+    and the basemap source is a small table (TILE_SOURCES in index.html) for
+    anything that needs more than a template.
 
 No basemap is loaded by default, and the alternative Site image source uses a
 file you supply, involving no third party at all.

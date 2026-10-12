@@ -790,7 +790,8 @@ DNI = G_on · τ_b,   G_on = 1367 · (1 + 0.033 cos(2π·doy/365))</div>
       <div class="sl-tbl"><table>
         <thead><tr><th>Parameter</th><th class="sl-n">Default</th><th class="sl-n">Range</th><th>Notes</th></tr></thead>
         <tbody>
-          <tr><td>Source</td><td class="sl-d">None</td><td class="sl-n">4 options</td><td>None · OpenStreetMap · OpenStreetMap + 3D buildings · Site image</td></tr>
+          <tr><td>Source</td><td class="sl-d">None</td><td class="sl-n">5 options</td><td>None · OpenStreetMap · OpenStreetMap + 3D buildings · Custom tile service · Site image. A deployment with the tile proxy configured gains a sixth, <i>Site imagery</i>, and opens on it.</td></tr>
+          <tr><td>Custom tile URL</td><td class="sl-d">—</td><td class="sl-n">https only</td><td>Template with <span class="sl-mono">{z}</span>, <span class="sl-mono">{x}</span>, <span class="sl-mono">{y}</span>, plus the provider’s credit line, which is required because their terms require it. Kept in the browser, never in the file; the OSM tile policy asks that the URL not be hard-coded.</td></tr>
           <tr><td>Site extent</td><td class="sl-d">400 m</td><td class="sl-n">100 – 2000 m</td><td>50 m steps; also sets the Overpass query box</td></tr>
           <tr><td>Opacity</td><td class="sl-d">1.0</td><td class="sl-n">0.1 – 1</td><td>0.05 steps</td></tr>
           <tr><td>Site image width</td><td class="sl-d">200 m</td><td class="sl-n">5 – 5000 m</td><td>The real-world width of the image you supply</td></tr>

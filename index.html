@@ -942,6 +942,7 @@ body.embed{--topbar-h:44px}
                 <option value="none">None</option>
                 <option value="osm">OpenStreetMap</option>
                 <option value="osm3d">OpenStreetMap + 3D buildings</option>
+                <option value="custom">Custom tile service&hellip;</option>
                 <option value="image">Site image</option>
               </select>
             </div>
@@ -964,6 +965,32 @@ body.embed{--topbar-h:44px}
                 </div>
               </div>
               <p class="hint">Tiles come through <b>tile-proxy.php</b> on this site, which holds the key. Nothing secret is in this page, so there is nothing to restrict by domain &mdash; the proxy only answers requests from pages on its own host.</p>
+            </div>
+
+            <div id="bm-custom" style="display:none">
+              <div class="row col">
+                <label for="i-bm-url">Tile URL template</label>
+                <input type="text" id="i-bm-url" spellcheck="false"
+                       placeholder="https://tiles.example.com/{z}/{x}/{y}.png">
+              </div>
+              <div class="row col">
+                <label for="i-bm-attrib">Credit line &mdash; required</label>
+                <input type="text" id="i-bm-attrib" spellcheck="false"
+                       placeholder="&copy; Your tile provider">
+              </div>
+              <div class="row col">
+                <label for="i-bm-maxzoom">Highest zoom the service offers</label>
+                <input type="number" id="i-bm-maxzoom" min="1" max="22" step="1" value="19">
+              </div>
+              <p class="hint" id="bm-custom-note"></p>
+              <p class="hint">Point the app at your own tile server, your institution's,
+                or a service you have an account with. <code>{z}</code>, <code>{x}</code> and
+                <code>{y}</code> are filled in per tile. It must be <b>https</b> and must send
+                CORS headers, or the browser will not let the tiles into an exported image.
+                The credit line is shown on screen and burned into every export, which is what
+                nearly every provider's terms require &mdash; so the app will not load tiles
+                without one. Put no API key in the URL: this page is public, and anyone who
+                opens it can read it. Settings are kept in this browser.</p>
             </div>
 
             <div id="bm-3d" style="display:none">
@@ -18717,6 +18744,20 @@ const TILE_SOURCES = {
               'on the server, and that PHP can reach the tile service.',
     viaProxy: true,
   },
+  // Whatever the user points the app at. The OpenStreetMap tile policy asks
+  // that an application not hard-code its tile URL, so that a deployment can be
+  // moved off the volunteer servers; this is how that is honoured here.
+  custom: {
+    label: 'Custom tile service',
+    url: (x, y, z) => State.basemap.custom.url
+      .replace(/\{z\}/g, z).replace(/\{x\}/g, x).replace(/\{y\}/g, y),
+    attribution: () => State.basemap.custom.attribution,
+    get maxZoom(){ return State.basemap.custom.maxZoom || 19; },
+    failHint: 'No tiles came back from that URL. Check the template, that the service is ' +
+              'reachable, and that it sends CORS headers \u2014 tiles are requested with ' +
+              'crossOrigin set so that exports stay usable, and a service that does not ' +
+              'allow that will refuse every tile.',
+  },
   // Same tiles as 'osm'; the difference is the extruded buildings that come
   // with it, which loadBasemapTiles() fetches once the ground is down.
   osm3d: {
@@ -18736,12 +18777,40 @@ scene.add(basemapGroup);
 const Basemap = (() => {
   const MAX_TILES_PER_SIDE = 6;                 // 36 tiles worst case, one screenful
   let mesh = null, texture = null;
-  let state = { kind: 'none', attribution: '', extent: 0, tainted: false, note: '' };
+  let state = { kind: 'none', attribution: '', extent: 0, tainted: false, note: '',
+                luminance: 1 };
+
+  /**
+   * Mean luminance of what has just been laid on the ground, 0 to 1.
+   *
+   * The flattened chart has to be drawn in ink the map can carry, and the only
+   * way to know which is to look: a street map is pale, an aerial of a city is
+   * dark, and both arrive through the same code path. Measured on a 32 x 32
+   * downsample, which is plenty for a mean and costs nothing. A canvas the
+   * browser will not let us read falls back to 1, the pale assumption this
+   * replaced, so an unreadable source is no worse off than before.
+   */
+  function meanLuminance(source){
+    try {
+      const c = document.createElement('canvas');
+      c.width = c.height = 32;
+      const g = c.getContext('2d', { willReadFrequently: true });
+      g.drawImage(source, 0, 0, 32, 32);
+      const d = g.getImageData(0, 0, 32, 32).data;
+      let sum = 0;
+      for (let i = 0; i < d.length; i += 4)
+        sum += (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255;
+      return sum / (d.length / 4);
+    } catch (e) {
+      return 1;
+    }
+  }
 
   function clear(){
     if (mesh){ basemapGroup.remove(mesh); mesh.geometry.dispose(); mesh.material.dispose(); mesh = null; }
     if (texture){ texture.dispose(); texture = null; }
-    state = { kind: 'none', attribution: '', extent: 0, tainted: false, note: '' };
+    state = { kind: 'none', attribution: '', extent: 0, tainted: false, note: '',
+              luminance: 1 };
     syncGridVisibility();
     ground.visible = true;
     sunLight.shadow.needsUpdate = true;
@@ -18777,6 +18846,7 @@ const Basemap = (() => {
 
     state.kind = kind;
     state.extent = Math.max(width, height);
+    state.luminance = meanLuminance(source);
     // A survey grid over a real map is clutter, and it is the surface most
     // likely to fight the basemap for depth
     syncGridVisibility();
@@ -18876,6 +18946,10 @@ const Basemap = (() => {
   function setOpacity(o){
     State.basemap.opacity = clamp(o, 0.1, 1);
     if (mesh) mesh.material.opacity = State.basemap.opacity;
+    // The viewport draws on demand, so changing a material is not enough to put
+    // it on screen: without this the slider did nothing until the camera next
+    // moved, and the map appeared to change opacity on zoom rather than on drag.
+    requestRender();
   }
 
   return {
@@ -19210,14 +19284,42 @@ const MAP_CHART = {
   // pale tiles, so the arcs take the light theme's stronger pair.
   sun: { summer: 0xd97706, winter: 0x1d6fbf, today: 0xb45309, analemma: 0x44566b },
 };
+/**
+ * The same, for a map that is not pale.
+ *
+ * The palette above assumes map tiles are light, which holds for a street map
+ * and fails completely for aerial imagery: print ink on a photograph of a city
+ * at dusk is ink on ink. So the chart is drawn the other way round over a dark
+ * map — light hairlines, a dark casing, labels haloed in near-black — and which
+ * one is used is decided by measuring the map rather than by guessing from the
+ * source or the theme.
+ */
+const MAP_CHART_DARK = {
+  grid: 0x9fb0c4, hour: 0xb9c7d8, ring: 0x8495a9,
+  casing: 0x070c12, casingAlpha: 0.72, casingExtra: 0.0010,
+  label: '#f3f7fb', labelHalo: 'rgba(7,12,18,0.95)',
+  // Bright enough to hold against imagery, and the same hues as the pale pair
+  // so a chart read in one presentation is recognisably the same chart.
+  sun: { summer: 0xffa63a, winter: 0x6aa9ff, today: 0xffc266, analemma: 0xb9c7d8 },
+};
+
+/** Luminance below which a basemap counts as dark. */
+const MAP_DARK_BELOW = 0.45;
+
+/** The over-map palette suited to the map actually loaded. */
+function mapChart(){
+  return (Basemap.info.luminance ?? 1) < MAP_DARK_BELOW ? MAP_CHART_DARK : MAP_CHART;
+}
+
 /** Seasonal arc colours for the current background. */
 function chartSunColors(){
   if (!(isStereo() && overBasemap())) return SUN_COLORS;
+  const m = mapChart();
   return {
-    summer: new THREE.Color(MAP_CHART.sun.summer),
-    winter: new THREE.Color(MAP_CHART.sun.winter),
-    today: new THREE.Color(MAP_CHART.sun.today),
-    analemma: new THREE.Color(MAP_CHART.sun.analemma),
+    summer: new THREE.Color(m.sun.summer),
+    winter: new THREE.Color(m.sun.winter),
+    today: new THREE.Color(m.sun.today),
+    analemma: new THREE.Color(m.sun.analemma),
   };
 }
 
@@ -19282,7 +19384,7 @@ function chartCasing(){
   // Only the arcs are cased now, so the outline can be crisp rather than a
   // translucent haze — a solid thin edge reads sharper at these widths.
   return overBasemap()
-    ? { color: MAP_CHART.casing, alpha: 0.9 }
+    ? { color: mapChart().casing, alpha: 0.9 }
     : { color: c.casing, alpha: 0.75 };
 }
 
@@ -19377,7 +19479,7 @@ function addChartLine(group, points, color, weightKey, opacity3d = 1){
  */
 function chartLabelInk(){
   return overBasemap()
-    ? { color: MAP_CHART.label, halo: MAP_CHART.labelHalo }
+    ? { color: mapChart().label, halo: mapChart().labelHalo }
     : { color: THEME.chart.label, halo: THEME.chart.labelHalo };
 }
 
@@ -19450,7 +19552,7 @@ function buildSunPath(){
     return true;
   };
   if (State.disp.analemma){
-    const hourCol = onMap ? MAP_CHART.hour : (flat ? THEME.chart.hour : SUN_COLORS.analemma);
+    const hourCol = onMap ? mapChart().hour : (flat ? THEME.chart.hour : SUN_COLORS.analemma);
     for (let h = 0; h < 24; h++){
       const pts = [];
       let above = false;
@@ -19494,7 +19596,7 @@ function buildSunPath(){
   /* --- altitude rings: every 10° flattened, as on a printed chart --- */
   if (State.disp.rings){
     const step = flat ? 10 : 15;
-    const ringCol = onMap ? MAP_CHART.ring : (flat ? THEME.chart.ring : THEME.ring);
+    const ringCol = onMap ? mapChart().ring : (flat ? THEME.chart.ring : THEME.ring);
     for (let alt = step; alt < 90; alt += step){
       const pts = [];
       for (let a = 0; a <= 360; a += 4) pts.push(domePoint(alt, a, R));
@@ -19517,7 +19619,7 @@ function buildCompass(R){
   if (!State.disp.compass) return;
   const flat = isStereo();
   const onMap = flat && overBasemap();
-  const gridCol = onMap ? MAP_CHART.grid : (flat ? THEME.chart.grid : THEME.compass);
+  const gridCol = onMap ? mapChart().grid : (flat ? THEME.chart.grid : THEME.compass);
 
   const ringPts = [];
   for (let a = 0; a <= 360; a += 2) ringPts.push(domePoint(0, a, R));
@@ -19617,7 +19719,13 @@ function updateSunVisuals(sun){
   sunLight.position.set(v.x * d, Math.max(v.y, 0.02) * d, v.z * d);
   sunLight.target.position.set(0, 0, 0);
   sunLight.target.updateMatrixWorld();
-  sunLight.visible = up && State.disp.shadow;
+  // "Cast shadows" turns off the shadow, not the sun. Hiding the light instead
+  // took the brightest thing in the scene away with it, and since the basemap,
+  // the ground and the massing are all lit materials, switching shadows off
+  // plunged a street map or an aerial into near-darkness — the opposite of what
+  // anyone asks for when they turn shadows off to read the site underneath.
+  sunLight.visible = up;
+  sunLight.castShadow = State.disp.shadow;
   sunLight.intensity = up ? lerp(0.55, 2.55, clamp(Math.sin(sun.altitude * D2R), 0, 1) ** 0.55) : 0;
   sunLight.color.setHSL(0.108, clamp(0.55 - sun.altitude / 120, 0.06, 0.55), 0.62);
 
@@ -20163,7 +20271,8 @@ const State = {
               hourFrom:0, hourTo:24, from:null, to:null, osmShade:true },
   legend: { scheme:'spectral', mode:'auto', min:0, max:1000 },
   basemap: { source:'none', extent:400, opacity:1, imageWidth:200,
-             style:'satellite' },
+             style:'satellite',
+             custom: { url:'', attribution:'', maxZoom:19 } },
   model: { tris:new Float32Array(0), count:0, area:0, bbox:new THREE.Box3() },
   modelHeight: 24, modelRadius: 24,
   objName: null,
@@ -21596,13 +21705,65 @@ on('b-place-save', 'click', savePlace);
 on('i-place-name', 'keydown', (e) => { if (e.key === 'Enter'){ e.preventDefault(); savePlace(); } });
 
 /* --- basemap ------------------------------------------------------------- */
+
+const BASEMAP_CUSTOM_KEY = 'sunpath.basemap.custom.v1';
+
+/**
+ * What is wrong with the custom tile settings, or null if nothing is.
+ *
+ * The credit line counts as a setting rather than a nicety: almost every tile
+ * provider's terms require attribution, the app has nowhere else to learn it,
+ * and a map on screen with no credit is the one state that would put a user in
+ * breach without telling them. So an empty one is an error like a missing URL.
+ */
+function customTilesProblem(){
+  const c = State.basemap.custom;
+  const url = (c.url || '').trim();
+  if (!url) return 'Enter the tile URL template to load a map.';
+  if (!/^https:\/\//i.test(url))
+    return 'The tile URL must start with https:// — a page served over https cannot load tiles over http.';
+  for (const token of ['{z}', '{x}', '{y}'])
+    if (!url.includes(token)) return 'The tile URL needs ' + token + ' in it, so each tile can be addressed.';
+  if (!(c.attribution || '').trim())
+    return 'Enter the credit line the tile service asks for. It is shown on screen and in exports.';
+  return null;
+}
+
+function loadCustomTiles(){
+  try {
+    const raw = localStorage.getItem(BASEMAP_CUSTOM_KEY);
+    if (!raw) return;
+    const c = JSON.parse(raw);
+    if (c && typeof c === 'object'){
+      State.basemap.custom = {
+        url: typeof c.url === 'string' ? c.url : '',
+        attribution: typeof c.attribution === 'string' ? c.attribution : '',
+        maxZoom: clamp(+c.maxZoom || 19, 1, 22),
+      };
+    }
+  } catch (e) { /* private mode, or someone else's JSON */ }
+}
+
+function saveCustomTiles(){
+  try { localStorage.setItem(BASEMAP_CUSTOM_KEY, JSON.stringify(State.basemap.custom)); }
+  catch (e) { /* private mode */ }
+}
+
 function syncBasemapUI(){
   const src = State.basemap.source;
-  const tiled = src === 'osm' || src === 'osm3d' || src === 'proxy';
+  const tiled = src === 'osm' || src === 'osm3d' || src === 'proxy' || src === 'custom';
   $('bm-tiles').style.display = tiled ? '' : 'none';
   $('bm-proxy').style.display = src === 'proxy' ? '' : 'none';
+  $('bm-custom').style.display = src === 'custom' ? '' : 'none';
   $('bm-3d').style.display = src === 'osm3d' ? '' : 'none';
   $('bm-image').style.display = src === 'image' ? '' : 'none';
+  if (src === 'custom'){
+    const problem = customTilesProblem();
+    $('bm-custom-note').textContent = problem || '';
+    $('b-bm-load').disabled = !!problem;
+  } else if ($('b-bm-load').disabled && src !== 'none'){
+    $('b-bm-load').disabled = false;
+  }
   $('bm-opacity-row').style.display = src === 'none' ? 'none' : '';
   $('bm-note').textContent = Basemap.info.note || '';
   $('bm-3d-note').textContent = OsmBuildings.info.note || '';
@@ -21623,6 +21784,20 @@ on('i-bm-stylepreset2', 'change', (e) => {
   State.basemap.style = e.target.value;
   if (State.basemap.source === 'proxy') loadBasemapTiles();
 });
+
+for (const [id, field] of [['i-bm-url', 'url'], ['i-bm-attrib', 'attribution']]){
+  on(id, 'input', (e) => {
+    State.basemap.custom[field] = e.target.value;
+    saveCustomTiles();
+    syncBasemapUI();
+  });
+}
+on('i-bm-maxzoom', 'change', (e) => {
+  State.basemap.custom.maxZoom = clamp(+e.target.value || 19, 1, 22);
+  e.target.value = State.basemap.custom.maxZoom;
+  saveCustomTiles();
+  syncBasemapUI();
+});
 on('i-bm-extent', 'input', (e) => {
   State.basemap.extent = +e.target.value;
   $('v-bm-extent').textContent = State.basemap.extent + ' m';
@@ -21638,6 +21813,15 @@ on('i-bm-opacity', 'input', (e) => {
 
 async function loadBasemapTiles(){
   const btn = $('b-bm-load');
+  if (State.basemap.source === 'custom'){
+    const problem = customTilesProblem();
+    if (problem){                      // no point firing requests that cannot work
+      $('bm-status').textContent = problem;
+      toast(problem, 'err', 7000);
+      syncBasemapUI();
+      return;
+    }
+  }
   btn.disabled = true;
   $('bm-status').textContent = 'Loading tiles…';
   try {
@@ -22902,6 +23086,13 @@ function init(){
   const credit = document.getElementById('credit');
   if (credit) credit.title = 'Solar Analysis Lab v' + BUILD + ' \u2014 licence, credits and release';
 
+  // A tile service the user configured last time is theirs, not this build's,
+  // so it comes back from the browser rather than from the file.
+  loadCustomTiles();
+  $('i-bm-url').value = State.basemap.custom.url;
+  $('i-bm-attrib').value = State.basemap.custom.attribution;
+  $('i-bm-maxzoom').value = State.basemap.custom.maxZoom;
+
   // The proxy option only makes sense once a deployed copy points at one
   if (PROXY_URL){
     const sel = $('i-basemap');
@@ -22952,6 +23143,7 @@ function init(){
     zoneFromGrid, zoneFromLongitude, zoneForPlace, markTzEstimated,
     elevationFromGrid, markElevEstimated,
     sourceAttribution, PROXY_URL, PROXY_ATTRIBUTION,
+    customTilesProblem, saveCustomTiles, loadCustomTiles, BASEMAP_CUSTOM_KEY,
     loadPlaces, savePlace, removePlace, renderPlaces, PLACES_KEY,
     requestRender, BUILD, setChartAt, armChartPlacement, gpuReport,
     OsmBuildings, occluderTriangles, contextGroup, importOBJ, placeObj,

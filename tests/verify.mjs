@@ -1101,13 +1101,305 @@ await ctx.route('**://overpass-api.de/**', async (route) => {
     sources: [...document.querySelectorAll('#i-basemap option')].map(o => o.value),
     keyFields: document.querySelectorAll('input[type="password"]').length,
     saysReadable: /readable in the page source/i.test(document.body.textContent),
+    warnsAboutKeys: /no API key in the URL/i.test(document.body.textContent),
   }));
-  check('the basemap panel offers no key field, and the custom template is gone',
-        ui.keyFields === 0 && !ui.saysReadable &&
-        !ui.sources.includes('maptiler') && !ui.sources.includes('custom') &&
-        ui.sources.includes('osm3d'),
+  /*
+   * The custom tile template is back, having been dropped when its dropdown
+   * slot went to OSM 3D buildings. What must not come back with it is a place
+   * to keep a key: the template lives in the user's own browser, never in the
+   * file, so a service they have an account with is reachable without anything
+   * secret entering the page that gets uploaded.
+   */
+  check('the basemap panel offers no key field, and no keyed source',
+        ui.keyFields === 0 && !ui.saysReadable && !ui.sources.includes('maptiler')
+        && ui.sources.includes('osm3d'),
         'sources: ' + ui.sources.join(', '));
+  check('the custom template is offered, and warns against putting a key in it',
+        ui.sources.includes('custom') && ui.warnsAboutKeys,
+        'custom present, warning shown');
 }
+
+/* -------------------------------------------------- custom tile service --- */
+console.log('\n=== a tile service of your own ===');
+
+/*
+ * The OpenStreetMap tile policy asks that an application not hard-code its tile
+ * URL, so that a deployment can be moved off the volunteer servers. This is how
+ * that is honoured: point the app at your own tiles, your institution's, or a
+ * service you hold an account with. The settings live in the browser, never in
+ * the file, so nothing of the user's reaches a copy of the page.
+ *
+ * The host below carries a token that appears nowhere else in the app. The
+ * first version of this test used the same example host as the field's
+ * placeholder, so the "never written into the page" check matched the
+ * placeholder and failed on a page that was behaving perfectly.
+ */
+const CUSTOM_HOST = 'tiles.q7f3a-private.test';
+const CUSTOM_URL = 'https://' + CUSTOM_HOST + '/{z}/{x}/{y}.png';
+const customTiles = [];
+await page.route('**://' + CUSTOM_HOST + '/**', async (route) => {
+  customTiles.push(route.request().url());
+  await route.fulfill({ status: 200, contentType: 'image/png',
+                        headers: { 'access-control-allow-origin': '*' }, body: TILE_PNG });
+});
+
+const custom = await page.evaluate(async (url) => {
+  const A = window.__SUNAPP, $ = (id) => document.getElementById(id);
+  const type = (id, v) => { $(id).value = v; $(id).dispatchEvent(new Event('input', { bubbles: true })); };
+  const out = {};
+  $('i-basemap').value = 'custom';
+  $('i-basemap').dispatchEvent(new Event('change', { bubbles: true }));
+  out.panel = $('bm-custom').style.display !== 'none';
+  out.extentRow = $('bm-tiles').style.display !== 'none';
+  out.empty = A.customTilesProblem();
+  out.disabledWhileEmpty = $('b-bm-load').disabled;
+  type('i-bm-url', 'http://insecure.example/{z}/{x}/{y}.png');
+  out.http = A.customTilesProblem();
+  type('i-bm-url', 'https://notokens.example/tile.png');
+  out.noTokens = A.customTilesProblem();
+  type('i-bm-url', url);
+  out.noCredit = A.customTilesProblem();
+  type('i-bm-attrib', '© Example Tiles');
+  out.valid = A.customTilesProblem();
+  out.enabledWhenValid = !$('b-bm-load').disabled;
+  out.credit = A.sourceAttribution(A.TILE_SOURCES.custom);
+  $('i-bm-maxzoom').value = '17';
+  $('i-bm-maxzoom').dispatchEvent(new Event('change', { bubbles: true }));
+  out.maxZoom = A.TILE_SOURCES.custom.maxZoom;
+  out.stored = JSON.parse(localStorage.getItem(A.BASEMAP_CUSTOM_KEY) || 'null');
+  // nothing the user typed may end up in the page that gets uploaded
+  out.inPage = document.documentElement.outerHTML.includes('q7f3a-private');
+  // and it really loads
+  A.State.basemap.extent = 400;
+  const r = await A.Basemap.loadTiles('custom');
+  out.tiles = r.tiles;
+  out.zoom = r.zoom;
+  out.attribution = A.Basemap.info.attribution;
+  return out;
+}, CUSTOM_URL);
+
+check('a custom tile service is offered, with its own settings and the extent control',
+      custom.panel && custom.extentRow, 'panel and extent row shown');
+check('an incomplete template says exactly what is missing, and will not load',
+      custom.empty === 'Enter the tile URL template to load a map.'
+      && /must start with https/.test(custom.http)
+      && /needs \{z\}/.test(custom.noTokens)
+      && /credit line/.test(custom.noCredit)
+      && custom.valid === null && custom.disabledWhileEmpty && custom.enabledWhenValid,
+      'four distinct messages, Load disabled until all are satisfied');
+check('the credit line is required, because the provider\'s terms are',
+      /credit line/.test(custom.noCredit) && custom.credit === '© Example Tiles'
+      && custom.attribution === '© Example Tiles',
+      'refused without one, then shown as the map credit');
+check('tiles are fetched from that service with the coordinates substituted',
+      customTiles.length === custom.tiles && custom.tiles > 0
+      && new RegExp('^https://' + CUSTOM_HOST.replace(/\./g, '\\.') + '/\\d+/\\d+/\\d+\\.png$')
+           .test(customTiles[0] || ''),
+      custom.tiles + ' tiles, first ' + (customTiles[0] || '(none)'));
+check('the zoom it asks for respects the ceiling the service declares',
+      custom.maxZoom === 17 && custom.zoom <= 17,
+      'max zoom 17, requested zoom ' + custom.zoom);
+check('the settings are kept in the browser and never written into the page',
+      custom.stored && custom.stored.url === CUSTOM_URL && custom.stored.maxZoom === 17
+      && custom.inPage === false,
+      'stored locally, absent from the page source');
+
+const customReload = await page.evaluate(() => {
+  const A = window.__SUNAPP;
+  A.loadCustomTiles();
+  return A.State.basemap.custom;
+});
+check('they survive a reload, so the service is configured once',
+      customReload.url === CUSTOM_URL && customReload.attribution === '© Example Tiles',
+      customReload.url);
+
+// A service that answers nothing provokes real failed image loads, as the
+// rejected-key test does; the console check allows them only inside this window.
+expectTileErrors = true;
+const customFail = await page.evaluate(async () => {
+  const A = window.__SUNAPP, $ = (id) => document.getElementById(id);
+  $('i-bm-url').value = 'https://nothing-here.q7f3a-private.test/{z}/{x}/{y}.png';
+  $('i-bm-url').dispatchEvent(new Event('input', { bubbles: true }));
+  await A.loadBasemapTiles();
+  const unreachable = $('bm-status').textContent;
+  $('i-bm-url').value = '';
+  $('i-bm-url').dispatchEvent(new Event('input', { bubbles: true }));
+  await A.loadBasemapTiles();
+  const refused = $('bm-status').textContent;
+  try { localStorage.removeItem(A.BASEMAP_CUSTOM_KEY); } catch (e) {}
+  A.State.basemap.custom = { url: '', attribution: '', maxZoom: 19 };
+  A.State.basemap.source = 'none';
+  $('i-basemap').value = 'none';
+  $('i-basemap').dispatchEvent(new Event('change', { bubbles: true }));
+  A.Basemap.clear();
+  return { unreachable, refused, buttonBack: !$('b-bm-load').disabled };
+});
+expectTileErrors = false;
+await page.unroute('**://' + CUSTOM_HOST + '/**');
+check('a service that answers nothing blames the service, not the connection',
+      /CORS/.test(customFail.unreachable) && /reachable/.test(customFail.unreachable),
+      customFail.unreachable.slice(0, 64) + '…');
+check('an incomplete template is refused before any request is made',
+      /Enter the tile URL template/.test(customFail.refused),
+      customFail.refused);
+
+/* --------------------------------------- the chart over a map it can read --- */
+console.log('\n=== the chart reads on a dark map as well as a pale one ===');
+
+/*
+ * The over-map palette assumed map tiles are pale — true of a street map, false
+ * of an aerial. Dark print ink on a photograph of a city is ink on ink, which
+ * is what "the sun path is difficult to read" meant. The palette now follows a
+ * measurement of the map rather than its mere presence.
+ *
+ * What is measured here is how much the chart changes the picture: draw the
+ * scene with the chart on and again with it off, and the mean difference is the
+ * ink it lays down. A chart that disappears into its background moves nothing.
+ */
+const chartInk = await page.evaluate(async () => {
+  const A = window.__SUNAPP;
+  const settle = () => new Promise(r => requestAnimationFrame(() =>
+                          requestAnimationFrame(() => setTimeout(r, 300))));
+  const flat = async (fill) => {
+    const c = document.createElement('canvas'); c.width = c.height = 128;
+    const g = c.getContext('2d'); g.fillStyle = fill; g.fillRect(0, 0, 128, 128);
+    const img = new Image();
+    await new Promise(res => { img.onload = res; img.src = c.toDataURL(); });
+    return img;
+  };
+  document.querySelector('[data-p="stereo"]').click();
+  await settle();
+  const cnv = document.querySelector('canvas');
+  const grab = () => {
+    const t = document.createElement('canvas'); t.width = cnv.width; t.height = cnv.height;
+    t.getContext('2d').drawImage(cnv, 0, 0);
+    return t.getContext('2d').getImageData(0, 0, t.width, t.height).data;
+  };
+  const CHART = ['d-arcs', 'd-analemma', 'd-today', 'd-compass', 'd-rings'];
+  const chart = async (on) => {
+    for (const id of CHART){
+      const el = document.getElementById(id);
+      el.checked = on; el.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    await settle();
+  };
+  const out = {};
+  for (const [name, fill] of [['pale', '#dfe3e8'], ['dark', '#262b31']]){
+    A.State.basemap.source = 'image';
+    A.Basemap.loadImage(await flat(fill), 300, name + '.png');
+    A.refresh(true);
+    await chart(true);
+    const on = grab();
+    await chart(false);
+    const off = grab();
+    await chart(true);
+    let diff = 0;
+    for (let i = 0; i < on.length; i += 4)
+      diff += Math.abs((0.2126*on[i] + 0.7152*on[i+1] + 0.0722*on[i+2])
+                     - (0.2126*off[i] + 0.7152*off[i+1] + 0.0722*off[i+2]));
+    out[name] = { luminance: +A.Basemap.info.luminance.toFixed(3),
+                  ink: +(diff / (on.length / 4)).toFixed(2) };
+  }
+  A.State.basemap.source = 'none';
+  A.Basemap.clear();
+  A.refresh(true);
+  return out;
+});
+check('a pale map and a dark one are told apart by measuring them',
+      chartInk.pale.luminance > 0.8 && chartInk.dark.luminance < 0.3,
+      'pale reads ' + chartInk.pale.luminance + ', dark reads ' + chartInk.dark.luminance);
+check('the chart puts down as much ink on a dark map as on a pale one',
+      chartInk.dark.ink >= chartInk.pale.ink * 0.9,
+      'pale ' + chartInk.pale.ink + ', dark ' + chartInk.dark.ink);
+
+/* ------------------------------------------- the display toggles behave --- */
+console.log('\n=== switching shadows off, and the opacity slider ===');
+
+/*
+ * "Cast shadows" used to hide the sun light itself rather than stop it casting.
+ * Since the basemap, the ground and the massing are all lit materials, the
+ * brightest thing in the scene went with it and a street map or an aerial
+ * dropped into near-darkness — exactly backwards, because people turn shadows
+ * off in order to read the site underneath.
+ */
+const shadowLight = await page.evaluate(async () => {
+  const A = window.__SUNAPP;
+  A.loadSample('demo');
+  A.setDoy(172); A.setMinutes(720);                 // 21 June noon, sun well up
+  A.refresh(true);
+  const settle = () => new Promise(r => requestAnimationFrame(() =>
+                          requestAnimationFrame(() => setTimeout(r, 250))));
+  await settle();
+  const cnv = document.querySelector('canvas');
+  const lum = () => {
+    const t = document.createElement('canvas'); t.width = cnv.width; t.height = cnv.height;
+    t.getContext('2d').drawImage(cnv, 0, 0);
+    const d = t.getContext('2d').getImageData(0, 0, t.width, t.height).data;
+    let s = 0;
+    for (let i = 0; i < d.length; i += 4) s += 0.2126*d[i] + 0.7152*d[i+1] + 0.0722*d[i+2];
+    return s / (d.length / 4);
+  };
+  const t = document.getElementById('d-shadow');
+  t.checked = true;  t.dispatchEvent(new Event('change', { bubbles: true }));
+  await settle();
+  const on = lum();
+  t.checked = false; t.dispatchEvent(new Event('change', { bubbles: true }));
+  await settle();
+  const off = lum();
+  t.checked = true;  t.dispatchEvent(new Event('change', { bubbles: true }));
+  await settle();
+  return { on: +on.toFixed(1), off: +off.toFixed(1),
+           drop: +(100 * (on - off) / on).toFixed(1) };
+});
+check('turning shadows off does not darken the scene with them',
+      Math.abs(shadowLight.drop) < 3,
+      'mean luminance ' + shadowLight.on + ' with shadows, ' + shadowLight.off +
+      ' without — ' + shadowLight.drop + '% change');
+
+/*
+ * The viewport draws on demand. Changing a material is not enough to put it on
+ * screen, so the opacity slider did nothing until the camera next moved: the
+ * map appeared to change opacity on zoom rather than on drag.
+ */
+const opacityPaint = await page.evaluate(async () => {
+  const A = window.__SUNAPP;
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d'); g.fillStyle = '#ffffff'; g.fillRect(0, 0, 64, 64);
+  const img = new Image();
+  await new Promise(res => { img.onload = res; img.src = c.toDataURL(); });
+  A.State.basemap.source = 'image';
+  A.Basemap.loadImage(img, 300, 'white.png');
+  A.refresh(true);
+  const settle = () => new Promise(r => requestAnimationFrame(() =>
+                          requestAnimationFrame(() => setTimeout(r, 250))));
+  await settle();
+  const cnv = document.querySelector('canvas');
+  const lum = () => {
+    const t = document.createElement('canvas'); t.width = cnv.width; t.height = cnv.height;
+    t.getContext('2d').drawImage(cnv, 0, 0);
+    const d = t.getContext('2d').getImageData(0, 0, t.width, t.height).data;
+    let s = 0;
+    for (let i = 0; i < d.length; i += 4) s += 0.2126*d[i] + 0.7152*d[i+1] + 0.0722*d[i+2];
+    return s / (d.length / 4);
+  };
+  const full = lum();
+  const sl = document.getElementById('i-bm-opacity');
+  sl.value = '0.1';
+  sl.dispatchEvent(new Event('input', { bubbles: true }));   // slider only, no camera
+  await settle();
+  const faded = lum();
+  const readout = document.getElementById('v-bm-opacity').textContent;
+  sl.value = '1'; sl.dispatchEvent(new Event('input', { bubbles: true }));
+  await settle();
+  A.State.basemap.source = 'none';
+  A.Basemap.clear();
+  A.refresh(true);
+  return { full: +full.toFixed(1), faded: +faded.toFixed(1), readout };
+});
+check('the opacity slider repaints at once, without waiting for the camera to move',
+      Math.abs(opacityPaint.full - opacityPaint.faded) > 1 && opacityPaint.readout === '10%',
+      'mean luminance ' + opacityPaint.full + ' at 100% → ' + opacityPaint.faded +
+      ' at ' + opacityPaint.readout);
 
 overpassQueries = [];
 const osm3d = await page.evaluate(async () => {
