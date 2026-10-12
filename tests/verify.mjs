@@ -1419,6 +1419,57 @@ check('the chart puts down as much ink on a dark map as on a pale one',
       chartInk.dark.ink >= chartInk.pale.ink * 0.9,
       'pale ' + chartInk.pale.ink + ', dark ' + chartInk.dark.ink);
 
+/* ------------------------------------------------ the shell stays put --- */
+console.log('\n=== the toolbar cannot be scrolled away ===');
+
+/*
+ * Reported from the live site: toggling Cast shadows pushed the toolbar off the
+ * top of the window every time, with no way to get it back — no scrollbars to
+ * drag, because the page is not meant to scroll — until the browser zoom was
+ * changed, which is what a relayout does to a stray scroll offset.
+ *
+ * It could not be reproduced outside the browser it happened in, so what is
+ * pinned here is not the trigger but the consequence: however the document
+ * comes to be scrollable, the shell must not move. overflow:hidden on html and
+ * body is not enough, because it stops a person scrolling and not the browser,
+ * which scrolls a focused control into view whenever it judges one to be out of
+ * it — and the checkbox inside a toggle is focused by the click that flips it.
+ *
+ * The probe below is absolutely positioned, which is how it escapes the
+ * overflow:hidden clamp and makes the document genuinely scrollable, the state
+ * the real browser evidently reached by itself.
+ */
+const shellHeld = await page.evaluate(async () => {
+  const top = () => Math.round(document.getElementById('topbar').getBoundingClientRect().top);
+  const d = document.scrollingElement || document.documentElement;
+  const probe = document.createElement('div');
+  probe.style.cssText = 'position:absolute;top:0;left:0;width:1px;height:3000px';
+  document.body.appendChild(probe);
+  await new Promise(r => setTimeout(r, 80));
+  const scrollable = d.scrollHeight - d.clientHeight;
+  d.scrollTop = 400;
+  await new Promise(r => setTimeout(r, 250));
+  const scrolled = { scrollTop: d.scrollTop, topbar: top() };
+  // and the way it actually happens: a focused control pulled into view
+  const cb = document.getElementById('d-shadow');
+  cb.focus();
+  cb.scrollIntoView({ block: 'center' });
+  await new Promise(r => setTimeout(r, 250));
+  const focused = { scrollTop: d.scrollTop, topbar: top() };
+  probe.remove();
+  await new Promise(r => setTimeout(r, 50));
+  return { scrollable, scrolled, focused, appPosition: getComputedStyle(document.getElementById('app')).position };
+});
+check('the shell is pinned to the viewport, not laid out in the document',
+      shellHeld.appPosition === 'fixed', '#app is position:' + shellHeld.appPosition);
+check('a document that becomes scrollable cannot take the toolbar with it',
+      shellHeld.scrollable > 1000 && shellHeld.scrolled.topbar === 0 && shellHeld.scrolled.scrollTop === 0,
+      `scrollable by ${shellHeld.scrollable}px, scrollTop forced to 400 and reset to ` +
+      `${shellHeld.scrolled.scrollTop}, toolbar at ${shellHeld.scrolled.topbar}`);
+check('nor can focusing a control that the browser decides to scroll into view',
+      shellHeld.focused.topbar === 0,
+      'toolbar at ' + shellHeld.focused.topbar + ' after focus and scrollIntoView');
+
 /* ------------------------------------------- the display toggles behave --- */
 console.log('\n=== switching shadows off, and the opacity slider ===');
 

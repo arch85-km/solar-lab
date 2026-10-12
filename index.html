@@ -166,6 +166,18 @@ button,input,select,textarea{font:inherit;color:inherit}
    App shell
    ============================================================ */
 #app{
+  /* Pinned to the viewport rather than laid out in the document.
+     overflow:hidden on html and body stops a PERSON scrolling the page; it does
+     not stop the BROWSER scrolling, which it does whenever it moves a focused
+     element into view — and a hidden checkbox inside a toggle is focused by the
+     click that flips it. With any overflow at all, that scrolls the shell up by
+     the height of the topbar, which then cannot be scrolled back because the
+     scrollbars are hidden: the toolbar is simply gone until a relayout, such as
+     changing the browser zoom, resets the offset. Taking the shell out of flow
+     removes the scrollable overflow entirely, so there is nothing to move. */
+  position:fixed;
+  inset:0;
+  overflow:hidden;
   display:grid;
   grid-template-rows:var(--topbar-h) minmax(0,1fr) auto;
   height:100dvh;
@@ -22378,6 +22390,25 @@ on('b-obj-centre', 'click', () => {
   refresh(true);
 });
 addEventListener('keydown', (e) => { if (e.key === 'Escape' && placingTarget) armPlacement(null); });
+
+/*
+ * Nothing at document level is meant to scroll: the shell is pinned to the
+ * viewport and every panel scrolls inside itself. But overflow:hidden only
+ * stops a person scrolling, not the browser, which scrolls a focused control
+ * into view whenever it decides one is out of it — and the checkbox inside a
+ * toggle is focused by the click that flips it. The report that started this:
+ * toggling Cast shadows pushed the toolbar off the top of the window, every
+ * time, with no way to bring it back because there are no scrollbars to drag.
+ * Changing the browser zoom fixed it, which is what a relayout does to a stray
+ * scroll offset.
+ *
+ * This could not be reproduced outside the browser it happened in, so the two
+ * layout rules above are precautions rather than a diagnosis. This is the one
+ * that cannot miss: whatever scrolls the page, it goes straight back.
+ */
+addEventListener('scroll', () => {
+  if (scrollX || scrollY) scrollTo(0, 0);
+}, { passive: true });
 
 on('i-ctx-osm', 'change', (e) => {
   State.analysis.osmShade = e.target.checked;
