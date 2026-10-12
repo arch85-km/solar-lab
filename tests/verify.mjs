@@ -1700,6 +1700,42 @@ overpassStatus = 200;
 check('an Overpass failure blames the building fetch, not the connection',
       /building data/i.test(denied) && /map itself is still loaded/i.test(denied),
       denied.slice(0, 90) + '…');
+check('and a busy server is named as busy, with what to do about it',
+      /after three tries/i.test(denied) && /Load map again/i.test(denied),
+      'the 503 is reported as the server being busy, not as missing data');
+
+/*
+ * Overpass runs on donated hardware and answers a heavy query with 504 when it
+ * is busy, which is what happened on the live site: the tiles loaded, the
+ * buildings did not, and nothing more happened. That is a transient state, so
+ * it is asked again rather than given up on. Here the first two attempts are
+ * refused and the third is allowed through; the buildings must arrive.
+ */
+let overpassRefusalsLeft = 2;
+await page.route('**/api/interpreter', async (route) => {
+  if (overpassRefusalsLeft > 0){
+    overpassRefusalsLeft -= 1;
+    await route.fulfill({ status: 504, contentType: 'text/plain',
+                          headers: { 'access-control-allow-origin': '*' },
+                          body: 'gateway timeout' });
+    return;
+  }
+  await route.fallback();
+});
+expectTileErrors = true;
+const recovered = await page.evaluate(async () => {
+  const A = window.__SUNAPP;
+  A.State.basemap.extent = 400;
+  try { const r = await A.OsmBuildings.load(); return { ok: true, count: r.count }; }
+  catch (e){ return { ok: false, msg: e.message }; }
+});
+expectTileErrors = false;
+await page.unroute('**/api/interpreter');
+check('two 504s in a row do not lose the buildings — it asks again',
+      recovered.ok && recovered.count > 0 && overpassRefusalsLeft === 0,
+      recovered.ok ? `refused twice, then ${recovered.count} buildings`
+                   : 'gave up: ' + recovered.msg);
+await page.evaluate(() => { window.__SUNAPP.OsmBuildings.clear(); });
 
 const cleared = await page.evaluate(() => {
   const A = window.__SUNAPP;

@@ -19146,18 +19146,42 @@ const OsmBuildings = (() => {
     const query = '[out:json][timeout:25];(way["building"](' + bbox +
                   ');relation["building"](' + bbox + ');); out geom;';
 
-    let json;
-    try {
-      const res = await fetch(ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'data=' + encodeURIComponent(query),
-      });
-      if (!res.ok) throw new Error('Overpass replied ' + res.status);
-      json = await res.json();
-    } catch (err){
-      throw new Error('Could not fetch building data from OpenStreetMap (' + err.message +
-                      '). The map itself is still loaded — this only affects the 3D volumes.');
+    /*
+     * Overpass is a free service running on donated hardware, and it answers a
+     * heavy query by making you wait: 504 and 429 mean "busy, come back", not
+     * "no data". A single attempt turned that into a dead end — the map loaded,
+     * no buildings appeared, and the only way to try again was to press Load
+     * map a second time. Three attempts, backing off, costs nothing when the
+     * first succeeds and rescues the common case where it does not.
+     */
+    const BUSY = new Set([429, 502, 503, 504]);
+    let json, lastMsg = '';
+    for (let attempt = 0; attempt < 3 && !json; attempt++){
+      if (attempt) await new Promise(r => setTimeout(r, attempt * 1500));
+      try {
+        const res = await fetch(ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: 'data=' + encodeURIComponent(query),
+        });
+        if (!res.ok){
+          lastMsg = 'Overpass replied ' + res.status;
+          if (BUSY.has(res.status)) continue;        // busy: worth asking again
+          throw new Error(lastMsg);                  // anything else will not change
+        }
+        json = await res.json();
+      } catch (err){
+        lastMsg = err.message;
+        if (attempt === 2) break;
+      }
+    }
+    if (!json){
+      const busy = /\b(429|502|503|504)\b/.test(lastMsg);
+      throw new Error('Could not fetch building data from OpenStreetMap (' + lastMsg +
+                      ')' + (busy ? ', after three tries — the public Overpass server is busy '
+                                  + 'rather than missing the data, so it is worth pressing '
+                                  + 'Load map again in a minute' : '') +
+                      '. The map itself is still loaded — this only affects the 3D volumes.');
     }
 
     const toLocal = projector(lat, lon);
