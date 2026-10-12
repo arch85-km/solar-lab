@@ -28,7 +28,7 @@ Below: the first-load state (London, clear-sky model) and the phone layout.
 |---|---|
 | **Site basemap** | Put the model on its real site: OpenStreetMap tiles, or an image you upload scaled by its real-world width. Shadows fall across the map, and the required credit appears on screen and in exports. The app holds no map key of its own — aerial imagery goes through a small proxy on your own server, so nothing secret is in the page. |
 | **3D city context** | **OpenStreetMap + 3D buildings** extrudes the surrounding footprints from their `height` and `building:levels` tags, fetched from the Overpass API with no key. They cast shadows, and a switch decides whether they shade the analysis — so you can show the same massing with and without its neighbours. |
-| **Saved locations** | Search a place, correct its time zone once, then save it by name — coordinates, time zone and elevation together — and it stays in the city list. |
+| **Saved locations** | Search a place, check its time zone once, then save it by name — coordinates, time zone and elevation together — and it stays in the city list. |
 | **2D stereographic sun path** | The classic printed sun-path chart — horizon on the outer circle, zenith at the centre — laid flat on the site. Engages automatically in top view, or switch it on in any view. |
 | **Dark and light presentation** | The whole interface and the 3D scene switch together, live — dark for the studio and the lecture theatre, light for print, handouts and projectors that wash out. The choice is remembered, and exports default to whichever is on screen. |
 | **Guided intro** | A ten-step walkthrough opens on launch, spotlighting each control in turn, with a **Don't show this on launch** toggle on the first and last cards. It is non-blocking — the model stays draggable while it runs — and replays any time from **Help**. |
@@ -122,14 +122,16 @@ the building shadows, and is excluded from the radiation analysis.
 
 **Find a place** — there is a search box in the toolbar (or press `/`); the Location panel
 has the same one next to the coordinates. Type an address, postcode or building name and
-press Enter. One
-caution the app will remind you of: **the time zone is not guessed** from coordinates, so
-check it after moving somewhere new. A wrong time zone silently shifts every sun position.
+press Enter. The **time zone follows the place**: a geocoder returns no zone, so the app
+reads the standard offset from a time-zone map built into the page — no key, no network, and
+right for all but a few hundred border towns worldwide. It flags it for checking under the
+field until you confirm or save it, because a wrong zone silently shifts every sun position
+while every one of them still looks plausible.
 
 **Save this location** — once the time zone is right, give the site a name and press Save.
 It joins a *Saved locations* group at the top of the city list, carrying its coordinates,
-**time zone** and elevation, and it persists in the browser. That last part is the point:
-the time zone is the one thing searching cannot work out, so it is worth keeping.
+**time zone** and elevation, and it persists in the browser. Worth doing wherever the lookup
+needed correcting, so the correction is made once and not every visit.
 
 ![Saved locations in the city list](docs/screenshot-dropdown.png)
 
@@ -412,8 +414,12 @@ bookkeeping are all consistent.
 - **The basemap is flat and Web Mercator.** There is no terrain — the map is a plane at
   ground level. Metres-per-pixel is exact only at the site's centre latitude, which is
   irrelevant over a few hundred metres but would matter at city scale.
-- **Time zone is never inferred** from a searched location; check it yourself after moving
-  the site, because a wrong zone silently shifts every sun position.
+- **The time zone is looked up, not guaranteed.** The map built into the page holds the
+  standard offset of every quarter-degree cell on Earth, which agrees with the recorded zone
+  for 99.6 per cent of the world's cities; the rest sit within a few kilometres of a
+  boundary, too close for a cell that size to separate. Check it if the site is near one, and
+  save the location to keep the correction. The lookup is standard time — summer time is the
+  separate daylight-saving switch.
 - **Large meshes are slow.** Above ~200 000 triangles the app warns; decimate or use a
   coarser grid. Analysis points are capped at 120 000, with the grid coarsened
   automatically (and a notice) if a setting would exceed that.

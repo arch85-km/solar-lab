@@ -2179,6 +2179,166 @@ await page.evaluate((t) => {
   A.applyEPW(A.EPW.parse(t, 'chicago.epw'));
 }, epwText);
 
+/* ------------------------------------------------------ time zone lookup --- */
+console.log('\n=== time zone from coordinates ===');
+
+/*
+ * A geocoder returns no time zone, so the app reads one from the grid embedded
+ * by tools/build-tz-grid.py. The offsets below are the legal STANDARD offsets,
+ * checked by hand: the places are picked because the longitude rule the grid
+ * replaced gets them wrong — a zone kept an hour off its meridian (Paris,
+ * Madrid, Reykjavik), on a half hour (Mumbai, Adelaide, St John's) or a quarter
+ * (Kathmandu, Eucla, Chatham), one zone across a continent (Shanghai), or a
+ * border a degree cell has to resolve (Enniskillen, Garden City, Urumqi).
+ */
+const ZONES = [
+  ['London',          51.4800,   -0.4500,  0],
+  ['Enniskillen',     54.3450,   -7.6310,  0],     // west of -7.5, the UK miss
+  ['Reykjavik',       64.1470,  -21.9420,  0],
+  ['Paris',           48.8570,    2.3520,  1],
+  ['Madrid',          40.4170,   -3.7040,  1],
+  ['Lagos',            6.5240,    3.3790,  1],
+  ['Cape Town',      -33.9250,   18.4240,  2],
+  ['Nairobi',         -1.2920,   36.8220,  3],
+  ['Tehran',          35.6900,   51.3900,  3.5],
+  ['Kabul',           34.5300,   69.1700,  4.5],
+  ['Mumbai',          19.0760,   72.8780,  5.5],
+  ['Kathmandu',       27.7170,   85.3240,  5.75],
+  ['Urumqi',          43.8250,   87.6160,  6],     // Xinjiang, not Beijing time
+  ['Singapore',        1.3520,  103.8200,  8],
+  ['Shanghai',        31.2300,  121.4700,  8],
+  ['Eucla',          -31.6770,  128.8850,  8.75],
+  ['Adelaide',       -34.9300,  138.6000,  9.5],
+  ['Sydney',         -33.8680,  151.2090, 10],
+  ['Chatham Islands',-43.9500, -176.5600, 12.75],
+  ['Honolulu',        21.3100, -157.8600,-10],
+  ['Anchorage',       61.2200, -149.9000, -9],
+  ['Garden City KS',  37.9700, -100.8700, -6],     // Central, not Mountain
+  ['New York',        40.7128,  -74.0060, -5],
+  ['Santiago',       -33.4500,  -70.6700, -4],
+  ['St John\'s',      47.5600,  -52.7100, -3.5],
+  ['Recife',          -8.0500,  -34.9000, -3],
+];
+const zoneRead = await page.evaluate((places) => {
+  const A = window.__SUNAPP;
+  return places.map(([n, lat, lon]) => [n, A.zoneForPlace(lat, lon)]);
+}, ZONES);
+const zoneWrong = ZONES
+  .map((p, i) => [p[0], zoneRead[i][1], p[3]])
+  .filter(([, got, want]) => got !== want);
+check('every hand-checked place reads its own standard offset from the grid',
+      zoneWrong.length === 0,
+      zoneWrong.length ? zoneWrong.map(([n, g, w]) => `${n} ${g} not ${w}`).join(', ')
+                       : ZONES.length + ' places, offsets -10 to +12.75');
+
+const lonRuleWrong = ZONES.filter(([, , lon, want]) =>
+  Math.max(-12, Math.min(14, Math.round(lon / 15))) !== want).length;
+check('the longitude rule the grid replaced would miss most of them',
+      lonRuleWrong >= 20, lonRuleWrong + ' of ' + ZONES.length + ' wrong by longitude alone');
+
+const edges = await page.evaluate(() => {
+  const A = window.__SUNAPP;
+  return {
+    east:     A.zoneForPlace(-17.5, 180),      // Fiji straddles the antimeridian
+    west:     A.zoneForPlace(-17.5, -180),
+    wrapHigh: A.zoneForPlace(-17.5, 540),      // 180 again, three turns on
+    wrapLow:  A.zoneForPlace(51.48, -360.45),  // London, one turn back
+    northPole: A.zoneForPlace(90, 0),
+    southPole: A.zoneForPlace(-90, 0),
+    nan:      A.zoneForPlace(NaN, NaN),
+  };
+});
+check('the antimeridian and out-of-range longitudes wrap instead of throwing',
+      edges.east === 12 && edges.west === 12 && edges.wrapHigh === 12 && edges.wrapLow === 0,
+      JSON.stringify(edges));
+check('the poles and a non-numeric coordinate still return a usable offset',
+      Number.isFinite(edges.northPole) && Number.isFinite(edges.southPole)
+      && Number.isFinite(edges.nan),
+      'N ' + edges.northPole + ', S ' + edges.southPole + ', NaN ' + edges.nan);
+
+check('the grid decoded, so the longitude fallback is not what answered',
+      zoneRead.find(r => r[0] === 'Mumbai')[1] === 5.5, 'Mumbai reads 5.5, not 5');
+
+/*
+ * The grid holds standard offsets. London in July is on BST, but the field is
+ * standard time plus the app's own daylight saving switch, and reading a summer
+ * offset here would apply the hour twice.
+ */
+const summer = await page.evaluate(() => {
+  const A = window.__SUNAPP;
+  return [A.zoneForPlace(51.48, -0.45), A.zoneForPlace(-33.868, 151.209)];
+});
+check('offsets are standard time, not whatever the zone is keeping today',
+      summer[0] === 0 && summer[1] === 10, 'London ' + summer[0] + ', Sydney ' + summer[1]);
+
+const fractional = await page.evaluate(async () => {
+  const A = window.__SUNAPP;
+  const out = [];
+  for (const [n, lat, lon] of [['Kathmandu', 27.717, 85.324], ['Mumbai', 19.076, 72.878],
+                               ['Eucla', -31.677, 128.885], ['New York', 40.7128, -74.006]]) {
+    A.pickPlace(lat, lon, n);
+    const f = document.getElementById('i-tz');
+    out.push({ n, field: f.value, state: A.State.site.tz, valid: f.checkValidity(),
+               flagged: !document.getElementById('tz-note').hidden });
+  }
+  return out;
+});
+check('picking a place writes the offset to the field, quarter hours included',
+      fractional.every(r => String(r.state) === r.field)
+      && fractional.find(r => r.n === 'Kathmandu').field === '5.75'
+      && fractional.find(r => r.n === 'Eucla').field === '8.75',
+      fractional.map(r => r.n + ' ' + r.field).join(', '));
+check('a quarter-hour offset does not fail the field\'s own validation',
+      fractional.every(r => r.valid), 'step attribute admits 5.75 and 8.75');
+check('a looked-up zone is flagged for checking under the field',
+      fractional.every(r => r.flagged), 'note shown for all four');
+
+const confirmed = await page.evaluate(() => {
+  const f = document.getElementById('i-tz');
+  f.value = '9';
+  f.dispatchEvent(new Event('change', { bubbles: true }));
+  return { hidden: document.getElementById('tz-note').hidden,
+           state: window.__SUNAPP.State.site.tz };
+});
+check('editing the field clears the flag and takes the user\'s value',
+      confirmed.hidden === true && confirmed.state === 9,
+      'note hidden, tz now ' + confirmed.state);
+
+/*
+ * The point of all of it: with the zone right, the sun crosses the meridian at
+ * solar noon. The offset of that crossing from 12:00 is a real property of the
+ * place — Reykjavik is an hour and a half late on UTC+0 — so what is asserted
+ * is the azimuth, which must be due south above the sun's declination and due
+ * north below it whatever the zone.
+ */
+const meridian = await page.evaluate((places) => {
+  const A = window.__SUNAPP;
+  const rows = [];
+  for (const [n, lat, lon] of places) {
+    const site = { lat, lon, tz: A.zoneForPlace(lat, lon), el: 0 };
+    for (const doy of [80, 172, 264, 355]) {
+      const noon = A.SolarCore.dayInfo(site, doy, 0).solarNoon;
+      const sun = A.SolarCore.position(site, doy, noon, 0);
+      const offMeridian = Math.min(Math.abs(sun.azimuth - 180), Math.abs(sun.azimuth),
+                                   Math.abs(sun.azimuth - 360));
+      rows.push({ n, doy, tz: site.tz, off: +offMeridian.toFixed(2) });
+    }
+  }
+  return rows;
+}, ZONES);
+const offMeridian = meridian.filter(r => r.off > 0.5);
+check('at solar noon the sun sits on the meridian everywhere in the table',
+      offMeridian.length === 0,
+      offMeridian.length ? offMeridian.slice(0, 4).map(r => `${r.n} doy ${r.doy} off ${r.off}deg`).join(', ')
+                         : meridian.length + ' place-days, worst ' +
+                           Math.max(...meridian.map(r => r.off)).toFixed(2) + ' deg off');
+
+// Put the site back, as the place-search section does, so later checks are clean
+await page.evaluate((t) => {
+  const A = window.__SUNAPP;
+  A.applyEPW(A.EPW.parse(t, 'chicago.epw'));
+}, epwText);
+
 /* ------------------------------------------------------ presentation modes --- */
 console.log('\n=== dark and light presentation ===');
 
