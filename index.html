@@ -19823,12 +19823,22 @@ function loadSample(key){
   objAssembly.clear();
   objItems = [];
   objActive = -1;
-  modelGroup.add(SAMPLES[key] ? SAMPLES[key]() : SAMPLES.demo());
-  State.objName = null;
+  modelGroup.add(objAssembly);
+  const g = SAMPLES[key] ? SAMPLES[key]() : SAMPLES.demo();
+  objAssembly.add(g);
+  // The empty site has nothing to move, so it stays an empty assembly and the
+  // placement controls stay away, as they do with no model at all.
+  let solid = false;
+  g.traverse(o => { if (o.isMesh) solid = true; });
+  if (solid){
+    objItems = [{ name: sampleLabel(key), root: g, scale: 1, rot: 0,
+                  at: { x: 0, z: 0 }, sample: true }];
+    objActive = 0;
+  }
+  State.objName = null;          // the name of an imported file, which this is not
   renderObjChips();
-  clearResults();
-  refreshModelMetrics();
-  buildSunPath();
+  if (solid) placeObj();         // applies scale, rotation and offset; clears results
+  else { clearResults(); refreshModelMetrics(); buildSunPath(); }
   frameModel();
 }
 
@@ -19921,8 +19931,23 @@ function frameModel(){
  *  files exported from the same model.
  * -------------------------------------------------------------------------- */
 const objAssembly = new THREE.Group();
-let objItems = [];            // [{ name, root, scale, at:{x,z} }]
+let objItems = [];            // [{ name, root, scale, rot, at:{x,z}, sample }]
 let objActive = -1;           // the one the scale and place controls act on
+
+/*
+ * A sample massing is an item too, so that it can be moved, turned and scaled
+ * with the same controls as an import. It differs in three ways, each flagged
+ * by `sample` on the item: the OBJ unit and up-axis settings do not apply to
+ * it, it is not centred on the chart (it keeps the position it is built at, so
+ * that turning the samples into items moved nothing on anyone's screen), and
+ * it has no remove button, because removing it would leave an empty site that
+ * the sample dropdown already offers.
+ */
+function sampleLabel(key){
+  const sel = document.getElementById('i-sample');
+  const opt = sel && sel.querySelector('option[value="' + key + '"]');
+  return opt ? opt.textContent : 'Sample massing';
+}
 
 function importOBJ(text, name){
   const loader = new OBJLoader();
@@ -19945,10 +19970,12 @@ function importOBJ(text, name){
     g.add(mesh);
   }
 
-  // The first import replaces the sample massing; later ones join it
-  if (!objItems.length){
+  // The first import replaces the sample massing; later ones join it. The
+  // sample is an item now, so "no models yet" means none that came from a file.
+  if (!objItems.length || objItems.every(it => it.sample)){
     disposeGroup(modelGroup);
     objAssembly.clear();
+    objItems = [];
     modelGroup.add(objAssembly);
   }
   objAssembly.add(g);
@@ -19976,7 +20003,9 @@ function renderObjChips(){
     nm.textContent = it.name;
     nm.title = it.name + (objItems.length > 1 ? ' — click to select' : '');
     nm.onclick = () => { objActive = i; renderObjChips(); syncObjControls(); };
-    chip.querySelector('.cx').onclick = () => removeObj(i);
+    const cx = chip.querySelector('.cx');
+    if (it.sample) cx.remove();        // the dropdown changes it; nothing to remove to
+    else cx.onclick = () => removeObj(i);
     box.appendChild(chip);
   });
   const many = objItems.length > 0;
@@ -20032,8 +20061,11 @@ function removeObj(i){
  */
 function placeObj(){
   if (!objItems.length) return new THREE.Vector3();
-  const unit = parseFloat(document.getElementById('i-units').value) || 1;
-  const zUp = document.getElementById('i-objup').value === 'z';
+  const importUnit = parseFloat(document.getElementById('i-units').value) || 1;
+  const importZUp = document.getElementById('i-objup').value === 'z';
+  // A sample is already in metres and already Y-up, so the OBJ import settings
+  // must not reach it: changing the unit dropdown would otherwise rescale it.
+  const sampleOnly = objItems.every(it => it.sample);
 
   // Two passes. The datum comes from the files as they were exported, with no
   // manual offsets applied; the offsets are then laid on top. Measuring the
@@ -20041,6 +20073,8 @@ function placeObj(){
   // single model by hand would move nothing at all.
   for (const it of objItems){
     const g = it.root;
+    const unit = it.sample ? 1 : importUnit;
+    const zUp  = it.sample ? false : importZUp;
     g.rotation.order = 'YXZ';          // Y applied last: a plan rotation
     g.scale.setScalar(unit * it.scale);
     g.position.set(0, 0, 0);
@@ -20065,11 +20099,14 @@ function placeObj(){
   // Centring means "under the sun path", which is the site origin until the
   // chart has been placed somewhere else — an imported model that ignores where
   // the chart is put is no use for reading a shadow off it.
+  // A sample keeps the position it is built at: it was placed there on purpose,
+  // and centring it would have shifted every sample on every existing screen the
+  // moment they became movable. The user's own offset still applies below.
   const at = State.disp.chartAt;
-  if (document.getElementById('i-center').checked){
+  if (!sampleOnly && document.getElementById('i-center').checked){
     off.x = at.x - ctr.x; off.z = at.z - ctr.z;
   }
-  if (document.getElementById('i-drop').checked) off.y = -bb.min.y;
+  if (!sampleOnly && document.getElementById('i-drop').checked) off.y = -bb.min.y;
   objAssembly.position.copy(off);
   for (const it of objItems) it.root.position.x += it.at.x, it.root.position.z += it.at.z;
   objAssembly.updateMatrixWorld(true);

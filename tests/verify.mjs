@@ -1949,8 +1949,8 @@ check('an imported model can be resized after the fact',
 check('changing the units re-places the model instead of doing nothing',
       Math.abs(resize.feet - 9 * 0.3048) < 0.01 && resize.back === 9,
       '9 m as feet → ' + resize.feet.toFixed(2) + ' m');
-check('the scale control is offered only while an imported model is loaded',
-      resize.rowHidden);
+check('the scale control stays for the sample the import is replaced by',
+      resize.rowHidden === false, 'row still shown, now pointing at the sample');
 
 // An imported model has to arrive where the chart is, and be movable afterwards
 const objPlace = await page.evaluate((t) => {
@@ -1983,7 +1983,8 @@ check('the offset is spelled out, and Centre returns it to the chart',
       /45 m W/.test(objPlace.note) && /52 m S/.test(objPlace.note) &&
       objPlace.back[0] === 55 && objPlace.back[1] === -40,
       objPlace.note.slice(0, 72));
-check('the placement control goes away with the imported model', objPlace.rowHidden);
+check('the placement control stays for the sample the import is replaced by',
+      objPlace.rowHidden === false, 'row still shown, now pointing at the sample');
 
 // A site usually arrives as several files, which have to land as one assembly
 const many = await page.evaluate((boxes) => {
@@ -2051,10 +2052,107 @@ check('it turns about its own centre, so it does not swing off the site',
       Math.abs(objRot.turned.cz - objRot.before.cz) < 0.1,
       'centre held at ' + objRot.turned.cx + ', ' + objRot.turned.cz + ' m');
 check('Reset returns it to the orientation it was imported in',
-      objRot.back.x === 30 && objRot.back.z === 8 && objRot.rowHidden);
+      objRot.back.x === 30 && objRot.back.z === 8 && objRot.rowHidden === false,
+      'back to ' + objRot.back.x + ' × ' + objRot.back.z + ' m, controls still shown');
 
 check('removing one leaves the rest loaded',
       many.left.length === 1 && many.left[0] === 'block-a.obj', many.left.join(', '));
+
+/* -------------------------------------------------- moving the sample --- */
+console.log('\n=== the sample massing moves too ===');
+
+/*
+ * The scale, rotate and place controls used to be gated on an OBJ import, so
+ * the massing the app opens with could not be moved at all: you could put the
+ * sun path anywhere on the site and the building stayed put. A sample is an
+ * item now, with the same controls.
+ *
+ * The first thing to prove is that making it movable moved nothing: the
+ * samples have to sit exactly where they always did, or every screenshot,
+ * every saved view and every figure anyone has published shifts under them.
+ */
+const sampleHome = await page.evaluate(() => {
+  const A = window.__SUNAPP, out = {};
+  for (const k of ['demo', 'court', 'tower', 'shading', 'box', 'none']){
+    A.loadSample(k);
+    const b = A.State.model.bbox;
+    out[k] = b && isFinite(b.min.x)
+      ? [b.min.x, b.min.z, b.max.x, b.max.z].map(v => +v.toFixed(3)) : null;
+  }
+  return out;
+});
+check('the six samples still sit exactly where they were built',
+      JSON.stringify(sampleHome.demo) === JSON.stringify([-26.5, -27, 21, 20.5])
+      && sampleHome.none === null,
+      'demo spans ' + JSON.stringify(sampleHome.demo));
+
+const sampleMove = await page.evaluate(() => {
+  const A = window.__SUNAPP;
+  const ctr = () => { const b = A.State.model.bbox;
+    return [+((b.min.x + b.max.x) / 2).toFixed(1), +((b.min.z + b.max.z) / 2).toFixed(1)]; };
+  const span = () => { const b = A.State.model.bbox;
+    return [+(b.max.x - b.min.x).toFixed(1), +(b.max.z - b.min.z).toFixed(1)]; };
+  const shown = (id) => document.getElementById(id).style.display !== 'none';
+  A.loadSample('court');
+  const rows = ['row-objscale', 'row-objrot', 'row-objplace'].map(shown);
+  const chipName = (document.querySelector('#obj-chip .cname') || {}).textContent;
+  const removable = !!document.querySelector('#obj-chip .chip .cx');
+  const home = ctr();
+  A.placeModelAt(30, -20);
+  const moved = ctr();
+  const note = document.getElementById('obj-at-note').textContent;
+  document.getElementById('b-obj-centre').click();
+  const back = ctr();
+
+  A.loadSample('shading');
+  const before = span();
+  const rot = document.getElementById('i-objrot');
+  rot.value = '90'; rot.dispatchEvent(new Event('input', { bubbles: true }));
+  const turned = span();
+  document.getElementById('b-objrot-reset').click();
+  const sl = document.getElementById('i-objscale');
+  sl.value = '2'; sl.dispatchEvent(new Event('input', { bubbles: true }));
+  const scaled = span();
+  sl.value = '1'; sl.dispatchEvent(new Event('input', { bubbles: true }));
+
+  // the OBJ unit and up-axis settings belong to imports and must not reach it
+  A.loadSample('box');
+  const metres = span();
+  const units = document.getElementById('i-units');
+  units.value = '0.001'; units.dispatchEvent(new Event('change', { bubbles: true }));
+  const afterMillimetres = span();
+  units.value = '1'; units.dispatchEvent(new Event('change', { bubbles: true }));
+
+  A.loadSample('none');
+  const rowsEmpty = ['row-objscale', 'row-objrot', 'row-objplace'].map(shown);
+  A.loadSample('demo');
+  return { rows, chipName, removable, home, moved, back, note, before, turned,
+           scaled, metres, afterMillimetres, rowsEmpty };
+});
+check('the sample massing gets the scale, rotate and place controls',
+      sampleMove.rows.every(Boolean), 'all three rows shown with a sample loaded');
+check('it can be placed anywhere on the site, and Centre brings it home',
+      sampleMove.moved[0] === 30 && sampleMove.moved[1] === -20
+      && sampleMove.back[0] === sampleMove.home[0]
+      && sampleMove.back[1] === sampleMove.home[1],
+      sampleMove.home.join(', ') + ' → ' + sampleMove.moved.join(', ') + ' → back');
+check('the offset is spelled out for the sample as it is for an import',
+      /30 m E/.test(sampleMove.note) && /20 m N/.test(sampleMove.note),
+      sampleMove.note.slice(0, 48));
+check('it can be turned in plan and scaled',
+      Math.abs(sampleMove.turned[0] - sampleMove.before[1]) < 0.2
+      && Math.abs(sampleMove.turned[1] - sampleMove.before[0]) < 0.2
+      && Math.abs(sampleMove.scaled[0] - sampleMove.before[0] * 2) < 0.2,
+      sampleMove.before.join('×') + ' turns to ' + sampleMove.turned.join('×') +
+      ', doubles to ' + sampleMove.scaled.join('×'));
+check('the chip names the sample and offers no remove, the dropdown being the way out',
+      sampleMove.chipName === 'Courtyard block' && sampleMove.removable === false,
+      'chip reads "' + sampleMove.chipName + '"');
+check('the OBJ unit setting does not reach a sample, which is already in metres',
+      JSON.stringify(sampleMove.metres) === JSON.stringify(sampleMove.afterMillimetres),
+      'still ' + sampleMove.metres.join(' × ') + ' m with the dropdown on millimetres');
+check('the empty site offers nothing to move, as before',
+      sampleMove.rowsEmpty.every(r => r === false), 'all three rows hidden');
 
 /* ------------------------------------------------------- placing the chart --- */
 // The chart can be dropped over a particular courtyard or roof. It is a drawing

@@ -256,18 +256,23 @@ it is turned.
 look north, keeping its height and distance. It glows whenever the view is off north. The quick buttons
 jump to the June solstice, an equinox and the December solstice.
 
+**Moving the building** — *Model scale*, *Model rotation* and *Place model…* work on the
+**sample massings as well as on imports**, so you can drop the sun path on one corner of the
+site and walk the building over to meet it without importing anything. *Place model…* puts
+the selected model anywhere on the site, *Centre* returns it to where it started, and
+rotation turns it in plan from −180° to 180° about its own centre rather than the file's
+origin.
+
 **Imported models** — import as many OBJ files as you like; they load as one assembly and
 each gets a chip in the panel. Click a chip to select that model, × to remove it. *Model
-scale* and *Place model…* act on the selected one; *Model units*, *OBJ up axis*, *Drop to
-ground* and *Centre under the sun path* act on the assembly, and all of them re-place what
-is already loaded rather than being read once at import.
+units*, *OBJ up axis*, *Drop to ground* and *Centre under the sun path* act on the assembly
+and apply to imports only — a sample is already in metres and already the right way up — and
+all of them re-place what is already loaded rather than being read once at import.
 
-Imports arrive **under the sun path**, wherever you have placed it. *Place model…* drops the
-selected one anywhere on the site (*Centre* returns it) and *Model rotation* turns it in
-plan, −180° to 180°, about its own centre rather than the file's origin. Relative positions
-between files are preserved: the assembly's datum is measured from the files as exported,
-before any manual offsets. Swapping the model also rebuilds the shadow map, so the previous
-massing's shadows do not linger on the ground.
+Imports arrive **under the sun path**, wherever you have placed it; a sample stays where it
+is built until you move it. Relative positions between files are preserved: the assembly's
+datum is measured from the files as exported, before any manual offsets. Swapping the model
+also rebuilds the shadow map, so the previous massing's shadows do not linger on the ground.
 
 **Model & Analysis** — choose a sample massing or import an OBJ, set the analysis grid,
 sky density and ground reflectance, then **Run analysis**.
