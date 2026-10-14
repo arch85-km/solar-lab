@@ -372,7 +372,7 @@ It is clearly labelled as synthetic; it is not real climate.
 
 ## Validation
 
-`npm test` runs 204 headless checks. Every number below is produced by that suite, not
+`npm test` runs about 290 headless checks. Every number below is produced by that suite, not
 asserted by hand.
 
 | Check | Result |
@@ -482,7 +482,7 @@ if those disagree with the `BUILD` constant, so they cannot drift apart.
 ```bash
 npm install          # playwright, for the test suite only
 npm run vendor       # fetch the validation EPW
-npm test             # 204 headless checks, screenshots and sample export sheets
+npm test             # ~290 headless checks, screenshots and sample export sheets
 npm run serve        # serve the folder at http://localhost:8080
 ```
 
@@ -504,6 +504,19 @@ tests/verify.mjs      headless verification and screenshots
 tests/fetch-vendor.mjs downloads the validation EPW
 tests/assets/         downloaded on demand (Chicago O'Hare TMY3, for validation)
 ```
+
+## How this was made
+
+I defined the problem and the scope, chose the methods and the sources, test
+the tool in use and find its bugs, and decide what is released and when. The
+code was written with an AI coding assistant working to my specification and
+direction: it wrote most of the code, drafted the documentation for my review,
+diagnosed bugs and proposed fixes that I then tested, and wrote and ran the
+automated tests and release checks.
+
+The reasons behind the design are in [`DESIGN.md`](DESIGN.md), how the code is
+organised is in [`ARCHITECTURE.md`](ARCHITECTURE.md), and every release is in
+[`CHANGELOG.md`](CHANGELOG.md).
 
 ---
 
