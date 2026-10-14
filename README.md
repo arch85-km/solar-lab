@@ -512,8 +512,8 @@ the tool in use and find its bugs, and decide what is released and when. The
 code was written with an AI coding assistant working to my specification and
 direction: it wrote most of the code, drafted the documentation for my review,
 diagnosed bugs and proposed fixes that I then tested, and wrote and ran the
-automated tests and release checks. The design decisions, and any errors, are
-mine.
+automated tests and release checks. I retain full intellectual responsibility
+for the design, the methods and the results, including any errors.
 
 The reasons behind the design are in [`DESIGN.md`](DESIGN.md), how the code is
 organised is in [`ARCHITECTURE.md`](ARCHITECTURE.md), and every release is in
