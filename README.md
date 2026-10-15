@@ -505,15 +505,16 @@ tests/fetch-vendor.mjs downloads the validation EPW
 tests/assets/         downloaded on demand (Chicago O'Hare TMY3, for validation)
 ```
 
-## How this was made
+## How this was developed
 
-I define the problem and the scope, choose the methods and the sources, test the
-tool in use and find its bugs, and decide what is released and when. The code is
-written with an AI coding assistant working to my specification and direction:
-it writes most of the code, drafts the documentation for my review, diagnoses
-bugs and proposes fixes that I test, and writes and runs the automated tests and
-release checks. I retain full intellectual responsibility for the design, the
-methods and the results, including any errors.
+I design the application: I define the problem and the scope, and choose the
+methods and the sources. I test it in use, find its bugs, and decide what is
+released and when. The code is written with an AI coding assistant working to my
+specification and direction: it writes most of the code, drafts the
+documentation for my review, diagnoses bugs and proposes fixes that I test, and
+writes and runs the automated tests and release checks. I retain full
+intellectual responsibility for the design, the methods and the results,
+including any errors.
 
 The reasons behind the design are in [`DESIGN.md`](DESIGN.md), how the code is
 organised is in [`ARCHITECTURE.md`](ARCHITECTURE.md), and every release is in

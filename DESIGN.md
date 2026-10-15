@@ -146,17 +146,19 @@ Every version is archived on Zenodo with its own DOI:
 - **A permanent archive.** Each version survives even if my website changes.
 - **Credit when reused.** Anyone who uses it has a proper way to cite it.
 
-## How this was made
+## How this was developed
 
-I defined the problem and the scope: what the tool is for, who it is for and
-what it leaves out. I chose the methods and the sources it relies on. I test
-it, find and report the bugs, and judge whether a fix works, and I decide
-what is released and when.
+I designed the application. I defined the problem and the scope: what the tool
+is for, who it is for and what it leaves out. I chose the methods and the
+sources it relies on. I tested it in use, found and reported the bugs, judged
+whether each fix worked, and decided what was released and when.
 
 The code was written with an AI coding assistant, working to my specification
 and direction. It wrote most of the code, drafted the documentation, which I
-review, diagnosed bugs and proposed fixes, which I then tested, and wrote and
-ran the automated tests and release checks.
+reviewed, diagnosed bugs and proposed fixes, which I then tested, and wrote and
+ran the automated tests and release checks. I retain full intellectual
+responsibility for the design, the methods and the results, including any
+errors.
 
 ## Next
 
