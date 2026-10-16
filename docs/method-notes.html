@@ -270,7 +270,6 @@
 /* long addresses in the references break rather than push the page sideways on a phone */
 .sl-doc a{overflow-wrap:anywhere;}
 /* a column of figures has its heading over the figures, not at the far edge */
-.sl-doc .sl-tbl table:has(tbody td.sl-n:nth-child(1), tbody td.sl-d:nth-child(1)) thead th:nth-child(1),
 .sl-doc .sl-tbl table:has(tbody td.sl-n:nth-child(2), tbody td.sl-d:nth-child(2)) thead th:nth-child(2),
 .sl-doc .sl-tbl table:has(tbody td.sl-n:nth-child(3), tbody td.sl-d:nth-child(3)) thead th:nth-child(3),
 .sl-doc .sl-tbl table:has(tbody td.sl-n:nth-child(4), tbody td.sl-d:nth-child(4)) thead th:nth-child(4),
@@ -278,6 +277,11 @@
 .sl-doc .sl-tbl table:has(tbody td.sl-n:nth-child(6), tbody td.sl-d:nth-child(6)) thead th:nth-child(6),
 .sl-doc .sl-tbl table:has(tbody td.sl-n:nth-child(7), tbody td.sl-d:nth-child(7)) thead th:nth-child(7),
 .sl-doc .sl-tbl table:has(tbody td.sl-n:nth-child(8), tbody td.sl-d:nth-child(8)) thead th:nth-child(8){text-align:right;}
+/* the first column names the row, so it reads from the left like the text, even when it holds a number (unless its heading is marked as a figure) */
+.sl-doc .sl-tbl table:not(:has(thead th.sl-n:first-child)) tr > :first-child{text-align:left;}
+/* the site theme stripes table rows and tints them on hover; the notes keep one even tint */
+.sl-doc .sl-tbl th,.sl-doc .sl-tbl td{background-color:transparent;}
+/* formulas are <pre>, not <div>: the site's HTML minifier leaves <pre> alone but collapses the line breaks in a <div> */
 /* no side padding of its own: the Elementor section sets the margins, so the notes line up with the blocks above them on every screen */
 .sl-doc{padding-left:0;padding-right:0;}
 /* and no width cap of its own: on a wide screen a capped, centred block starts further in than the blocks above it */
@@ -375,7 +379,7 @@
         Direct sun, the diffuse sky patches and the reflecting ground are folded into one flat
         source list so the ray tracer has a single code path. The value at a sensor is then a
         cosine-weighted sum over that list, with blocked directions dropped:</p>
-      <div class="sl-formula">E(p) = Σⱼ  Vⱼ · max(0, n̂ₚ · d̂ⱼ) · vis(p, d̂ⱼ)        <em>W/m²</em>
+      <pre class="sl-formula">E(p) = Σⱼ  Vⱼ · max(0, n̂ₚ · d̂ⱼ) · vis(p, d̂ⱼ)        <em>W/m²</em>
 &nbsp;
 <em>j</em>    runs over every source: the sky patches, the ground
      patches, and the sun
@@ -384,10 +388,10 @@
 <em>n̂ₚ</em>   the sensor's outward normal — back-facing directions
      contribute nothing, they are not merely attenuated
 <em>vis</em>  0 if any triangle blocks the ray, 1 otherwise; a binary
-     any-hit test, with no partial occlusion</div>
+     any-hit test, with no partial occlusion</pre>
 
       <p>The three groups of sources are built as follows.</p>
-      <div class="sl-formula"><em>diffuse sky</em>    Vᵢ = Lᵢ · ωᵢ
+      <pre class="sl-formula"><em>diffuse sky</em>    Vᵢ = Lᵢ · ωᵢ
                Lᵢ from the Perez distribution, ωᵢ the patch
                solid angle. 145 patches, or 577 at Reinhart
                density.
@@ -401,7 +405,7 @@
                One direction for an instant. Over a period, every
                sun-up hour is binned onto a 2.5° grid and the
                bins are energy-weighted; the test suite reduces
-               4,703 sun-up hours to 589 unique directions.</div>
+               4,703 sun-up hours to 589 unique directions.</pre>
 
       <p class="sl-note"><b>The beam is deliberately kept out of the sky patches.</b> Smearing a
         low-altitude sun across 145 Tregenza patches is a well-known artefact of the coarse
@@ -431,8 +435,8 @@
         longitude with the nutation term in Ω, the obliquity of the ecliptic and its correction,
         and finally the declination. The equation of time is the usual series in
         <code>y = tan²(ε/2)</code>:</p>
-      <div class="sl-formula">EoT = 4 · (y·sin 2L₀ − 2e·sin M + 4ey·sin M·cos 2L₀
-           − ½y²·sin 4L₀ − 1.25e²·sin 2M)          <em>minutes</em></div>
+      <pre class="sl-formula">EoT = 4 · (y·sin 2L₀ − 2e·sin M + 4ey·sin M·cos 2L₀
+           − ½y²·sin 4L₀ − 1.25e²·sin 2M)          <em>minutes</em></pre>
 
       <h3>Refraction</h3>
       <p>NOAA's piecewise fit is applied to the true altitude to give the apparent altitude the
@@ -548,11 +552,11 @@
         is generated exactly as Radiance's <code>rh_init()</code> does in
         <code>gendaymtx.c</code>, and the construction is reproduced here in full because it is
         short enough to check:</p>
-      <div class="sl-formula">α            = (π/2) / (7·MF + 0.5)
+      <pre class="sl-formula">α            = (π/2) / (7·MF + 0.5)
 row i altitude = α · (i + 0.5)
 patches in row = tnaz[⌊i/MF⌋] · MF,   tnaz = [30,30,24,24,18,12,6]
 solid angle    = 2π · (sin α(i+1) − sin αi) / patchesInRow
-zenith cap     = 2π · (1 − cos(α/2))</div>
+zenith cap     = 2π · (1 − cos(α/2))</pre>
       <p>MF:1 gives 145 patches, which is Tregenza's subdivision unchanged; MF:2 gives 577, which
         is Reinhart's. Both counts include the single zenith cap. The interface offers exactly
         these two, labelled <b>Tregenza (145)</b> and <b>Reinhart (577)</b>. The solid angle is
@@ -565,10 +569,10 @@ zenith cap     = 2π · (1 − cos(α/2))</div>
         Radiance's <code>gendaymtx.c</code> — specifically <code>PerezCoeff</code>,
         <code>CalcPerezParam</code> and <code>CalcRelLuminance</code> — and the full eight-bin,
         twenty-coefficient table is present in the file.</p>
-      <div class="sl-formula">L(γ, ζ) = (1 + a·exp(b / cos ζ)) · (1 + c·exp(d·γ) + e·cos²γ)
+      <pre class="sl-formula">L(γ, ζ) = (1 + a·exp(b / cos ζ)) · (1 + c·exp(d·γ) + e·cos²γ)
 &nbsp;
 <em>γ</em>  angle between the sky point and the sun
-<em>ζ</em>  zenith angle of the sky point, with cos ζ floored at 0.01</div>
+<em>ζ</em>  zenith angle of the sky point, with cos ζ floored at 0.01</pre>
       <p>Clearness ε selects the bin. The upper bounds are
         <code>1.065, 1.230, 1.500, 1.950, 2.800, 4.500, 6.200</code> and above, with ε itself
         clamped to the range 1.0 to 11.9. Brightness Δ uses the air mass and the eccentricity
@@ -578,11 +582,11 @@ zenith cap     = 2π · (1 − cos(α/2))</div>
         <code>if (ε &gt; 1.065 &amp;&amp; ε &lt; 2.8 &amp;&amp; Δ &lt; 0.2) Δ = 0.2</code> — and in the
         <b>lowest</b> bin, the overcast one, the coefficients c and d are computed from Perez's
         equations 7 and 8 instead of the linear equation 6 used for every other bin:</p>
-      <div class="sl-formula">c = exp( (Δ(x₃₀ + x₃₁·Z))^x₃₂ ) − x₃₃
-d = −exp( Δ(x₄₀ + x₄₁·Z) ) + x₄₂ + Δ·x₄₃</div>
+      <pre class="sl-formula">c = exp( (Δ(x₃₀ + x₃₁·Z))^x₃₂ ) − x₃₃
+d = −exp( Δ(x₄₀ + x₄₁·Z) ) + x₄₂ + Δ·x₄₃</pre>
       <p>The air mass is what the code calls a Kasten-style relative optical air mass, identified
         with Radiance's <code>CalcAirMass()</code> rather than with any publication:</p>
-      <div class="sl-formula">m = 1 / (cos Z + 0.15 · max(93.885 − Z°, 0.1)^−1.253)</div>
+      <pre class="sl-formula">m = 1 / (cos Z + 0.15 · max(93.885 − Z°, 0.1)^−1.253)</pre>
       <p>Those coefficients are <b>Kasten's 1965 set</b>, not the 1989 Kasten &amp; Young revision
         that is more often cited. The distinction matters if you compare this term against another
         implementation, and the references below set it out. It is used only to compute the Perez brightness
@@ -600,12 +604,12 @@ d = −exp( Δ(x₄₀ + x₄₁·Z) ) + x₄₂ + Δ·x₄₃</div>
       <p>When no EPW is loaded, and only then, the hourly irradiance comes from a synthetic clear
         day. Beam transmittance is Hottel's 1976 correlation for the 23 km visibility standard
         atmosphere, with the mid-latitude summer correction factors applied to each constant:</p>
-      <div class="sl-formula">a₀ = 0.97 · (0.4237 − 0.00821(6 − A)²)
+      <pre class="sl-formula">a₀ = 0.97 · (0.4237 − 0.00821(6 − A)²)
 a₁ = 0.99 · (0.5055 + 0.00595(6.5 − A)²)
 k  = 1.02 · (0.2711 + 0.01858(2.5 − A)²)
 &nbsp;
 τ_b = a₀ + a₁ · exp(−k / cos Z)
-DNI = G_on · τ_b,   G_on = 1367 · (1 + 0.033 cos(2π·doy/365))</div>
+DNI = G_on · τ_b,   G_on = 1367 · (1 + 0.033 cos(2π·doy/365))</pre>
       <p>A is site elevation in kilometres, clamped to the range 0–2.5 km because that is where
         Hottel's fit is valid — the code says so at the clamp. The diffuse fraction is the
         Liu &amp; Jordan 1960 correlation, <code>τ_d = 0.271 − 0.294·τ_b</code>, and global
@@ -655,7 +659,7 @@ DNI = G_on · τ_b,   G_on = 1367 · (1 + 0.033 cos(2π·doy/365))</div>
         midnight to 01:00 and lands in index 0. For an instant, the tool takes
         <code>hourIndex = ⌊minutes / 60⌋</code>. For a cumulative run it samples the middle of
         each hour:</p>
-      <div class="sl-formula">minutes = h · 60 + 30      <em>mid-hour: EPW hour h covers (h−1, h]</em></div>
+      <pre class="sl-formula">minutes = h · 60 + 30      <em>mid-hour: EPW hour h covers (h−1, h]</em></pre>
       <p>The sun position for that hour is therefore computed at its midpoint, not its start or
         end, which is the right choice for a quantity that is an hourly mean — but it does mean
         the sun moves in half-hour steps within the accumulation, and a shadow edge sweeping
@@ -895,9 +899,9 @@ DNI = G_on · τ_b,   G_on = 1367 · (1 + 0.033 cos(2π·doy/365))</div>
       <h4>3D context from OpenStreetMap</h4>
       <p>Footprints and heights come from the Overpass API with no key and no account. The query
         is a single request per load, for a box capped at 600 m across:</p>
-      <div class="sl-formula">[out:json][timeout:25];
+      <pre class="sl-formula">[out:json][timeout:25];
 (way["building"](bbox); relation["building"](bbox););
-out geom;</div>
+out geom;</pre>
       <div class="sl-tbl"><table>
         <thead><tr><th>Limit</th><th class="sl-n">Value</th><th>Why it exists</th></tr></thead>
         <tbody>
