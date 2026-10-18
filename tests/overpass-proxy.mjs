@@ -172,6 +172,28 @@ try {
         'files ' + [...new Set(kept2.map((f) => f.split('.').pop()))].join('/') +
         '; a direct request gets ' + direct.status + ', ' + directBody.length + ' bytes');
 
+  // Reported from the live site: the second version deleted the first version's
+  // .json answers, so Sheffield's only copy was lost on a day every server was
+  // down. An old .json is now moved into the guarded form, its age kept.
+  {
+    const BOX5 = '53.390000,-1.490000,53.393594,-1.483980';
+    const { createHash } = await import('node:crypto');
+    const key = createHash('sha1').update(BOX5).digest('hex');
+    const legacy = join(dir, 'overpass-cache', key + '.json');
+    writeFileSync(legacy, JSON.stringify({ version: 0.6, elements: ELEMENTS }));
+    const tenDays = (Date.now() / 1000) - 10 * 86400;
+    utimesSync(legacy, tenDays, tenDays);
+    reset(); mode.u1 = mode.u2 = mode.u3 = 'busy';
+    const moved = await ask(BOX5);
+    check('an answer kept as .json by the first version is moved, not lost',
+          moved.status === 200 && moved.cache === 'hit' && moved.age > 9 * 86400 &&
+          !existsSync(legacy) && existsSync(join(dir, 'overpass-cache', key + '.php')) &&
+          hits.u1 + hits.u2 + hits.u3 === 0,
+          'status ' + moved.status + ', cache ' + moved.cache + ', ' + Math.round(moved.age / 86400) +
+          ' days old, Overpass asked ' + (hits.u1 + hits.u2 + hits.u3) + '×');
+    mode.u1 = mode.u2 = mode.u3 = 'ok';
+  }
+
   // A POST is not how the page asks
   const post = await fetch(BASE + '/overpass-proxy.php?bbox=' + BOX, { method: 'POST', headers: { Referer: PAGE } });
   check('only GET is answered', post.status === 405, 'POST ' + post.status);

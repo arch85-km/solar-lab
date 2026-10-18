@@ -45,7 +45,8 @@ in general rather than one build, use the concept DOI
 - **Fixed** the buildings proxy kept its answers as plain `.json` files, which
   SiteGround serves directly whatever `.htaccess` says, so a kept answer could
   be downloaded by its name. They are now `.php` files whose first line ends a
-  direct request with nothing; old `.json` files are removed.
+  direct request with nothing; an old `.json` answer is moved into that form
+  with its age kept.
 - **Fixed** a query Overpass ran out of time for comes back as a success with
   a "runtime error" note and no buildings, and was reported as "OpenStreetMap
   has no building footprints mapped around this point". It is now retried as

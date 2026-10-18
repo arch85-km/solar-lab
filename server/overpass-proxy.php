@@ -156,8 +156,17 @@ if (!is_dir($CACHE_DIR)) {
 }
 $key = sha1($raw);
 $file = $CACHE_DIR . '/' . $key . '.php';
-// Answers kept by the first version, as plain .json files a browser could fetch
-@unlink($CACHE_DIR . '/' . $key . '.json');
+// An answer kept by the first version, as a plain .json file a browser could
+// fetch, is moved into the guarded form with its age kept, not thrown away:
+// on a day when every server is down it may be the only copy there is.
+$legacy = $CACHE_DIR . '/' . $key . '.json';
+if (is_file($legacy)) {
+    if (!is_file($file)) {
+        $when = (int)filemtime($legacy);
+        if (@file_put_contents($file, GUARD . (string)file_get_contents($legacy)) !== false) @touch($file, $when);
+    }
+    @unlink($legacy);
+}
 $maxAge = $CACHE_DAYS * 86400;
 
 $age = is_file($file) ? time() - (int)filemtime($file) : null;
@@ -214,13 +223,11 @@ foreach ($UPSTREAMS as $url) {
         $tmp = $CACHE_DIR . '/' . $key . '.' . getmypid() . '.tmp.php';
         if (@file_put_contents($tmp, GUARD . $body) !== false) @rename($tmp, $file);
         // Now and then, drop answers nobody has refreshed in 90 days and their
-        // locks, so the folder cannot grow without limit, and any plain .json
-        // left by the first version.
+        // locks, so the folder cannot grow without limit.
         if (mt_rand(1, 50) === 1) {
             foreach ((array)glob($CACHE_DIR . '/*') as $old) {
                 if (!is_string($old)) continue;
-                if (preg_match('/\.json$/', $old)
-                    || (preg_match('/\.(php|lock)$/', $old) && time() - (int)@filemtime($old) > 90 * 86400)) {
+                if (preg_match('/\.(json|php|lock)$/', $old) && time() - (int)@filemtime($old) > 90 * 86400) {
                     @unlink($old);
                 }
             }
