@@ -19019,7 +19019,17 @@ const contextGroup = new THREE.Group();
 scene.add(contextGroup);
 
 const OsmBuildings = (() => {
-  const ENDPOINT = 'https://overpass-api.de/api/interpreter';
+  /*
+   * The main public Overpass instance first. When it is busy, the next try goes
+   * to a second public instance serving the same OpenStreetMap data, so one
+   * overloaded server does not leave a class without buildings. Neither needs
+   * a key or an account.
+   */
+  const ENDPOINTS = [
+    'https://overpass-api.de/api/interpreter',
+    'https://overpass.private.coffee/api/interpreter',
+  ];
+  const ENDPOINT = ENDPOINTS[0];
   const MAX_BUILDINGS = 1200;
   const MAX_RADIUS = 600;          // metres; Overpass is a shared free service
   // Only the near ring casts shadows. The shadow map is a fixed 2048 texels, so
@@ -19159,8 +19169,26 @@ const OsmBuildings = (() => {
     requestRender();
   }
 
-  /** Fetch and extrude the buildings around the current site. */
-  async function load(){
+  /*
+   * Each load gets a number, and a newer load, or switching the 3D context off,
+   * retires the older one: its request is aborted and its answer, if one still
+   * arrives, is dropped. Without this, a slow answer for the place just left
+   * could land after the new place's buildings, and two queries running at
+   * once count twice against Overpass's per-user limit.
+   */
+  let generation = 0, inflight = null;
+  function cancel(){
+    generation++;
+    if (inflight) inflight.abort();
+    inflight = null;
+  }
+
+  /**
+   * Fetch and extrude the buildings around the current site. Resolves to null
+   * when a newer load or a clear has superseded this one.
+   * @param {{onRetry?: (msg: string) => void}} [opts]
+   */
+  async function load({ onRetry } = {}){
     const { lat, lon } = State.site;
     /*
      * The volumes standing on screen belong to wherever they were fetched for,
@@ -19171,6 +19199,8 @@ const OsmBuildings = (() => {
      * buildings did not, and nothing on screen said which place they belonged
      * to. Showing none is honest; showing somewhere else's is not.
      */
+    cancel();
+    const mine = generation;
     clear();
     requestRender();
     const radius = clamp(State.basemap.extent / 2, 120, MAX_RADIUS);
@@ -19183,38 +19213,75 @@ const OsmBuildings = (() => {
     /*
      * Overpass is a free service running on donated hardware, and it answers a
      * heavy query by making you wait: 504 and 429 mean "busy, come back", not
-     * "no data". A single attempt turned that into a dead end — the map loaded,
-     * no buildings appeared, and the only way to try again was to press Load
-     * map a second time. Three attempts, backing off, costs nothing when the
-     * first succeeds and rescues the common case where it does not.
+     * "no data". When it is busy the reply often carries no CORS header, and
+     * the browser then reports only "Failed to fetch", so a request that never
+     * arrives counts as busy too. It can also hold a request open for minutes;
+     * each attempt is abandoned after 45 s. Four attempts, alternating between
+     * the two servers and waiting longer each time, cost nothing when the first
+     * succeeds. A server that refuses outright (a 404, say, if a public instance
+     * moves) is dropped and the other is asked, rather than giving up on both.
+     *
+     * Overpass also answers a query it ran out of time or memory for with a 200
+     * whose "remark" reads "runtime error: …" and whose elements are missing.
+     * That is the server failing, not an empty map, and is retried as busy:
+     * read as data, it reported a city centre as having no buildings mapped.
      */
     const BUSY = new Set([429, 502, 503, 504]);
-    let json, lastMsg = '';
-    for (let attempt = 0; attempt < 3 && !json; attempt++){
-      if (attempt) await new Promise(r => setTimeout(r, attempt * 1500));
+    const WAITS = [0, 1000, 5000, 10000];
+    let json, lastMsg = '', busy = false;
+    const refused = new Set();
+    for (let attempt = 0; attempt < WAITS.length && !json; attempt++){
+      const live = ENDPOINTS.filter(e => !refused.has(e));
+      if (!live.length) break;                     // every server refused outright
+      const endpoint = live[attempt % live.length];
+      if (attempt){
+        if (onRetry) onRetry('OpenStreetMap buildings: the Overpass server ' +
+                             (busy ? 'is busy' : 'refused the request') + ' (' + lastMsg +
+                             '). Trying ' + new URL(endpoint).host + ', ' + (attempt + 1) +
+                             ' of ' + WAITS.length + '…');
+        await new Promise(r => setTimeout(r, WAITS[attempt]));
+        if (mine !== generation) return null;
+      }
+      const ctl = new AbortController();
+      inflight = ctl;
+      let timedOut = false;
+      const timer = setTimeout(() => { timedOut = true; ctl.abort(); }, 45000);
       try {
-        const res = await fetch(ENDPOINT, {
+        const res = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           body: 'data=' + encodeURIComponent(query),
+          signal: ctl.signal,
         });
         if (!res.ok){
           lastMsg = 'Overpass replied ' + res.status;
-          if (BUSY.has(res.status)) continue;        // busy: worth asking again
-          throw new Error(lastMsg);                  // anything else will not change
+          busy = BUSY.has(res.status);
+          if (!busy) refused.add(endpoint);          // will not change: ask the other
+          continue;
         }
-        json = await res.json();
+        const body = await res.json();
+        if (body && typeof body.remark === 'string' && /runtime error/i.test(body.remark)){
+          lastMsg = body.remark.replace(/\s+/g, ' ').trim().slice(0, 90);
+          busy = true;
+          continue;
+        }
+        json = body;
       } catch (err){
-        lastMsg = err.message;
-        if (attempt === 2) break;
+        if (mine !== generation) return null;      // superseded, not failed
+        lastMsg = timedOut ? 'no answer in 45 s' : err.message;
+        busy = true;                               // no reply at all: treat as busy
+      } finally {
+        clearTimeout(timer);
+        if (inflight === ctl) inflight = null;
       }
     }
+    if (mine !== generation) return null;
     if (!json){
-      const busy = /\b(429|502|503|504)\b/.test(lastMsg);
-      throw new Error('Could not fetch building data from OpenStreetMap (' + lastMsg +
-                      ')' + (busy ? ', after three tries — the public Overpass server is busy '
-                                  + 'rather than missing the data, so it is worth pressing '
-                                  + 'Load map again in a minute' : '') +
+      throw new Error('Could not fetch building data from OpenStreetMap (' + lastMsg + ')' +
+                      (busy ? ', after ' + WAITS.length + ' tries on two servers. The public '
+                              + 'Overpass servers are busy rather than missing the data, so it '
+                              + 'is worth pressing '
+                              + 'Load map again in a minute' : '') +
                       '. The map itself is still loaded — this only affects the 3D volumes.');
     }
 
@@ -19249,8 +19316,8 @@ const OsmBuildings = (() => {
              triangles: built.tris.length / 9 };
   }
 
-  return { load, clear, info: state, get meshes(){ return meshes; },
-           ENDPOINT, MAX_BUILDINGS, SHADOW_RADIUS };
+  return { load, clear: () => { cancel(); clear(); }, info: state, get meshes(){ return meshes; },
+           ENDPOINT, ENDPOINTS, MAX_BUILDINGS, SHADOW_RADIUS };
 })();
 
 /** Show the basemap credit in the viewport; exports repeat it in the footer. */
@@ -21202,12 +21269,26 @@ function applyTheme(name){
  * Screen-space box containing the 3D content, in pixels of a W x H render.
  * The viewport is framed to fit the dome on both axes, which usually leaves a
  * band of empty sky; a sheet destined for a report should not carry it.
+ *
+ * The basemap and the OSM context are content too. Counting only the dome and
+ * the model, the crop cut every sheet down to the dome, so zooming out or
+ * framing more of the map changed nothing in the export. A map that runs
+ * behind the camera fills the view to its near edge, so the view is kept whole.
  */
 function contentCropRect(W, H){
   const full = { x: 0, y: 0, w: W, h: H };
   const inv = camera.matrixWorldInverse;
+  const site = [];
+  for (const g of [basemapGroup, contextGroup]){
+    const b = new THREE.Box3().setFromObject(g);
+    if (b.isEmpty()) continue;
+    for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z])
+      site.push(new THREE.Vector3(x, y, z));
+  }
+  for (const p of site)
+    if (p.clone().applyMatrix4(inv).z > -camera.near) return full;
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity, n = 0;
-  for (const p of contentPoints()){
+  for (const p of contentPoints().concat(site)){
     const cam = p.clone().applyMatrix4(inv);
     if (cam.z > -camera.near) continue;                  // behind the camera
     const v = p.clone().project(camera);
@@ -22015,7 +22096,10 @@ async function loadBasemapTiles(){
       $('bm-3d-note').style.display = '';
       $('bm-3d-note').textContent = 'Fetching building footprints from OpenStreetMap…';
       try {
-        const b = await OsmBuildings.load();
+        const b = await OsmBuildings.load({
+          onRetry: (msg) => { $('bm-3d-note').textContent = msg; },
+        });
+        if (!b) return;                  // a newer load or a clear took over
         syncBasemapUI();
         refresh(true);
         toast('3D context loaded — ' + OsmBuildings.info.note, 'ok', 5000);

@@ -926,7 +926,9 @@ DNI = G_on · τ_b,   G_on = 1367 · (1 + 0.033 cos(2π·doy/365))</pre>
 
       <h4>3D context from OpenStreetMap</h4>
       <p>Footprints and heights come from the Overpass API with no key and no account. The query
-        is a single request per load, for a box capped at 600 m across:</p>
+        is a single request per load, for a box capped at 600 m across. While the server is busy it
+        is asked again up to three more times, alternating with a second public instance,
+        <span class="sl-mono">overpass.private.coffee</span>, which serves the same data:</p>
       <pre class="sl-formula">[out:json][timeout:25];
 (way["building"](bbox); relation["building"](bbox););
 out geom;</pre>
@@ -1417,7 +1419,9 @@ out geom;</pre>
         Map data under the Open Database License (ODbL) 1.0.<br>
         <b>Code:</b> <span class="sl-mono">footprints and heights from OpenStreetMap via the
         Overpass API — no key, no account</span>, the endpoint
-        <span class="sl-mono">https://overpass-api.de/api/interpreter</span>, and at the radius
+        <span class="sl-mono">https://overpass-api.de/api/interpreter</span>, the fallback
+        <span class="sl-mono">https://overpass.private.coffee/api/interpreter</span>
+        (<a href="https://private.coffee/" target="_blank" rel="noopener">private.coffee</a>), and at the radius
         cap, <span class="sl-mono">metres; Overpass is a shared free service</span>. Supplies
         building footprints and height tags for the 3D context, and the basemap tiles.</li>
 

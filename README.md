@@ -149,7 +149,8 @@ needed correcting, so the correction is made once and not every visit.
 
 **OpenStreetMap + 3D buildings** loads the street map and then the buildings themselves.
 Footprints and heights come from OpenStreetMap through the [Overpass
-API](https://overpass-api.de/) — no key, no account — for a box around the site sized by
+API](https://overpass-api.de/) — no key, no account, with `overpass.private.coffee` as a
+fallback when the main server is busy — for a box around the site sized by
 the *Site extent* slider, capped at 600 m. Heights are read from the `height` tag, then
 `building:levels` × 3.2 m; anything untagged is drawn at 8 m and the panel says how many
 were guessed, so a default is never mistaken for a survey.
@@ -302,7 +303,8 @@ sky density and ground reflectance, then **Run analysis**.
 local time, sun altitude and azimuth, project north, the hour's global horizontal
 irradiance, the climate source, and — once an analysis has been run — the legend with its
 units and period, so the image needs no caption. The render is cropped to the sun path and
-the model rather than to the empty viewport. Results CSV is available from the same panel.
+the model rather than to the empty viewport; with a basemap or 3D context loaded, the sheet
+is the whole view as you framed it. Results CSV is available from the same panel.
 
 ![Light print sheet](docs/screenshot-sheet.png)
 
@@ -372,7 +374,7 @@ It is clearly labelled as synthetic; it is not real climate.
 
 ## Validation
 
-`npm test` runs about 290 headless checks. Every number below is produced by that suite, not
+`npm test` runs about 300 headless checks. Every number below is produced by that suite, not
 asserted by hand.
 
 | Check | Result |
@@ -482,7 +484,7 @@ if those disagree with the `BUILD` constant, so they cannot drift apart.
 ```bash
 npm install          # playwright, for the test suite only
 npm run vendor       # fetch the validation EPW
-npm test             # ~290 headless checks, screenshots and sample export sheets
+npm test             # ~300 headless checks, screenshots and sample export sheets
 npm run serve        # serve the folder at http://localhost:8080
 ```
 

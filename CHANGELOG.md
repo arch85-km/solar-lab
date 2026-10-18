@@ -17,6 +17,28 @@ in general rather than one build, use the concept DOI
 - **Fixed** exercise 1's plan labelled the neighbours "11 m" where it meant
   their height; they now read "11 m high". Its key named the tower's south face
   blue; it is red.
+- **Fixed** with a basemap loaded, an exported sheet was cut down to the sun
+  path dome whatever the view, so zooming out, panning or the top view changed
+  nothing in the image. The map and the 3D context now count as content, and
+  the sheet is the whole view as framed.
+- **Fixed** OpenStreetMap buildings often failed with "Failed to fetch". A busy
+  Overpass server frequently replies without the header the browser needs, so
+  the browser reports only a failed request. That is now treated as busy, like
+  a 504: the panel says it is trying again, and it asks up to four times,
+  waiting 1, 5 and then 10 s. An attempt with no answer after 45 s is
+  abandoned rather than left on "Fetching…".
+- **Added** a fallback Overpass server. When overpass-api.de is busy, the next
+  try goes to overpass.private.coffee, a second public instance serving the
+  same OpenStreetMap data, with no key or account. A server that refuses
+  outright is dropped and the other asked, rather than giving up on both.
+- **Fixed** a query Overpass ran out of time for comes back as a success with
+  a "runtime error" note and no buildings, and was reported as "OpenStreetMap
+  has no building footprints mapped around this point". It is now retried as
+  a busy server.
+- **Fixed** a building load overtaken by a newer one, or by switching the 3D
+  context off, is now cancelled. Its answer could arrive late and put the
+  previous site's buildings on the new map, and two queries at once counted
+  twice against Overpass's per-user limit.
 - **Docs** `ARCHITECTURE.md`, `CHANGELOG.md` and `DESIGN.md` added; the "How
   this was developed" statement in the README, both method notes and
   `.zenodo.json`; both method notes set in the website's style.

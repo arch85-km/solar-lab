@@ -1094,10 +1094,12 @@ console.log('\n=== OpenStreetMap 3D buildings ===');
 // overpass-api.de:443), so the response is mocked in the documented
 // "out geom" shape: four blocks around the site — one with a height tag, one
 // with building:levels, one with nothing, and one as a multipolygon relation.
-let overpassQueries = [];
+let overpassQueries = [], overpassHosts = [];
 let overpassStatus = 200;
-await ctx.route('**://overpass-api.de/**', async (route) => {
+// Both public servers the app asks: the main one and the fallback
+await ctx.route(/:\/\/(overpass-api\.de|overpass\.private\.coffee)\//, async (route) => {
   overpassQueries.push(decodeURIComponent(route.request().postData() || ''));
+  overpassHosts.push(new URL(route.request().url()).host);
   if (overpassStatus !== 200)
     return route.fulfill({ status: overpassStatus, contentType: 'text/plain', body: 'busy' });
   const q = overpassQueries[overpassQueries.length - 1];
@@ -1683,6 +1685,50 @@ check('the context adds occluders without adding analysis surfaces',
       osm3d.occluders > osm3d.model && osm3d.model > 0,
       osm3d.model + ' model triangles, ' + osm3d.occluders + ' occluders');
 
+/*
+ * Reported from the live site: with a basemap loaded, every exported sheet was
+ * cut down to the dome, so zooming out or framing more of the map changed
+ * nothing in the image. The map is content too: with it filling the view, the
+ * sheet carries the whole view, in the axonometric and in the top view, and
+ * zooming out changes the picture.
+ */
+const takeSheet = () => page.evaluate(() => {
+  const A = window.__SUNAPP, vp = document.getElementById('viewport');
+  const sh = A.exportSheet({ theme: 'dark', scale: 1, save: false });
+  const c = sh.sheetInfo.crop;
+  return { w: Math.round(c.w), h: Math.round(c.h), W: vp.clientWidth, H: vp.clientHeight,
+           // a coarse 6 x 6 sample of the picture, to tell two framings apart
+           sig: (() => { const g = sh.getContext('2d'), out = [];
+             for (let i = 1; i <= 6; i++) for (let j = 1; j <= 6; j++)
+               out.push(g.getImageData(Math.round(sh.width * i / 7),
+                 Math.round(sh.sheetInfo.headerH + sh.sheetInfo.imageH * j / 7), 1, 1).data[1]);
+             return out; })() };
+});
+const mapSheet = {};
+mapSheet.axo = await takeSheet();
+const distBefore = (await page.evaluate(() => window.__SUNAPP.cameraProbe())).dist;
+{
+  const box = await page.locator('#viewport').boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  for (let i = 0; i < 4; i++){ await page.mouse.wheel(0, 300); await page.waitForTimeout(120); }
+  await page.waitForTimeout(600);
+}
+const distAfter = (await page.evaluate(() => window.__SUNAPP.cameraProbe())).dist;
+mapSheet.out = await takeSheet();
+await page.click('[data-view="top"]'); await page.waitForTimeout(900);
+mapSheet.top = await takeSheet();
+await page.click('[data-view="axo"]'); await page.waitForTimeout(900);
+check('with a map loaded, the sheet is the whole view, not the dome cut out of it',
+      ['axo', 'out', 'top'].every(k => mapSheet[k].w === mapSheet[k].W && mapSheet[k].h === mapSheet[k].H),
+      ['axo', 'out', 'top'].map(k => k + ' ' + mapSheet[k].w + '×' + mapSheet[k].h + ' of ' +
+                                mapSheet[k].W + '×' + mapSheet[k].H).join(', '));
+check('and zooming out changes what the sheet shows',
+      distAfter > distBefore * 1.1 &&
+      mapSheet.axo.sig.filter((v, k) => Math.abs(v - mapSheet.out.sig[k]) > 8).length >= 6,
+      'camera ' + distBefore.toFixed(0) + ' → ' + distAfter.toFixed(0) + ' m; ' +
+      mapSheet.axo.sig.filter((v, k) => Math.abs(v - mapSheet.out.sig[k]) > 8).length +
+      ' of 36 sample points changed');
+
 // Both ways, as asked: the switch decides whether the neighbours shade the run
 const shading = await page.evaluate(async () => {
   const A = window.__SUNAPP;
@@ -1762,7 +1808,7 @@ check('an Overpass failure blames the building fetch, not the connection',
       /building data/i.test(denied) && /map itself is still loaded/i.test(denied),
       denied.slice(0, 90) + '…');
 check('and a busy server is named as busy, with what to do about it',
-      /after three tries/i.test(denied) && /Load map again/i.test(denied),
+      /after 4 tries on two servers/i.test(denied) && /busy/i.test(denied) && /Load map again/i.test(denied),
       'the 503 is reported as the server being busy, not as missing data');
 
 /*
@@ -1883,6 +1929,152 @@ check('two 504s in a row do not lose the buildings — it asks again',
       recovered.ok && recovered.count > 0 && overpassRefusalsLeft === 0,
       recovered.ok ? `refused twice, then ${recovered.count} buildings`
                    : 'gave up: ' + recovered.msg);
+
+/*
+ * Reported from the live site as "Could not fetch building data from
+ * OpenStreetMap (Failed to fetch)". A busy Overpass often answers without a
+ * CORS header, and the browser then reports only that the request failed. That
+ * is the same transient state as a 504, so it is asked again, and the panel
+ * says it is retrying rather than sitting on "Fetching…".
+ */
+let overpassDropsLeft = 2;
+await page.route('**/api/interpreter', async (route) => {
+  if (overpassDropsLeft > 0){ overpassDropsLeft -= 1; await route.abort('failed'); return; }
+  await route.fallback();
+});
+expectTileErrors = true;
+const dropped = await page.evaluate(async () => {
+  const A = window.__SUNAPP, notes = [];
+  A.State.basemap.extent = 400;
+  try {
+    const r = await A.OsmBuildings.load({ onRetry: (m) => notes.push(m) });
+    return { ok: true, count: r.count, notes };
+  } catch (e){ return { ok: false, msg: e.message, notes }; }
+});
+expectTileErrors = false;
+await page.unroute('**/api/interpreter');
+check('a request that fails outright is treated as a busy server and asked again',
+      dropped.ok && dropped.count > 0 && overpassDropsLeft === 0,
+      dropped.ok ? `failed twice, then ${dropped.count} buildings` : 'gave up: ' + dropped.msg);
+check('and the panel says it is trying again while it waits',
+      dropped.notes.length === 2 && /busy/i.test(dropped.notes[0]) && /2 of 4/.test(dropped.notes[0]),
+      dropped.notes[0] || 'no retry message');
+
+/*
+ * A load that is overtaken, by a new site or by switching the 3D context off,
+ * must not land afterwards: its buildings would belong to the previous place.
+ */
+await page.route('**/api/interpreter', async (route) => {
+  await new Promise(r => setTimeout(r, 800));
+  await route.fallback().catch(() => {});
+});
+expectTileErrors = true;
+const overtaken = await page.evaluate(async () => {
+  const A = window.__SUNAPP;
+  const pending = A.OsmBuildings.load();
+  await new Promise(r => setTimeout(r, 200));
+  A.OsmBuildings.clear();
+  const r = await pending;
+  await new Promise(r2 => setTimeout(r2, 1200));
+  return { result: r, meshes: A.OsmBuildings.meshes.length };
+});
+expectTileErrors = false;
+await page.unroute('**/api/interpreter');
+check('a load overtaken by a clear is dropped, and leaves no buildings behind',
+      overtaken.result === null && overtaken.meshes === 0,
+      'result ' + JSON.stringify(overtaken.result) + ', ' + overtaken.meshes + ' meshes');
+
+/*
+ * When the main server stays busy, the second try goes to the fallback server,
+ * and its answer is used. Here overpass-api.de refuses every request.
+ */
+overpassHosts = [];
+await page.route('**://overpass-api.de/api/interpreter', (route) =>
+  route.fulfill({ status: 429, contentType: 'text/plain', body: 'rate limited' }));
+expectTileErrors = true;
+const viaFallback = await page.evaluate(async () => {
+  const A = window.__SUNAPP;
+  try { const r = await A.OsmBuildings.load(); return { ok: true, count: r.count }; }
+  catch (e){ return { ok: false, msg: e.message }; }
+});
+expectTileErrors = false;
+await page.unroute('**://overpass-api.de/api/interpreter');
+await page.evaluate(() => { window.__SUNAPP.OsmBuildings.clear(); });
+check('when the main Overpass server is busy, the fallback server supplies the buildings',
+      viaFallback.ok && viaFallback.count > 0 && overpassHosts.join() === 'overpass.private.coffee',
+      viaFallback.ok ? viaFallback.count + ' buildings from ' + overpassHosts.join(', ')
+                     : 'gave up: ' + viaFallback.msg);
+
+/*
+ * Public Overpass servers come and go. If the fallback refuses outright (a 404
+ * here), the main server must still be asked again rather than the load given
+ * up after one second.
+ */
+overpassHosts = [];
+let mainBusyLeft = 1;
+await page.route('**://overpass-api.de/api/interpreter', async (route) => {
+  if (mainBusyLeft > 0){
+    mainBusyLeft -= 1;
+    overpassHosts.push('overpass-api.de:504');
+    await route.fulfill({ status: 504, contentType: 'text/plain',
+                          headers: { 'access-control-allow-origin': '*' }, body: 'busy' });
+    return;
+  }
+  await route.fallback();
+});
+await page.route('**://overpass.private.coffee/api/interpreter', async (route) => {
+  overpassHosts.push('overpass.private.coffee:404');
+  await route.fulfill({ status: 404, contentType: 'text/plain',
+                        headers: { 'access-control-allow-origin': '*' }, body: 'gone' });
+});
+expectTileErrors = true;
+const deadFallback = await page.evaluate(async () => {
+  const A = window.__SUNAPP;
+  try { const r = await A.OsmBuildings.load(); return { ok: true, count: r.count }; }
+  catch (e){ return { ok: false, msg: e.message }; }
+});
+expectTileErrors = false;
+await page.unroute('**://overpass-api.de/api/interpreter');
+await page.unroute('**://overpass.private.coffee/api/interpreter');
+await page.evaluate(() => { window.__SUNAPP.OsmBuildings.clear(); });
+check('a fallback that refuses outright is dropped, and the main server is asked again',
+      deadFallback.ok && deadFallback.count > 0 &&
+      overpassHosts.join() === 'overpass-api.de:504,overpass.private.coffee:404,overpass-api.de',
+      deadFallback.ok ? overpassHosts.join(' → ') + ', then ' + deadFallback.count + ' buildings'
+                      : 'gave up: ' + deadFallback.msg);
+
+/*
+ * A query Overpass ran out of time for comes back as a 200 with a "runtime
+ * error" remark and no elements. That is the server failing, so it is asked
+ * again; it must never be reported as an area with no buildings mapped.
+ */
+let timeoutRepliesLeft = 1;
+await page.route('**://overpass-api.de/api/interpreter', async (route) => {
+  if (timeoutRepliesLeft > 0){
+    timeoutRepliesLeft -= 1;
+    await route.fulfill({ status: 200, contentType: 'application/json',
+      headers: { 'access-control-allow-origin': '*' },
+      body: JSON.stringify({ version: 0.6, elements: [],
+        remark: 'runtime error: Query timed out in "query" at line 1 after 26 seconds.' }) });
+    return;
+  }
+  await route.fallback();
+});
+const timedOutQuery = await page.evaluate(async () => {
+  const A = window.__SUNAPP, notes = [];
+  try {
+    const r = await A.OsmBuildings.load({ onRetry: (m) => notes.push(m) });
+    return { ok: true, count: r.count, notes };
+  } catch (e){ return { ok: false, msg: e.message, notes }; }
+});
+await page.unroute('**://overpass-api.de/api/interpreter');
+await page.evaluate(() => { window.__SUNAPP.OsmBuildings.clear(); });
+check('a query the server timed out on is asked again, not read as "no buildings here"',
+      timedOutQuery.ok && timedOutQuery.count > 0 && timeoutRepliesLeft === 0 &&
+      /timed out/i.test(timedOutQuery.notes[0] || ''),
+      timedOutQuery.ok ? (timedOutQuery.notes[0] || '').slice(0, 110) + '… then ' +
+                         timedOutQuery.count + ' buildings'
+                       : 'gave up: ' + timedOutQuery.msg);
 await page.evaluate(() => { window.__SUNAPP.OsmBuildings.clear(); });
 
 const cleared = await page.evaluate(() => {

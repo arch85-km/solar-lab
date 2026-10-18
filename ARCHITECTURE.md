@@ -100,7 +100,7 @@ file's own measured GHI, and the test suite uses it for the physics checks.
 | `rleGridDecode()` | Decodes both grids on first use | — |
 | `Mercator` | Web Mercator maths for tiles and footprints | — |
 | `Basemap` | Map tiles under the model | OpenStreetMap, a server-side proxy, or a custom tile service, on request |
-| `OsmBuildings` | Building footprints as 3D context | Overpass API, on request, retried when busy |
+| `OsmBuildings` | Building footprints as 3D context | Overpass API (overpass-api.de, then overpass.private.coffee), on request, retried when busy |
 
 Those three — tiles, Overpass and Nominatim — are the only network requests
 the app makes, and only when the user asks for them. Looked-up time zone and
@@ -141,7 +141,7 @@ and record their source, checksum and measured accuracy.
   agree across `package.json`, `.zenodo.json`, `CITATION.cff`, `index.html`
   and both method notes pages. The DOI rule is derived from `CITATION.cff`, so
   it knows whether a version DOI has been minted yet.
-- `tests/verify.mjs` (about 290 checks). Drives the shipped file in headless
+- `tests/verify.mjs` (about 300 checks). Drives the shipped file in headless
   Chromium: solar geometry, the sky model, analysis results against the
   Chicago O'Hare TMY3 file's measured irradiance, the site lookups, the
   interface in both themes, the tour, the export, and the deploy build.
