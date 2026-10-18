@@ -39,6 +39,10 @@ in general rather than one build, use the concept DOI
   context off, is now cancelled. Its answer could arrive late and put the
   previous site's buildings on the new map, and two queries at once counted
   twice against Overpass's per-user limit.
+- **Fixed** the guided tour opens each section it points at, and left them all
+  open when it finished or was skipped, so the panels came back with every
+  control showing. It now closes what it opened and scrolls the panels back;
+  a section that was open before the tour stays open.
 - **Docs** `ARCHITECTURE.md`, `CHANGELOG.md` and `DESIGN.md` added; the "How
   this was developed" statement in the README, both method notes and
   `.zenodo.json`; both method notes set in the website's style.

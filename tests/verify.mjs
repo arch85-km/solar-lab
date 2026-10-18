@@ -3642,6 +3642,15 @@ console.log('\n=== guided tour ===');
     }
   };
 
+  // Which sections and panels are open, and where each panel is scrolled
+  const openState = () => tp.evaluate(() => JSON.stringify({
+    open: [...document.querySelectorAll('.sec')].filter(s => !s.classList.contains('closed'))
+            .map(s => s.dataset.sec || '?'),
+    panels: ['left', 'right'].filter(side => !document.getElementById('app').classList.contains('no-' + side)),
+    scroll: [...document.querySelectorAll('.panel-scroll')].map(el => Math.round(el.scrollTop)),
+  }));
+  const beforeTour = await openState();
+
   const seen = [];
   for (let i = 0; i < first.total; i++){
     await settle();
@@ -3674,6 +3683,35 @@ console.log('\n=== guided tour ===');
     }));
     await tp.click('#tour-next');
   }
+  /*
+   * Reported from the live site: the steps open the sections they point at, and
+   * after the last step they were all left open, so the panels came back with
+   * every control showing. Finishing must put the panels back as they were.
+   */
+  await tp.waitForTimeout(400);
+  const afterTour = await openState();
+  check('finishing the tour closes the sections it opened',
+        afterTour === beforeTour, 'before ' + beforeTour + ' · after ' + afterTour);
+  await tp.evaluate(() => window.__SUNAPP.Tour.start(0));
+  for (let i = 0; i < 6; i++){ await settle(); await tp.click('#tour-next', { timeout: 10000 }); }
+  await settle();
+  const midTour = await openState();
+  await tp.click('#tour-skip', { timeout: 10000 });
+  await tp.waitForTimeout(400);
+  const afterSkip = await openState();
+  check('and so does skipping it part-way',
+        afterSkip === beforeTour && midTour !== beforeTour,
+        'during ' + midTour + ' · after Skip ' + afterSkip);
+  await tp.evaluate(() => {
+    const s = document.querySelector('.sec[data-sec="time"]');
+    s.classList.remove('closed');                // the visitor opens one themselves
+    window.__SUNAPP.Tour.start(0); window.__SUNAPP.Tour.end();
+  });
+  const keptOwn = await tp.evaluate(() =>
+    !document.querySelector('.sec[data-sec="time"]').classList.contains('closed'));
+  await tp.evaluate(() => document.querySelector('.sec[data-sec="time"]').classList.add('closed'));
+  check('a section the visitor had open before the tour stays open after it', keptOwn);
+
   const offScreen = seen.filter(x => !x.onScreen).map(x => x.title);
   check('every tour card stays inside the viewport', offScreen.length === 0,
         offScreen.length ? offScreen.join(', ') : seen.length + ' steps checked at 1280×820');

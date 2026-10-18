@@ -22989,6 +22989,14 @@ const TOUR = [
 
 const Tour = (() => {
   let idx = -1, active = false;
+  /*
+   * What the tour opened, so it can close it again. The steps open the panels
+   * and the sections they point at, and leaving them all open after the last
+   * step left the screen cluttered with every control at once. Only what the
+   * tour itself opened is closed; anything already open stays open, and the
+   * panels scroll back to where they were.
+   */
+  let opened = null;
 
   const spot = () => $('tour-spot');
   const card = () => $('tour-card');
@@ -23059,10 +23067,14 @@ const Tour = (() => {
     idx = clamp(i, 0, TOUR.length - 1);
     const step = TOUR[idx];
 
-    if (step.open) setPanel(step.open, true);
+    if (step.open){
+      if (opened && app.classList.contains('no-' + step.open)) opened.panels.add(step.open);
+      setPanel(step.open, true);
+    }
     if (step.sec){
       const sec = document.querySelector('.sec[data-sec="' + step.sec + '"]');
       if (sec){
+        if (opened && sec.classList.contains('closed')) opened.secs.add(sec);
         sec.classList.remove('closed');
         sec.scrollIntoView({ block: 'nearest' });
       }
@@ -23091,6 +23103,8 @@ const Tour = (() => {
   }
 
   function start(from = 0){
+    if (!active) opened = { secs: new Set(), panels: new Set(),
+                            scroll: [...document.querySelectorAll('.panel-scroll')].map(el => [el, el.scrollTop]) };
     active = true;
     show(from);
   }
@@ -23126,6 +23140,12 @@ const Tour = (() => {
     active = false;
     spot().hidden = true;
     card().hidden = true;
+    if (opened){
+      for (const sec of opened.secs) sec.classList.add('closed');
+      for (const side of opened.panels) setPanel(side, false);
+      for (const [el, top] of opened.scroll) el.scrollTop = top;
+      opened = null;
+    }
   }
 
   function next(){ if (idx >= TOUR.length - 1) end(); else show(idx + 1); }
