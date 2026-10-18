@@ -590,6 +590,45 @@ check('instantaneous horizontal irradiance reproduces EPW global horizontal',
       'sampled sum ' + Math.round(inst.sumComputed) + ' vs ' + Math.round(inst.sumEpw) +
       ' W/m² (' + ((inst.sumComputed / inst.sumEpw - 1) * 100).toFixed(2) + '%)');
 
+/* ---------------------------------------------- daylight saving vs EPW --- */
+// EPW records are standard time. Daylight saving moves the clock and nothing else, so a
+// run must pair each sun position with the record for the same standard-time hour.
+// Until October 2026 ticking the switch paired them an hour apart in both modes.
+const dst = await page.evaluate(() => {
+  const A = window.__SUNAPP;
+  const faces = [[1, 0, 0], [-1, 0, 0], [0, 1, 0]];       // east, west, horizontal
+  const run = (dstHours) => {
+    A.State.dstHours = dstHours;
+    const src = A.buildSources();
+    return faces.map(([x, y, z]) => A.unobstructed(x, y, z, src));
+  };
+  A.setAnalysis({ mode: 'cum', period: 'year', density: 1, useGround: false, hourFrom: 0, hourTo: 24 });
+  const cumOff = run(0), cumOn = run(1);
+  A.setAnalysis({ mode: 'inst', density: 1, useGround: false });
+  A.State.doy = 172;
+  A.State.minutes = 12 * 60; const instOff = run(0);           // 12:00 standard time
+  A.State.minutes = 13 * 60; const instOn = run(1);            // 13:00 summer time, the same instant
+  // 00:30 summer time is 23:30 the day before. Both candidate records are dark, so mark
+  // them with different values to see which one is read, then put them back.
+  const w = A.State.weather.dni, prev = (171 - 1) * 24 + 23, same = (172 - 1) * 24;
+  const keep = [w[prev], w[same]];
+  w[prev] = 777; w[same] = 555;
+  A.State.minutes = 30; A.State.dstHours = 1;
+  const late = A.buildSources().meta.dni;
+  w[prev] = keep[0]; w[same] = keep[1];
+  A.State.dstHours = 0;
+  return { cumOff, cumOn, instOff, instOn, late, lateRecord: 777 };
+});
+const sameAll = (a, b) => a.every((v, i) => Math.abs(v - b[i]) <= 1e-9 * Math.max(1, Math.abs(v)));
+check('daylight saving leaves a cumulative EPW run unchanged (east, west, horizontal)',
+      sameAll(dst.cumOff, dst.cumOn),
+      dst.cumOff.map(v => (v / 1000).toFixed(1)).join(' / ') + ' vs ' + dst.cumOn.map(v => (v / 1000).toFixed(1)).join(' / ') + ' kWh/m²');
+check('13:00 summer time reads the same sun and EPW hour as 12:00 standard time',
+      sameAll(dst.instOff, dst.instOn),
+      dst.instOff.map(v => v.toFixed(1)).join(' / ') + ' vs ' + dst.instOn.map(v => v.toFixed(1)).join(' / ') + ' W/m²');
+check('00:30 summer time reads the last EPW record of the previous day',
+      dst.late === dst.lateRecord, 'read ' + dst.late + ' (777 marks 21 June 23:00, 555 marks 22 June 00:00)');
+
 /* ------------------------------------------------------- ground-reflected --- */
 const grnd = await page.evaluate(() => {
   const A = window.__SUNAPP;

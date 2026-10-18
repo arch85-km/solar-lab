@@ -17606,6 +17606,18 @@ function doyOf(month, day){
   for (let m = 0; m < month - 1; m++) d += DAYS_IN_MONTH[m];
   return d;
 }
+/**
+ * The EPW record for a local clock time. EPW hours are standard time, so daylight
+ * saving comes off the clock first: 13:00 summer time reads the 12:00-13:00 record,
+ * and 00:30 summer time the last record of the day before. Without this, ticking
+ * Daylight saving paired the sun with the weather of the following hour.
+ * @returns {{doy:number, hour:number}}  hour is the 0-based record index, 0..23
+ */
+function standardHour(doy, minutes, dstHours = 0){
+  let m = minutes - dstHours * 60, d = doy;
+  if (m < 0) { m += 1440; d = d > 1 ? d - 1 : 365; }
+  return { doy: d, hour: clamp(Math.floor(m / 60), 0, 23) };
+}
 /** Inverse of doyOf: {month (1..12), day}. */
 function dateOfDoy(doy){
   let d = clamp(Math.round(doy), 1, 365), m = 0;
@@ -18107,9 +18119,9 @@ const SkyMatrix = (() => {
   function instant(opts){
     const { dome, site, weather, doy, minutes, dstHours, groundRefl, useGround } = opts;
     const sun = SolarCore.position(site, doy, minutes, dstHours);
-    // EPW hour h describes the hour *preceding* h, so hour index = floor(minutes/60)
-    const hourIndex = clamp(Math.floor(minutes / 60), 0, 23);
-    const rad = hourly(weather, site, doy, hourIndex, sun.altitude);
+    // The record for the same standard-time hour the sun was computed for
+    const std = standardHour(doy, minutes, dstHours);
+    const rad = hourly(weather, site, std.doy, std.hour, sun.altitude);
 
     const nSky = dome.count;
     const nGround = useGround ? dome.count : 0;
@@ -18168,7 +18180,9 @@ const SkyMatrix = (() => {
       for (let h = hourFrom; h < hourTo; h++){
         hours++;
         const minutes = h * 60 + 30;                 // mid-hour: EPW hour h covers (h-1, h]
-        const sun = SolarCore.position(site, doy, minutes, dstHours);
+        // h counts EPW records, which are standard time, so the sun is computed at
+        // standard time too. Passing dstHours here put it an hour before its record.
+        const sun = SolarCore.position(site, doy, minutes, 0);
         const rad = hourly(weather, site, doy, h, sun.altitude);
         if (rad.dni <= 0 && rad.dhi <= 0) continue;
 
@@ -20965,9 +20979,9 @@ function currentDayInfo(){ return SolarCore.dayInfo(State.site, State.doy, State
 
 /** DNI / DHI / GHI for the hour containing the current time. */
 function currentIrradiance(sun){
-  const h = clamp(Math.floor(State.minutes / 60), 0, 23);
   if (State.weather){
-    const i = (State.doy - 1) * 24 + h;
+    const std = standardHour(State.doy, State.minutes, State.dstHours);
+    const i = (std.doy - 1) * 24 + std.hour;
     return { dni: State.weather.dni[i], dhi: State.weather.dhi[i], ghi: State.weather.ghi[i],
              temp: State.weather.temp[i], source: 'EPW' };
   }

@@ -6,6 +6,21 @@ DOI resolves to the archived copy of exactly that build. To cite the software
 in general rather than one build, use the concept DOI
 [10.5281/zenodo.22812939](https://doi.org/10.5281/zenodo.22812939).
 
+## Unreleased
+
+- **Fixed** with an EPW loaded and **Daylight saving** ticked, the sun and the
+  weather were paired an hour apart: a single moment read the following hour's
+  record, and a cumulative run computed each record's sun an hour early. EPW
+  hours are standard time, so the switch now moves the clock only. On the test
+  suite's Chicago file a year's east and west façades had come out about 21%
+  high and low; with the switch ticked they now match the run without it.
+- **Fixed** exercise 1's plan labelled the neighbours "11 m" where it meant
+  their height; they now read "11 m high". Its key named the tower's south face
+  blue; it is red.
+- **Docs** `ARCHITECTURE.md`, `CHANGELOG.md` and `DESIGN.md` added; the "How
+  this was developed" statement in the README, both method notes and
+  `.zenodo.json`; both method notes set in the website's style.
+
 ## [1.2.1](https://github.com/arch85-km/solar-lab/releases/tag/v1.2.1) — 12 October 2026
 
 Version DOI [10.5281/zenodo.23326705](https://doi.org/10.5281/zenodo.23326705)
