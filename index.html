@@ -18754,6 +18754,13 @@ const RELEASED = '2026-10-12';
  */
 const PROXY_URL = '';                 // e.g. 'tile-proxy.php?z={z}&x={x}&y={y}&s={style}'
 const PROXY_ATTRIBUTION = '© MapTiler © OpenStreetMap contributors';
+/*
+ * Some hosts refuse to run PHP in subfolders (karam.me.uk answers 403 for any
+ * .php under /apps/). If no tile at all comes back from the proxy beside the
+ * page, the same path at the top of the site is tried, and kept for the session.
+ */
+let tileProxyAtRoot = false;
+const tileProxyRelative = () => !!PROXY_URL && !/^(\/|[a-z][a-z0-9+.-]*:)/i.test(PROXY_URL);
 const PROXY_LABEL = 'Site imagery';
 /**
  * Tile sources. Each carries the attribution its terms require, and says whether
@@ -18768,7 +18775,7 @@ const TILE_SOURCES = {
   },
   proxy: {
     label: PROXY_LABEL,
-    url: (x, y, z) => PROXY_URL
+    url: (x, y, z) => ((tileProxyAtRoot ? '/' : '') + PROXY_URL)
       .replace(/\{z\}/g, z).replace(/\{x\}/g, x).replace(/\{y\}/g, y)
       .replace(/\{style\}/g, encodeURIComponent(State.basemap.style || 'satellite')),
     attribution: () => PROXY_ATTRIBUTION,
@@ -18943,6 +18950,11 @@ const Basemap = (() => {
       }
     }
     const ok = (await Promise.all(jobs)).reduce((a, b) => a + b, 0);
+    if (!ok && src.viaProxy && !tileProxyAtRoot && tileProxyRelative() &&
+        /^https?:$/.test(location.protocol) && location.pathname.replace(/[^/]*$/, '') !== '/'){
+      tileProxyAtRoot = true;              // refused beside the page: try the site root
+      return loadTiles(sourceKey);
+    }
     if (!ok){
       // A configured source failing completely is almost never "no internet": it
       // is the configuration. Say which, so the fix is obvious.

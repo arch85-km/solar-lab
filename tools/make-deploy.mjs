@@ -111,6 +111,8 @@ for (const f of written) console.log(`    ${f}`);
 console.log('');
 if (variant === 'proxy'){
   console.log('Upload ALL the files into the same folder on your server, keeping these names.');
+  console.log('If the host refuses PHP in subfolders, put the two .php files at the top of');
+  console.log('the site instead; the page looks there too.');
   console.log('The key is only in tile-proxy.php, which the server executes rather than');
   console.log('serves, so it is not readable from the page. Do not set an allowed-origins');
   console.log('restriction on this key: the proxy requests tiles server-side and sends no');

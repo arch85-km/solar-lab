@@ -2275,6 +2275,48 @@ check('leaving the source takes the volumes and their occluders with it',
         /MapTiler/.test(px.attribution), px.attribution);
 
   await proxCtx.close();
+
+  /*
+   * The host behind the live site refuses PHP anywhere under /apps/, so a tile
+   * proxy beside the page there gets 403 for every tile. With nothing back,
+   * the page tries the same path at the top of the site, and stays with it.
+   */
+  const subCtx = await browser.newContext({ viewport: { width: 1100, height: 800 } });
+  const tileAsked = [];
+  await subCtx.route('**/tile-proxy.php*', async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    tileAsked.push(path);
+    if (path.startsWith('/apps/'))
+      return route.fulfill({ status: 403, contentType: 'text/html',
+                             body: '403 - Forbidden | Access to this page is forbidden.' });
+    await route.fulfill({ status: 200, contentType: 'image/png',
+                          headers: { 'access-control-allow-origin': '*' }, body: TILE_PNG });
+  });
+  await subCtx.route('**/apps/solar-lab/**', (route) => {
+    const url = route.request().url();
+    if (/\/proxied\.html/.test(url))
+      return route.fulfill({ status: 200, contentType: 'text/html', body: src });
+    if (/tile-proxy\.php/.test(url)) return route.fallback();
+    return route.continue({ url: url.replace('/apps/solar-lab/', '/') });
+  });
+  const sp = await subCtx.newPage();
+  await sp.goto('http://127.0.0.1:' + port + '/apps/solar-lab/proxied.html?tour=0', { waitUntil: 'load' });
+  await sp.waitForFunction(() => window.__SUNAPP && window.__SUNAPP.ready, null, { timeout: 30000 });
+  const subTiles = await sp.evaluate(async () => {
+    const A = window.__SUNAPP;
+    A.State.basemap.extent = 400;
+    const r1 = await A.Basemap.loadTiles('proxy');
+    const r2 = await A.Basemap.loadTiles('proxy');
+    return { a: r1.tiles - r1.missing, b: r2.tiles - r2.missing, n: r1.tiles };
+  });
+  await subCtx.close();
+  const inSub = tileAsked.filter(p => p.startsWith('/apps/')).length;
+  const atRootTiles = tileAsked.filter(p => p === '/tile-proxy.php').length;
+  check('where the host refuses PHP beside the page, tiles come from the proxy at the top of the site',
+        subTiles.a === subTiles.n && subTiles.b === subTiles.n && inSub === subTiles.n &&
+        atRootTiles === subTiles.n * 2,
+        subTiles.n + ' tiles: refused ' + inSub + '× beside the page once, then ' + atRootTiles +
+        ' from the root over two loads');
 }
 
 /* ------------------------------------------------------- saved locations --- */

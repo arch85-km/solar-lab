@@ -8,8 +8,10 @@
  * is not readable by visitors.
  *
  * Install
- *   Upload next to index.html, e.g.
- *     /wp-content/uploads/solar-analysis-lab/tile-proxy.php
+ *   Upload next to index.html, or, where the host refuses to run PHP in
+ *   subfolders (karam.me.uk answers 403 for any .php under /apps/ and
+ *   /wp-content/), at the top of the site, e.g. public_html/tile-proxy.php: if
+ *   no tile comes back from beside the page, the page tries the site root.
  *   Set $MAPTILER_KEY below. Nothing else needs configuring: requests are only
  *   accepted from pages on this same host.
  *

@@ -137,9 +137,9 @@ try {
         'status ' + down.status + ', each server asked once');
 
   // Every server down, an old answer kept: the old answer, marked stale
-  const kept = readdirSync(join(dir, 'overpass-cache')).find((f) => f.endsWith('.json'));
+  const kept = readdirSync(join(dir, 'overpass-cache')).find((f) => f.endsWith('.php'));
   const old = (Date.now() / 1000) - 40 * 86400;
-  for (const f of readdirSync(join(dir, 'overpass-cache')).filter((f) => f.endsWith('.json')))
+  for (const f of readdirSync(join(dir, 'overpass-cache')).filter((f) => f.endsWith('.php')))
     utimesSync(join(dir, 'overpass-cache', f), old, old);
   reset();
   const stale = await ask(BOX);
@@ -159,6 +159,18 @@ try {
   check('the cache folder is closed to direct browsing',
         existsSync(join(dir, 'overpass-cache', '.htaccess')) &&
         /Require all denied/.test(readFileSync(join(dir, 'overpass-cache', '.htaccess'), 'utf8')));
+
+  // Reported from the live site: SiteGround serves a plain .json file directly,
+  // .htaccess or not, so a kept answer was downloadable by its name. Each is now
+  // a .php file whose first line ends a direct request with nothing.
+  const kept2 = readdirSync(join(dir, 'overpass-cache'));
+  const direct = await fetch(BASE + '/overpass-cache/' + kept2.find((f) => f.endsWith('.php')));
+  const directBody = await direct.text();
+  check('a kept answer cannot be downloaded directly, even where .htaccess is ignored',
+        !kept2.some((f) => f.endsWith('.json')) && kept2.some((f) => f.endsWith('.php')) &&
+        direct.status === 404 && !directBody.includes('elements'),
+        'files ' + [...new Set(kept2.map((f) => f.split('.').pop()))].join('/') +
+        '; a direct request gets ' + direct.status + ', ' + directBody.length + ' bytes');
 
   // A POST is not how the page asks
   const post = await fetch(BASE + '/overpass-proxy.php?bbox=' + BOX, { method: 'POST', headers: { Referer: PAGE } });

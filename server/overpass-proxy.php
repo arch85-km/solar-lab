@@ -91,6 +91,20 @@ function answer(string $json, string $cache, string $source, int $ageSeconds): v
     exit;
 }
 
+/*
+ * Answers are kept as .php files that begin with a line which ends any direct
+ * request at once. SiteGround hands plain data files (.json) straight to the
+ * web, bypassing .htaccess, so a kept answer was downloadable by anyone who had
+ * its name; a .php file is run instead, and this one returns nothing.
+ */
+const GUARD = "<?php http_response_code(404); exit; ?>\n";
+
+/** The answer kept in a cache file, without its guard line. */
+function cached(string $path): string {
+    $s = (string)@file_get_contents($path);
+    return strncmp($s, GUARD, strlen(GUARD)) === 0 ? substr($s, strlen(GUARD)) : '';
+}
+
 /** A usable Overpass answer: JSON with an elements list and no runtime error. */
 function usable(string $body): bool {
     $j = json_decode($body, true);
@@ -134,18 +148,21 @@ $query = '[out:json][timeout:25];(way["building"](' . $raw . ');relation["buildi
 
 if (!is_dir($CACHE_DIR)) {
     @mkdir($CACHE_DIR, 0755, true);
-    // Close the folder to direct browsing: the answers are public data, but the
-    // folder is this script's, not a download area.
+    // Close the folder to direct browsing where the server reads .htaccess. The
+    // answers are public data, but the folder is this script's, not a download
+    // area; the guard line (above) is what protects each file.
     @file_put_contents($CACHE_DIR . '/.htaccess', "Require all denied\nDeny from all\n");
     @file_put_contents($CACHE_DIR . '/index.html', '');
 }
 $key = sha1($raw);
-$file = $CACHE_DIR . '/' . $key . '.json';
+$file = $CACHE_DIR . '/' . $key . '.php';
+// Answers kept by the first version, as plain .json files a browser could fetch
+@unlink($CACHE_DIR . '/' . $key . '.json');
 $maxAge = $CACHE_DAYS * 86400;
 
 $age = is_file($file) ? time() - (int)filemtime($file) : null;
 if ($age !== null && $age < $maxAge) {
-    answer((string)file_get_contents($file), 'hit', 'cache', $age);
+    answer(cached($file), 'hit', 'cache', $age);
 }
 
 // One fetch per box at a time. Everyone else asking for the same box waits for
@@ -155,7 +172,7 @@ if ($lock) flock($lock, LOCK_EX);
 clearstatcache(true, $file);
 $age = is_file($file) ? time() - (int)filemtime($file) : null;
 if ($age !== null && $age < $maxAge) {
-    answer((string)file_get_contents($file), 'hit', 'cache', $age);
+    answer(cached($file), 'hit', 'cache', $age);
 }
 
 /* ── rate limit per visitor, for fetches only ──────────────────────────── */
@@ -164,7 +181,7 @@ $ip = (string)($_SERVER['REMOTE_ADDR'] ?? 'unknown');
 $bucket = sys_get_temp_dir() . '/sunstudio-overpass-' . date('YmdH') . '-' . sha1($ip) . '.cnt';
 $count = (int)@file_get_contents($bucket);
 if ($count >= $MAX_FETCHES_PER_HOUR) {
-    if ($age !== null) answer((string)file_get_contents($file), 'stale', 'cache', $age);
+    if ($age !== null) answer(cached($file), 'stale', 'cache', $age);
     fail(429, 'Building request limit reached for this hour.', 600);
 }
 @file_put_contents($bucket, (string)($count + 1), LOCK_EX);
@@ -194,14 +211,18 @@ foreach ($UPSTREAMS as $url) {
     curl_close($ch);
     if ($status === 200 && is_string($body) && usable($body)) {
         // Written to a temporary name and moved, so a reader never sees half a file.
-        $tmp = $file . '.' . getmypid() . '.tmp';
-        if (@file_put_contents($tmp, $body) !== false) @rename($tmp, $file);
-        // Now and then, drop answers nobody has refreshed in 90 days, and their
-        // locks, so the folder cannot grow without limit.
+        $tmp = $CACHE_DIR . '/' . $key . '.' . getmypid() . '.tmp.php';
+        if (@file_put_contents($tmp, GUARD . $body) !== false) @rename($tmp, $file);
+        // Now and then, drop answers nobody has refreshed in 90 days and their
+        // locks, so the folder cannot grow without limit, and any plain .json
+        // left by the first version.
         if (mt_rand(1, 50) === 1) {
             foreach ((array)glob($CACHE_DIR . '/*') as $old) {
-                if (is_string($old) && preg_match('/\.(json|lock|tmp)$/', $old)
-                    && time() - (int)@filemtime($old) > 90 * 86400) @unlink($old);
+                if (!is_string($old)) continue;
+                if (preg_match('/\.json$/', $old)
+                    || (preg_match('/\.(php|lock)$/', $old) && time() - (int)@filemtime($old) > 90 * 86400)) {
+                    @unlink($old);
+                }
             }
         }
         answer($body, 'miss', (string)parse_url($url, PHP_URL_HOST), 0);
@@ -210,5 +231,5 @@ foreach ($UPSTREAMS as $url) {
 
 // Every server failed. An old answer is better than none: buildings rarely
 // change within weeks, and the header says how old it is.
-if ($age !== null) answer((string)file_get_contents($file), 'stale', 'cache', $age);
+if ($age !== null) answer(cached($file), 'stale', 'cache', $age);
 fail(503, 'The public Overpass servers did not answer. Try again in a minute.', 60);

@@ -192,7 +192,9 @@ node tools/make-deploy.mjs --key YOUR_MAPTILER_KEY
 
 That writes `deploy/solar-analysis-lab-v<version>-proxy/` containing `index.html` — with **no key
 in it** — and `tile-proxy.php`, which has the key. Upload both into the same folder,
-keeping those names. `PROXY_URL` inside the page is a relative path, so the pair works in
+keeping those names. If your host refuses to run PHP in subfolders, put `tile-proxy.php`
+(and `overpass-proxy.php`) at the top of the site instead: when no tile comes back from
+beside the page, the page tries the site root. `PROXY_URL` inside the page is a relative path, so the pair works in
 any directory on any domain; moving or renaming the folder is fine as long as they stay
 together. The script refuses to write the page if the key has leaked into it, which is the
 one thing here worth automating.

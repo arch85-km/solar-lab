@@ -39,6 +39,13 @@ in general rather than one build, use the concept DOI
   every server is down. A network that blocks Overpass no longer matters, and a
   class loading together costs one request. Where it is not installed the page
   asks Overpass directly, as before. Checked by `tests/overpass-proxy.mjs`.
+- **Changed** the tile proxy is looked for at the top of the site too: if no
+  tile comes back from `tile-proxy.php` beside the page, the page tries the
+  site root, where a host that refuses PHP in subfolders still runs it.
+- **Fixed** the buildings proxy kept its answers as plain `.json` files, which
+  SiteGround serves directly whatever `.htaccess` says, so a kept answer could
+  be downloaded by its name. They are now `.php` files whose first line ends a
+  direct request with nothing; old `.json` files are removed.
 - **Fixed** a query Overpass ran out of time for comes back as a success with
   a "runtime error" note and no buildings, and was reported as "OpenStreetMap
   has no building footprints mapped around this point". It is now retried as
