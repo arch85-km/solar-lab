@@ -18,9 +18,12 @@
  * No key and nothing secret: the data is OpenStreetMap's, under the ODbL.
  *
  * Install
- *   Upload next to index.html, in the same folder. Nothing to configure. It
- *   keeps its answers in a folder beside itself, overpass-cache/, which it
- *   creates and closes to direct access.
+ *   Upload next to index.html, in the same folder, or, where the host refuses
+ *   to run PHP in subfolders (karam.me.uk answers 403 for any .php under
+ *   /apps/), at the top of the site, e.g. public_html/overpass-proxy.php. The
+ *   page looks in both places. Nothing to configure. It keeps its answers in a
+ *   folder beside itself, overpass-cache/, which it creates and closes to
+ *   direct access.
  *
  * Licence: MIT, same as the app's code. © 2026 Karam Al-Obaidi
  */

@@ -2163,6 +2163,50 @@ check('where the proxy is not installed, one 404 turns it off and Overpass is as
       noProxy.a > 0 && noProxy.b > 0 && proxyAsked.length === 1 && noProxy.on === false &&
       overpassQueries.length === 2,
       'two loads: the proxy asked ' + proxyAsked.length + '×, Overpass ' + overpassQueries.length + '×');
+
+/*
+ * Reported from the live site: the host refuses to run PHP anywhere under
+ * /apps/ (any .php there answers 403, even one that does not exist), so the
+ * proxy beside the page never ran. The page now also looks at the top of the
+ * site. Here the page is served from /apps/solar-lab/, the proxy beside it is
+ * refused with the host's 403 page, and the one at the root answers.
+ */
+{
+  const sub = await ctx.newPage();
+  const subErrors = [];
+  sub.on('pageerror', e => subErrors.push(e.message));
+  const asked = [];
+  // the app's own files, served as if from a subfolder
+  await sub.route('**/apps/solar-lab/**', (route) =>
+    route.continue({ url: route.request().url().replace('/apps/solar-lab/', '/') }));
+  const fixture = await proxyFixture();
+  await sub.route('**/overpass-proxy.php*', async (route) => {
+    const url = new URL(route.request().url());
+    asked.push(url.pathname);
+    if (url.pathname.startsWith('/apps/'))
+      return route.fulfill({ status: 403, contentType: 'text/html',
+                             body: '403 - Forbidden | Access to this page is forbidden.' });
+    return route.fulfill({ status: 200, contentType: 'application/json',
+                           headers: { 'x-overpass-cache': 'miss' }, body: fixture });
+  });
+  overpassQueries = [];
+  await sub.goto('http://127.0.0.1:' + port + '/apps/solar-lab/index.html?tour=0', { waitUntil: 'load' });
+  await sub.waitForFunction(() => window.__SUNAPP && window.__SUNAPP.ready, null, { timeout: 30000 });
+  const atRoot = await sub.evaluate(async (site) => {
+    const A = window.__SUNAPP;
+    A.State.site.lat = site.lat; A.State.site.lon = site.lon;
+    const r1 = await A.OsmBuildings.load();
+    const r2 = await A.OsmBuildings.load();
+    return { a: r1 && r1.count, b: r2 && r2.count, list: A.OsmBuildings.PROXIES };
+  }, await page.evaluate(() => ({ ...window.__SUNAPP.State.site })));
+  await sub.close();
+  check('where the host refuses PHP beside the page, the proxy at the top of the site is used',
+        atRoot.a === 2 && atRoot.b === 2 && overpassQueries.length === 0 &&
+        asked.join() === '/apps/solar-lab/overpass-proxy.php,/overpass-proxy.php,/overpass-proxy.php' &&
+        subErrors.length === 0,
+        'asked ' + asked.join(' → ') + '; Overpass asked ' + overpassQueries.length + '×' +
+        (subErrors.length ? '; ' + subErrors[0] : ''));
+}
 await page.evaluate(() => { window.__SUNAPP.OsmBuildings.clear(); });
 
 const cleared = await page.evaluate(() => {

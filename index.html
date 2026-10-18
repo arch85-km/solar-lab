@@ -19035,12 +19035,18 @@ const OsmBuildings = (() => {
    * the page). The browser then talks only to its own site: a network that
    * blocks the Overpass servers, or a busy server that answers without a CORS
    * header, no longer stops the buildings, and the proxy keeps each answer for
-   * 30 days. Where it is not installed (opened from disk, or a host without
-   * PHP) the first refusal turns it off for the session and the servers above
-   * are asked directly, as before.
+   * 30 days. It is looked for beside the page and then at the top of the site:
+   * some hosts refuse to run PHP in subfolders (karam.me.uk answers 403 for any
+   * .php under /apps/), so there it lives at the root. Where neither is
+   * installed (opened from disk, or a host without PHP) each refusal turns that
+   * place off for the session and the servers above are asked directly.
    */
   const PROXY = 'overpass-proxy.php';
-  let proxyGone = !/^https?:$/.test(location.protocol);
+  const web = /^https?:$/.test(location.protocol);
+  const PROXIES = web ? [...new Set([new URL(PROXY, location.href).href,
+                                     new URL('/' + PROXY, location.href).href])] : [];
+  const proxyMissing = new Set();
+  const proxiesLeft = () => PROXIES.filter(u => !proxyMissing.has(u));
   const MAX_BUILDINGS = 1200;
   const MAX_RADIUS = 600;          // metres; Overpass is a shared free service
   // Only the near ring casts shadows. The shadow map is a fixed 2048 texels, so
@@ -19241,34 +19247,40 @@ const OsmBuildings = (() => {
     const WAITS = [0, 1000, 5000, 10000];
     let json, lastMsg = '', busy = false, source = '';
 
-    if (!proxyGone){
+    for (const proxy of proxiesLeft()){
       const ctl = new AbortController();
       inflight = ctl;
       // Allowed longer than a direct try: the proxy may itself ask three servers
-      let timedOut = false;
+      let timedOut = false, down = false;
       const timer = setTimeout(() => { timedOut = true; ctl.abort(); }, 100000);
       try {
-        const res = await fetch(PROXY + '?bbox=' + bbox, { signal: ctl.signal });
+        const res = await fetch(proxy + '?bbox=' + bbox, { signal: ctl.signal });
         if (res.ok){
           const body = await res.json();
           if (body && Array.isArray(body.elements)){
             json = body;
             source = res.headers.get('X-Overpass-Cache') || '';
-          } else proxyGone = true;                 // not the proxy answering
+          } else proxyMissing.add(proxy);          // not the proxy answering
         } else if (BUSY.has(res.status)){
           lastMsg = 'this site\'s building cache: ' + res.status;   // installed, servers down
-        } else proxyGone = true;                   // 404, 403, 500: not installed here
+          down = true;
+        } else proxyMissing.add(proxy);            // 404, 403, 500: not installed there
       } catch (err){
         if (mine !== generation) return null;      // superseded, not failed
-        if (timedOut) lastMsg = 'this site\'s building cache: no answer in 100 s';
-        else proxyGone = true;                     // HTML, PHP source, no route
+        if (timedOut){ lastMsg = 'this site\'s building cache: no answer in 100 s'; down = true; }
+        else proxyMissing.add(proxy);              // HTML, PHP source, no route
       } finally {
         clearTimeout(timer);
         if (inflight === ctl) inflight = null;
       }
       if (mine !== generation) return null;
-      if (!json && onRetry) onRetry('OpenStreetMap buildings: this site\'s building cache could ' +
-                                    'not reach Overpass. Asking the servers directly…');
+      if (json) break;
+      if (down){
+        // Installed, but the servers behind it are down: they are asked directly
+        if (onRetry) onRetry('OpenStreetMap buildings: this site\'s building cache could ' +
+                             'not reach Overpass. Asking the servers directly…');
+        break;
+      }
     }
 
     const refused = new Set();
@@ -19361,8 +19373,9 @@ const OsmBuildings = (() => {
 
   return { load, clear: () => { cancel(); clear(); }, info: state, get meshes(){ return meshes; },
            // whether this site's proxy is still being asked this session
-           get proxyOn(){ return !proxyGone; }, set proxyOn(on){ proxyGone = !on; },
-           ENDPOINT, ENDPOINTS, PROXY, MAX_BUILDINGS, SHADOW_RADIUS };
+           get proxyOn(){ return proxiesLeft().length > 0; },
+           set proxyOn(on){ proxyMissing.clear(); if (!on) PROXIES.forEach(u => proxyMissing.add(u)); },
+           ENDPOINT, ENDPOINTS, PROXY, PROXIES, MAX_BUILDINGS, SHADOW_RADIUS };
 })();
 
 /** Show the basemap credit in the viewport; exports repeat it in the footer. */

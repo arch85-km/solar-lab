@@ -100,7 +100,7 @@ file's own measured GHI, and the test suite uses it for the physics checks.
 | `rleGridDecode()` | Decodes both grids on first use | — |
 | `Mercator` | Web Mercator maths for tiles and footprints | — |
 | `Basemap` | Map tiles under the model | OpenStreetMap, a server-side proxy, or a custom tile service, on request |
-| `OsmBuildings` | Building footprints as 3D context | This site's `overpass-proxy.php` where installed; otherwise the Overpass API (overpass-api.de, then overpass.private.coffee), on request, retried when busy |
+| `OsmBuildings` | Building footprints as 3D context | This site's `overpass-proxy.php` where installed (beside the page, then at the site root); otherwise the Overpass API (overpass-api.de, then overpass.private.coffee), on request, retried when busy |
 
 Those three — tiles, Overpass and Nominatim — are the only network requests
 the app makes, and only when the user asks for them. Looked-up time zone and

@@ -155,8 +155,9 @@ the *Site extent* slider, capped at 600 m. Heights are read from the `height` ta
 `building:levels` × 3.2 m; anything untagged is drawn at 8 m and the panel says how many
 were guessed, so a default is never mistaken for a survey.
 
-On a server with PHP, upload `server/overpass-proxy.php` beside `index.html`. The page
-then asks its own site for the buildings, and the proxy asks the public Overpass servers
+On a server with PHP, upload `server/overpass-proxy.php` beside `index.html`, or at the
+top of the site if the host refuses PHP in subfolders (the page looks in both places). The
+page then asks its own site for the buildings, and the proxy asks the public Overpass servers
 in turn (overpass-api.de, overpass.private.coffee, maps.mail.ru) and keeps each answer
 for 30 days. A network that blocks those servers no longer matters, a place loads once
 and is instant afterwards, a class loading together costs one request, and when every

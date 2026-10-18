@@ -31,7 +31,9 @@ in general rather than one build, use the concept DOI
   try goes to overpass.private.coffee, a second public instance serving the
   same OpenStreetMap data, with no key or account. A server that refuses
   outright is dropped and the other asked, rather than giving up on both.
-- **Added** `server/overpass-proxy.php`, uploaded beside the page. The browser
+- **Added** `server/overpass-proxy.php`, uploaded beside the page or, where
+  the host refuses PHP in subfolders, at the top of the site; the page looks
+  in both places. The browser
   asks its own site for the buildings; the proxy asks the public Overpass
   servers in turn and keeps each answer for 30 days, serving an older one when
   every server is down. A network that blocks Overpass no longer matters, and a
