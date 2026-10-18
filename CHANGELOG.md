@@ -8,6 +8,14 @@ in general rather than one build, use the concept DOI
 
 ## Unreleased
 
+- **Added** a message over the model when the browser runs scripts without
+  its compiler, as Microsoft Edge's "Enhance your security on the web" does
+  for sites it does not know. Every run then takes about thirteen times as
+  long (the demo massing 0.7 s against 9.9 s), and the app seems to hang. In
+  Edge the message gives the steps (the padlock, "Enhanced security is active
+  for this site", turn it off, Refresh); in any other browser in that mode, to
+  use Chrome or Firefox. It stays until hidden. Recognised by timing, the same
+  check as Urban Wind Lab's.
 - **Fixed** with an EPW loaded and **Daylight saving** ticked, the sun and the
   weather were paired an hour apart: a single moment read the following hour's
   record, and a cumulative run computed each record's sun an hour early. EPW

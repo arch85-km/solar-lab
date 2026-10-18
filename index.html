@@ -588,6 +588,28 @@ table.tbl .swatch{display:inline-block;width:8px;height:8px;border-radius:2px;ma
 @keyframes spin{to{transform:rotate(360deg)}}
 #vp-busy .msg{margin-left:11px;font-size:12px;color:var(--text-dim)}
 
+/* Stays over the model while the browser runs scripts without its compiler: a
+   toast is gone in seconds, so it never told a student why a run was taking a
+   minute. Above the busy veil, which is up for most of such a run. */
+.slowbar{
+  position:absolute;left:12px;bottom:12px;z-index:20;
+  max-width:min(480px,calc(100% - 24px));
+  display:flex;gap:10px;align-items:flex-start;
+  padding:10px 12px 11px 14px;border-radius:9px;font-size:12px;line-height:1.45;
+  background:color-mix(in srgb,var(--warn) 14%,var(--panel));
+  border:1px solid color-mix(in srgb,var(--warn) 55%,transparent);color:var(--text);
+  box-shadow:var(--shadow);
+}
+.slowbar[hidden]{display:none}
+.slowbar b{font-weight:650}
+.slowbar ol{margin:4px 0;padding-left:20px;list-style:decimal}
+.slowbar button{
+  margin-left:auto;flex:none;border:0;background:none;color:inherit;cursor:pointer;
+  font-size:16px;line-height:1;padding:0 2px;opacity:.7;
+}
+.slowbar button:hover,.slowbar button:focus-visible{opacity:1}
+#vp-scrub.on ~ .slowbar{bottom:62px}
+
 /* floating bottom-centre time scrubber (visible when panels hidden) */
 #vp-scrub{
   left:50%;bottom:12px;transform:translateX(-50%);
@@ -802,6 +824,8 @@ table.tbl .swatch{display:inline-block;width:8px;height:8px;border-radius:2px;ma
   .st{padding:0 8px;height:15px}
   .st.sec-only{display:none}
   #vp-scrub{width:calc(100% - 18px);bottom:9px}
+  .slowbar{left:9px;bottom:9px;max-width:calc(100% - 18px);font-size:11.5px}
+  #vp-scrub.on ~ .slowbar{bottom:58px}
 }
 @media (max-width:430px){
   .brand-text{display:none}
@@ -1143,6 +1167,23 @@ body.embed{--topbar-h:44px}
       </div>
       <div class="vp-overlay" id="vp-attrib" style="display:none"></div>
       <div class="vp-overlay" id="vp-busy"><div class="spinner"></div><div class="msg" id="busy-msg">Working…</div></div>
+      <div class="slowbar" id="slowbar" role="status" hidden>
+        <div id="slowbar-edge">
+          <b>Calculations are running about 10 times slower than they should.</b>
+          Microsoft Edge is running this site in its enhanced security mode. To fix it:
+          <ol>
+            <li>click the padlock to the left of the address bar;</li>
+            <li>choose <b>Enhanced security is active for this site</b> and turn it off for this site;</li>
+            <li>press <b>Refresh</b>.</li>
+          </ol>
+          Or open the app in Chrome or Firefox instead.
+        </div>
+        <div id="slowbar-other" hidden>
+          <b>Calculations are running about 10 times slower than they should.</b>
+          This browser is running the site in a restricted mode. Open the app in Chrome or Firefox.
+        </div>
+        <button type="button" id="slowbar-close" aria-label="Hide this message">&times;</button>
+      </div>
       <div id="scrim"></div>
     </div>
 
@@ -21571,6 +21612,37 @@ function exportSheet({ theme = 'dark', scale = 2, save = true } = {}){
 const $ = (id) => document.getElementById(id);
 const on = (id, ev, fn) => { const el = $(id); if (el) el.addEventListener(ev, fn); };
 
+/* Microsoft Edge's "Enhance your security on the web" runs sites it does not
+   know without the script compiler. Every run then takes about thirteen times
+   as long (the demo massing 0.7 s against 9.9 s, measured with the compiler
+   switched off), and a student sees an app that seems to hang.
+
+   Recognised by timing, not by a feature: Edge in that mode still provides
+   WebAssembly. Plain script work is timed against built-in work, which runs as
+   native code either way, so the computer's own speed cancels: the ratio is
+   about 0.1-0.4 in a normal browser and about 2 without the compiler. Takes
+   about 60 ms, up to half a second without the compiler. The same check as
+   Urban Wind Lab's. */
+function scriptsWithoutCompiler(){
+  if (typeof WebAssembly === 'undefined') return true;
+  let best = Infinity;
+  for (let k = 0; k < 2; k++){
+    let t0 = performance.now(), x = 0;
+    for (let i = 0; i < 2e6; i++) x = (x + i * 3) | 0;
+    const js = performance.now() - t0;
+    const a = new Float64Array(200000);
+    for (let j = 0; j < a.length; j++) a[j] = (j * 7919) % 200003;
+    t0 = performance.now();
+    a.sort();
+    const nat = performance.now() - t0;
+    if (nat > 0) best = Math.min(best, (js + (x & 0)) / nat);
+  }
+  return best > 1;
+}
+/* The padlock steps are Edge's own; any other browser in this mode (Safari's
+   Lockdown Mode, a locked-down managed Chrome) gets the short version. */
+const IS_EDGE = /\bEdg(A|iOS)?\//.test(navigator.userAgent || '');
+
 let statusThrottle = 0;
 /** Refresh everything that depends on the current instant. */
 function refresh(force = false){
@@ -22796,6 +22868,7 @@ on('i-ground', 'change', (e) => { State.analysis.groundRefl = clamp(+e.target.va
 on('i-useground', 'change', (e) => { State.analysis.useGround = e.target.checked; });
 on('i-ctx', 'change', (e) => { State.analysis.shade = e.target.checked; });
 on('b-run', 'click', runAnalysis);
+on('slowbar-close', 'click', () => { $('slowbar').hidden = true; });
 on('b-clear', 'click', () => { clearResults(); toast('Results cleared.', 'info', 2200); });
 on('b-auto', 'click', () => {
   State.autoRun = !State.autoRun;
@@ -23559,6 +23632,15 @@ function init(){
   // symptoms that a stale file had already fixed.
 
   Tour.maybeAutoStart();
+
+  // Checked once the first frames are drawn, so the timing is not disturbed by
+  // start-up work, and before a student has pressed Run.
+  setTimeout(() => {
+    if (!scriptsWithoutCompiler()) return;
+    $('slowbar-edge').hidden = !IS_EDGE;
+    $('slowbar-other').hidden = IS_EDGE;
+    $('slowbar').hidden = false;
+  }, 1500);
 
   // Public surface for the automated test suite
   window.__SUNAPP = {
