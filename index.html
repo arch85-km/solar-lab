@@ -23274,7 +23274,12 @@ function onResize(){
   $('vp-scrub').classList.toggle('avail', innerWidth <= 1100);
 
   const narrow = innerWidth <= 1100;
-  if (wasNarrow !== null && narrow !== wasNarrow){
+  const crossed = wasNarrow !== null && narrow !== wasNarrow;
+  // Recorded before acting: setPanel() calls back into onResize(), and with the
+  // old value still in place each call saw the breakpoint crossed again and
+  // reopened the panels, until the stack overflowed on widening the window.
+  wasNarrow = narrow;
+  if (crossed){
     // Crossing the breakpoint changes panels from docked to overlay; docked
     // panels that stay open would bury the viewport, so fold them away.
     if (narrow){ app.classList.add('no-left', 'no-right');
@@ -23283,7 +23288,6 @@ function onResize(){
     else { setPanel('left', true); setPanel('right', true); }
     requestAnimationFrame(() => { onResize(); frameModel(); });
   }
-  wasNarrow = narrow;
 }
 addEventListener('resize', onResize);
 if (window.ResizeObserver) new ResizeObserver(onResize).observe(viewportEl);

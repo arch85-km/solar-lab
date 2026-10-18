@@ -3847,6 +3847,25 @@ for (const s of sizes){
   check('no horizontal overflow at ' + s.w + '×' + s.h, overflow <= 1, 'overflow ' + overflow + 'px');
 }
 
+/*
+ * Reported from the live site: widening the window back past the 1100 px
+ * breakpoint threw "Maximum call stack size exceeded", dozens of times, and
+ * brought back only the left panel. setPanel() calls onResize(), which still
+ * held the old breakpoint state and so reopened the panels again, and again.
+ */
+{
+  const errorsBefore = consoleErrors.length;
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.waitForTimeout(800);
+  const widened = await page.evaluate(() => ['left', 'right']
+    .filter(side => !document.getElementById('app').classList.contains('no-' + side)).join('+'));
+  const newErrors = consoleErrors.slice(errorsBefore);
+  check('widening the window back past the breakpoint reopens both panels without an error',
+        widened === 'left+right' && newErrors.length === 0,
+        'panels ' + (widened || 'none') + ', ' + newErrors.length + ' errors' +
+        (newErrors.length ? ': ' + newErrors[0].slice(0, 80) : ''));
+}
+
 /* ----------------------------------------------------------- deploy build --- */
 // The key must never be in the page the public downloads. The app has nowhere to
 // put one at all now, and the build script is what keeps it that way: checked

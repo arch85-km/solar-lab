@@ -43,6 +43,10 @@ in general rather than one build, use the concept DOI
   open when it finished or was skipped, so the panels came back with every
   control showing. It now closes what it opened and scrolls the panels back;
   a section that was open before the tour stays open.
+- **Fixed** widening the window back past 1100 px threw "Maximum call stack
+  size exceeded" dozens of times and brought back only the left panel: the
+  panel switch re-entered the resize handler before it had recorded the new
+  width. Both panels now return, with no error.
 - **Docs** `ARCHITECTURE.md`, `CHANGELOG.md` and `DESIGN.md` added; the "How
   this was developed" statement in the README, both method notes and
   `.zenodo.json`; both method notes set in the website's style.
