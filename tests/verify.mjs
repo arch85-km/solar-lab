@@ -144,6 +144,10 @@ page.on('console', m => {
   if (m.type() !== 'error') return;
   const t = m.text();
   if (expectTileErrors && /403|Forbidden|Failed to load resource/i.test(t)) return;
+  // This server has no overpass-proxy.php, as a host without PHP would not: the
+  // app's first request for it is a 404 by design, after which it asks Overpass
+  // directly. That one expected 404 is not an error in the app.
+  if (/overpass-proxy\.php/.test((m.location() || {}).url || '') && /404/.test(t)) return;
   consoleErrors.push(t);
 });
 page.on('pageerror', e => consoleErrors.push('pageerror: ' + e.message));
@@ -2075,6 +2079,90 @@ check('a query the server timed out on is asked again, not read as "no buildings
       timedOutQuery.ok ? (timedOutQuery.notes[0] || '').slice(0, 110) + '… then ' +
                          timedOutQuery.count + ' buildings'
                        : 'gave up: ' + timedOutQuery.msg);
+
+/*
+ * This site's own proxy (server/overpass-proxy.php). Where it is installed the
+ * browser asks only its own site, so a network that blocks the Overpass servers
+ * no longer matters. Three cases: it answers; it is installed but every server
+ * behind it is down; it is not installed at all.
+ */
+const proxyFixture = async () => {
+  // the same four buildings the Overpass stand-in returns, for the site's box
+  const site = await page.evaluate(() => ({ ...window.__SUNAPP.State.site }));
+  const m2deg = (m) => m / 111320, c = Math.cos(site.lat * Math.PI / 180);
+  const ring = (dx, dz, w, d) => {
+    const cx = site.lon + m2deg(dx) / c, cz = site.lat - m2deg(dz), hw = m2deg(w / 2) / c, hd = m2deg(d / 2);
+    return [{ lat: cz - hd, lon: cx - hw }, { lat: cz - hd, lon: cx + hw }, { lat: cz + hd, lon: cx + hw },
+            { lat: cz + hd, lon: cx - hw }, { lat: cz - hd, lon: cx - hw }];
+  };
+  return JSON.stringify({ version: 0.6, elements: [
+    { type: 'way', id: 1, tags: { building: 'yes', height: '24 m' }, geometry: ring(-45, -35, 30, 22) },
+    { type: 'way', id: 2, tags: { building: 'yes', 'building:levels': '6' }, geometry: ring(50, -20, 26, 26) },
+  ] });
+};
+let proxyAsked = [];
+let proxyReply = null;                     // { status, body, cache }
+await page.route('**/overpass-proxy.php*', async (route) => {
+  proxyAsked.push(new URL(route.request().url()).searchParams.get('bbox'));
+  const r = proxyReply;
+  await route.fulfill({ status: r.status, contentType: r.status === 200 ? 'application/json' : 'text/plain',
+                        headers: r.cache ? { 'x-overpass-cache': r.cache } : {}, body: r.body });
+});
+
+// 1. Installed and answering: the buildings come from this site, Overpass is not asked
+overpassQueries = []; proxyAsked = [];
+proxyReply = { status: 200, body: await proxyFixture(), cache: 'stale' };
+const viaProxy = await page.evaluate(async () => {
+  const A = window.__SUNAPP;
+  A.OsmBuildings.proxyOn = true;
+  const r = await A.OsmBuildings.load();
+  const out = { count: r && r.count, note: A.OsmBuildings.info.note, on: A.OsmBuildings.proxyOn };
+  A.OsmBuildings.clear();
+  return out;
+});
+check('with the proxy installed, the buildings come from this site and Overpass is not asked',
+      viaProxy.count === 2 && proxyAsked.length === 1 && overpassQueries.length === 0 &&
+      /^-?\d+\.\d{6},-?\d+\.\d{6},-?\d+\.\d{6},-?\d+\.\d{6}$/.test(proxyAsked[0] || ''),
+      viaProxy.count + ' buildings; asked this site for ' + proxyAsked[0] + '; Overpass asked ' +
+      overpassQueries.length + '×');
+check('an answer the proxy kept from an earlier load says so in the panel',
+      /kept from an earlier load/.test(viaProxy.note), viaProxy.note);
+
+// 2. Installed, but every server behind it down: the servers are asked directly
+overpassQueries = []; proxyAsked = [];
+proxyReply = { status: 503, body: 'The public Overpass servers did not answer.' };
+expectTileErrors = true;
+const proxyBusy = await page.evaluate(async () => {
+  const A = window.__SUNAPP, notes = [];
+  const r = await A.OsmBuildings.load({ onRetry: (m) => notes.push(m) });
+  const out = { count: r && r.count, notes, on: A.OsmBuildings.proxyOn };
+  A.OsmBuildings.clear();
+  return out;
+});
+expectTileErrors = false;
+check('when the proxy says the servers are down, the browser asks them directly',
+      proxyBusy.count > 0 && proxyAsked.length === 1 && overpassQueries.length >= 1 && proxyBusy.on === true &&
+      /building cache/.test(proxyBusy.notes[0] || ''),
+      'proxy 503, then Overpass asked ' + overpassQueries.length + '×; proxy kept for next time: ' + proxyBusy.on);
+
+// 3. Not installed: one 404, then the proxy is left alone for the session
+overpassQueries = []; proxyAsked = [];
+proxyReply = { status: 404, body: 'Not Found' };
+expectTileErrors = true;
+const noProxy = await page.evaluate(async () => {
+  const A = window.__SUNAPP;
+  const r1 = await A.OsmBuildings.load();
+  const r2 = await A.OsmBuildings.load();
+  const out = { a: r1 && r1.count, b: r2 && r2.count, on: A.OsmBuildings.proxyOn };
+  A.OsmBuildings.clear();
+  return out;
+});
+expectTileErrors = false;
+await page.unroute('**/overpass-proxy.php*');
+check('where the proxy is not installed, one 404 turns it off and Overpass is asked directly',
+      noProxy.a > 0 && noProxy.b > 0 && proxyAsked.length === 1 && noProxy.on === false &&
+      overpassQueries.length === 2,
+      'two loads: the proxy asked ' + proxyAsked.length + '×, Overpass ' + overpassQueries.length + '×');
 await page.evaluate(() => { window.__SUNAPP.OsmBuildings.clear(); });
 
 const cleared = await page.evaluate(() => {
@@ -3902,7 +3990,7 @@ console.log('\n=== deploy build ===');
           php.includes("$MAPTILER_KEY = '" + FAKE + "';"));
   }
 
-  check('a build with no key is a single file with no proxy wired in', (() => {
+  check('a build with no key has no tile proxy wired in, and carries the buildings proxy', (() => {
     try {
       execFileSync(process.execPath,
         [join(ROOT, 'tools', 'make-deploy.mjs'), '--out', out], { encoding: 'utf8' });
@@ -3911,7 +3999,8 @@ console.log('\n=== deploy build ===');
     if (!exists(plain)) return false;
     const h = readFileSync(plain, 'utf8');
     return /const PROXY_URL = '';/.test(h) && !/MAPTILER_KEY/.test(h) &&
-           !exists(join(out, 'solar-analysis-lab-v' + build + '-plain', 'tile-proxy.php'));
+           !exists(join(out, 'solar-analysis-lab-v' + build + '-plain', 'tile-proxy.php')) &&
+           exists(join(out, 'solar-analysis-lab-v' + build + '-plain', 'overpass-proxy.php'));
   })());
 }
 

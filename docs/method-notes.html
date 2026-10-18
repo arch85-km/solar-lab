@@ -928,8 +928,13 @@ DNI = G_on · τ_b,   G_on = 1367 · (1 + 0.033 cos(2π·doy/365))</pre>
 
       <h4>3D context from OpenStreetMap</h4>
       <p>Footprints and heights come from the Overpass API with no key and no account. The query
-        is a single request per load, for a box capped at 600 m across. While the server is busy it
-        is asked again up to three more times, alternating with a second public instance,
+        is a single request per load, for a box capped at 600 m across. On the website it goes
+        through a small proxy beside the page, <span class="sl-mono">overpass-proxy.php</span>,
+        which asks the public servers in turn and keeps each answer for 30 days, so the buildings
+        shown can be up to a month old; when every server is down it serves an older answer
+        rather than none, and the panel says so. Where the proxy is not installed the browser
+        asks directly: while the server is busy it is asked again up to three more times,
+        alternating with a second public instance,
         <span class="sl-mono">overpass.private.coffee</span>, which serves the same data:</p>
       <pre class="sl-formula">[out:json][timeout:25];
 (way["building"](bbox); relation["building"](bbox););

@@ -31,6 +31,12 @@ in general rather than one build, use the concept DOI
   try goes to overpass.private.coffee, a second public instance serving the
   same OpenStreetMap data, with no key or account. A server that refuses
   outright is dropped and the other asked, rather than giving up on both.
+- **Added** `server/overpass-proxy.php`, uploaded beside the page. The browser
+  asks its own site for the buildings; the proxy asks the public Overpass
+  servers in turn and keeps each answer for 30 days, serving an older one when
+  every server is down. A network that blocks Overpass no longer matters, and a
+  class loading together costs one request. Where it is not installed the page
+  asks Overpass directly, as before. Checked by `tests/overpass-proxy.mjs`.
 - **Fixed** a query Overpass ran out of time for comes back as a success with
   a "runtime error" note and no buildings, and was reported as "OpenStreetMap
   has no building footprints mapped around this point". It is now retried as

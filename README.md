@@ -155,6 +155,14 @@ the *Site extent* slider, capped at 600 m. Heights are read from the `height` ta
 `building:levels` × 3.2 m; anything untagged is drawn at 8 m and the panel says how many
 were guessed, so a default is never mistaken for a survey.
 
+On a server with PHP, upload `server/overpass-proxy.php` beside `index.html`. The page
+then asks its own site for the buildings, and the proxy asks the public Overpass servers
+in turn (overpass-api.de, overpass.private.coffee, maps.mail.ru) and keeps each answer
+for 30 days. A network that blocks those servers no longer matters, a place loads once
+and is instant afterwards, a class loading together costs one request, and when every
+server is down an older answer is served rather than none. Without the proxy the page
+asks Overpass directly, as before. It needs no key and no configuration.
+
 Two things are deliberate. The volumes are **geographic**, so they do not turn with the
 project-north rotation — they stay lined up with their own tiles. And only the buildings
 within 160 m cast shadows: the shadow map is a fixed size, and stretching it over 600 m of
@@ -502,6 +510,7 @@ Screenshots land in `tests/screenshots/`.
 index.html            the entire app — this is the deliverable
 tools/make-deploy.mjs builds the files to upload, keeping the map key out of the page
 server/tile-proxy.php optional tile proxy, holds the key server-side
+server/overpass-proxy.php  fetches and keeps the OpenStreetMap buildings, no key
 tests/verify.mjs      headless verification and screenshots
 tests/fetch-vendor.mjs downloads the validation EPW
 tests/assets/         downloaded on demand (Chicago O'Hare TMY3, for validation)

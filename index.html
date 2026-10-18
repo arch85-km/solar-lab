@@ -19030,6 +19030,17 @@ const OsmBuildings = (() => {
     'https://overpass.private.coffee/api/interpreter',
   ];
   const ENDPOINT = ENDPOINTS[0];
+  /*
+   * First, this site's own proxy (server/overpass-proxy.php, uploaded beside
+   * the page). The browser then talks only to its own site: a network that
+   * blocks the Overpass servers, or a busy server that answers without a CORS
+   * header, no longer stops the buildings, and the proxy keeps each answer for
+   * 30 days. Where it is not installed (opened from disk, or a host without
+   * PHP) the first refusal turns it off for the session and the servers above
+   * are asked directly, as before.
+   */
+  const PROXY = 'overpass-proxy.php';
+  let proxyGone = !/^https?:$/.test(location.protocol);
   const MAX_BUILDINGS = 1200;
   const MAX_RADIUS = 600;          // metres; Overpass is a shared free service
   // Only the near ring casts shadows. The shadow map is a fixed 2048 texels, so
@@ -19228,7 +19239,38 @@ const OsmBuildings = (() => {
      */
     const BUSY = new Set([429, 502, 503, 504]);
     const WAITS = [0, 1000, 5000, 10000];
-    let json, lastMsg = '', busy = false;
+    let json, lastMsg = '', busy = false, source = '';
+
+    if (!proxyGone){
+      const ctl = new AbortController();
+      inflight = ctl;
+      // Allowed longer than a direct try: the proxy may itself ask three servers
+      let timedOut = false;
+      const timer = setTimeout(() => { timedOut = true; ctl.abort(); }, 100000);
+      try {
+        const res = await fetch(PROXY + '?bbox=' + bbox, { signal: ctl.signal });
+        if (res.ok){
+          const body = await res.json();
+          if (body && Array.isArray(body.elements)){
+            json = body;
+            source = res.headers.get('X-Overpass-Cache') || '';
+          } else proxyGone = true;                 // not the proxy answering
+        } else if (BUSY.has(res.status)){
+          lastMsg = 'this site\'s building cache: ' + res.status;   // installed, servers down
+        } else proxyGone = true;                   // 404, 403, 500: not installed here
+      } catch (err){
+        if (mine !== generation) return null;      // superseded, not failed
+        if (timedOut) lastMsg = 'this site\'s building cache: no answer in 100 s';
+        else proxyGone = true;                     // HTML, PHP source, no route
+      } finally {
+        clearTimeout(timer);
+        if (inflight === ctl) inflight = null;
+      }
+      if (mine !== generation) return null;
+      if (!json && onRetry) onRetry('OpenStreetMap buildings: this site\'s building cache could ' +
+                                    'not reach Overpass. Asking the servers directly…');
+    }
+
     const refused = new Set();
     for (let attempt = 0; attempt < WAITS.length && !json; attempt++){
       const live = ENDPOINTS.filter(e => !refused.has(e));
@@ -19308,7 +19350,8 @@ const OsmBuildings = (() => {
     state.tris = built.tris;
     state.note = fmtNum(rings.length) + ' buildings within ' + radius.toFixed(0) + ' m' +
                  (built.guessed ? ' · ' + built.guessed + ' without a height tag, drawn at 8 m' : '') +
-                 (capped ? ' · capped at ' + MAX_BUILDINGS : '');
+                 (capped ? ' · capped at ' + MAX_BUILDINGS : '') +
+                 (source === 'stale' ? ' · kept from an earlier load, as Overpass did not answer' : '');
     State.bvhDirty = true;
     refresh(true);                       // re-fits the shadow frustum to the new ring
     requestRender();
@@ -19317,7 +19360,9 @@ const OsmBuildings = (() => {
   }
 
   return { load, clear: () => { cancel(); clear(); }, info: state, get meshes(){ return meshes; },
-           ENDPOINT, ENDPOINTS, MAX_BUILDINGS, SHADOW_RADIUS };
+           // whether this site's proxy is still being asked this session
+           get proxyOn(){ return !proxyGone; }, set proxyOn(on){ proxyGone = !on; },
+           ENDPOINT, ENDPOINTS, PROXY, MAX_BUILDINGS, SHADOW_RADIUS };
 })();
 
 /** Show the basemap credit in the viewport; exports repeat it in the footer. */

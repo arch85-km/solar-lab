@@ -6,10 +6,11 @@
  * who views the source, so there is nowhere in the HTML to put one. For aerial
  * imagery this script emits a pair: the page, plus a small PHP proxy that keeps
  * the key server-side. It refuses to write the page if the key has leaked into
- * it.
+ * it. Every build also carries overpass-proxy.php, which needs no key: it fetches
+ * and keeps the OpenStreetMap buildings, so the browser asks only its own site.
  *
- *   node tools/make-deploy.mjs                      just the page
- *   node tools/make-deploy.mjs --key YOUR_KEY       page + keyed tile proxy
+ *   node tools/make-deploy.mjs                      page + buildings proxy
+ *   node tools/make-deploy.mjs --key YOUR_KEY       the same + keyed tile proxy
  *
  * Options
  *   --key KEY   your MapTiler Cloud key — goes into the PHP file only
@@ -49,6 +50,7 @@ const outRoot = value('--out') || join(ROOT, 'deploy');
 
 const html = readFileSync(join(ROOT, 'index.html'), 'utf8');
 const php  = readFileSync(join(ROOT, 'server', 'tile-proxy.php'), 'utf8');
+const overpassPhp = readFileSync(join(ROOT, 'server', 'overpass-proxy.php'), 'utf8');
 
 // The version comes from the source, so a stamped filename can never drift from
 // the build it was cut from — which is what caused a round of stale downloads.
@@ -91,7 +93,8 @@ mkdirSync(dir, { recursive: true });
 // Named index.html because that is what it is uploaded as; PROXY_URL is a
 // relative path, so the pair works in any directory under any domain.
 writeFileSync(join(dir, 'index.html'), page);
-const written = ['index.html'];
+writeFileSync(join(dir, 'overpass-proxy.php'), overpassPhp);
+const written = ['index.html', 'overpass-proxy.php'];
 
 if (key){
   writeFileSync(join(dir, 'tile-proxy.php'),
@@ -107,15 +110,16 @@ console.log(`  ${dir}`);
 for (const f of written) console.log(`    ${f}`);
 console.log('');
 if (variant === 'proxy'){
-  console.log('Upload BOTH files into the same folder on your server, keeping these names.');
+  console.log('Upload ALL the files into the same folder on your server, keeping these names.');
   console.log('The key is only in tile-proxy.php, which the server executes rather than');
   console.log('serves, so it is not readable from the page. Do not set an allowed-origins');
   console.log('restriction on this key: the proxy requests tiles server-side and sends no');
   console.log('browser origin, so the restriction would block it.');
 } else {
-  console.log('One file, no key anywhere: OpenStreetMap street tiles, the same with 3D');
-  console.log('buildings from Overpass, or an uploaded site image. Pass --key YOUR_KEY to');
-  console.log('add MapTiler aerial imagery through the tile proxy.');
+  console.log('No key anywhere: OpenStreetMap street tiles, the same with 3D buildings, or');
+  console.log('an uploaded site image. Upload both files into the same folder; without');
+  console.log('overpass-proxy.php the page still works, asking Overpass directly. Pass');
+  console.log('--key YOUR_KEY to add MapTiler aerial imagery through the tile proxy.');
 }
 
 /* ── helpers ───────────────────────────────────────────────────────────── */
