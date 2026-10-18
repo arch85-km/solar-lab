@@ -298,25 +298,27 @@
 @media (min-width:1280px){.sl-doc .sl-secnum{font-size:1.14rem;}}
 /* on the app's page the title sits under the app's own heading, so it names only the notes */
 .sl-doc h1,.sl-doc .sl-title{font-size:1.5em;}
-/* light grey panels: the three warnings, then every other section. The exercises always stay
-   white, so their figures keep their own grey and are not a box inside a box. The panels are
+/* light grey panels: the warnings, then every other section. The exercises always stay
+   white (marked sl-sec-ex in the markup), so their figures keep their own grey and are not a
+   box inside a box. The section part is wrapped in :is(), so a browser that cannot read it
+   drops only that part and still draws the warnings panel. The panels are
    there so a long page reads in steps. Each panel reaches a little into the margin, so its
    text stays in line with the rest; on a phone, where there is no margin to spare, it stays
    inside the column. */
-.sl-doc .sl-traps,.sl-doc .sl-sec:not(:has(.sl-ex)):nth-child(even of .sl-sec){background:var(--sl-surface);border:0;border-radius:4px;
+.sl-doc .sl-traps,.sl-doc :is(.sl-sec:not(.sl-sec-ex):nth-child(even of .sl-sec)){background:var(--sl-surface);border:0;border-radius:4px;
   margin-left:-1.25rem;margin-right:-1.25rem;padding:1.4rem 1.25rem 1.1rem;}
 /* the same space before every section heading, white or grey: 2rem between sections and
    1.4rem above the heading inside each */
-.sl-doc .sl-traps,.sl-doc .sl-sec:not(:has(.sl-ex)):nth-child(even of .sl-sec){margin-top:2rem;margin-bottom:2rem;}
+.sl-doc .sl-traps,.sl-doc .sl-sec{margin-top:2rem;margin-bottom:2rem;}
 .sl-doc .sl-traps,.sl-doc .sl-sec{padding-top:1.4rem;}
 /* and no extra space at the foot of a panel */
-.sl-doc .sl-traps > :last-child,.sl-doc .sl-sec:not(:has(.sl-ex)):nth-child(even of .sl-sec) .sl-secbody > :last-child{margin-bottom:0;}
-.sl-doc .sl-traps h2,.sl-doc .sl-sec:not(:has(.sl-ex)):nth-child(even of .sl-sec) .sl-sechead{border-bottom-color:rgba(10,12,16,.12);}
+.sl-doc .sl-traps > :last-child,.sl-doc :is(.sl-sec:not(.sl-sec-ex):nth-child(even of .sl-sec)) .sl-secbody > :last-child{margin-bottom:0;}
+.sl-doc .sl-traps h2,.sl-doc :is(.sl-sec:not(.sl-sec-ex):nth-child(even of .sl-sec)) .sl-sechead{border-bottom-color:rgba(10,12,16,.12);}
 /* what already sits on grey turns white inside a grey panel, so it still stands out */
-.sl-doc .sl-sec:not(:has(.sl-ex)):nth-child(even of .sl-sec) .sl-tbl,.sl-doc .sl-sec:not(:has(.sl-ex)):nth-child(even of .sl-sec) .sl-formula,
-.sl-doc .sl-sec:not(:has(.sl-ex)):nth-child(even of .sl-sec) .sl-fig svg,.sl-doc .sl-sec:not(:has(.sl-ex)):nth-child(even of .sl-sec) code{background:#fff;}
+.sl-doc .sl-sec:not(.sl-sec-ex):nth-child(even of .sl-sec) .sl-tbl,.sl-doc .sl-sec:not(.sl-sec-ex):nth-child(even of .sl-sec) .sl-formula,
+.sl-doc .sl-sec:not(.sl-sec-ex):nth-child(even of .sl-sec) .sl-fig svg,.sl-doc .sl-sec:not(.sl-sec-ex):nth-child(even of .sl-sec) code{background:#fff;}
 @media (max-width:700px){
-  .sl-doc .sl-traps,.sl-doc .sl-sec:not(:has(.sl-ex)):nth-child(even of .sl-sec){margin-left:0;margin-right:0;padding-left:.9rem;padding-right:.9rem;}
+  .sl-doc .sl-traps,.sl-doc :is(.sl-sec:not(.sl-sec-ex):nth-child(even of .sl-sec)){margin-left:0;margin-right:0;padding-left:.9rem;padding-right:.9rem;}
 }
 </style>
 
@@ -478,7 +480,7 @@
     </div>
   </section>
 
-  <section class="sl-sec">
+  <section class="sl-sec sl-sec-ex">
     <div class="sl-sechead"><span class="sl-secnum"></span><h2>Three exercises</h2></div>
     <div class="sl-secbody">
       <p>Each isolates one variable and holds everything else fixed. Unless told otherwise, work in
