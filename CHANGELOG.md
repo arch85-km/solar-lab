@@ -21,6 +21,13 @@ in general rather than one build, use the concept DOI
   face's year from 1,089 to 908 kWh/m² evergreen and 992 deciduous, and the
   deciduous year equals its parts run separately. With no trees, every result
   is identical to before: compared value by value, the difference is zero.
+- **Changed** the OpenStreetMap buildings are asked for in a box snapped to a
+  grid of about 220 m, so sites close together ask for the same box and this
+  site's building cache answers them. A box centred on the site was new for
+  every coordinate: three points 30 m apart in Sheffield each waited for
+  Overpass, and now share one. Sites 30 m apart share a box 84% of the time,
+  10 m apart 95%. The box is up to 113 m wider on each side, and buildings
+  that do not reach into the site's own square are left out, as before.
 - **Changed** the placing buttons (*Place model*, the chart's, *Place trees*)
   show while they wait for a click on the site.
 - **Added** a message over the model when the browser runs scripts without

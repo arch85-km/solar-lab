@@ -129,7 +129,8 @@ tools/
   make-screenshots.mjs      regenerates the documentation screenshots
   check-release-metadata.mjs  holds every version and date stamp to CITATION.cff
 server/tile-proxy.php       keeps a map API key on the server, never in the page
-server/overpass-proxy.php   fetches the OpenStreetMap buildings and keeps them 30 days
+server/overpass-proxy.php   fetches the OpenStreetMap buildings and keeps them 30 days, per box;
+                            the page snaps its box to a ~220 m grid (requestBox) so nearby sites share one
 tests/
   verify.mjs                the headless test suite
   overpass-proxy.mjs        checks the buildings proxy under PHP's built-in server

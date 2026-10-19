@@ -19307,6 +19307,50 @@ const OsmBuildings = (() => {
   }
 
   /**
+   * The box asked for, snapped to a grid so that nearby sites ask for the same
+   * one. This site's building cache keeps an answer per box, and a box centred
+   * on the site itself was new for every coordinate: three points 30 m apart in
+   * Sheffield each waited for Overpass. The centre is rounded to a grid of
+   * GRID degrees of latitude (about 220 m, the same in metres east-west), and
+   * the box grows by half a cell so it still covers the site's own square
+   * wherever the site falls in its cell. Every site in one cell shares a box.
+   */
+  const GRID = 0.002;
+  function requestBox(lat, lon, radius){
+    const latC = Math.round(lat / GRID) * GRID;
+    const k = Math.max(Math.cos(latC * D2R), 0.05);
+    const lonC = Math.round(lon / (GRID / k)) * (GRID / k);
+    const half = radius + GRID * 111320 / 2 + 2;     // 2 m for the cosine's change across the cell
+    const dLat = half / 111320, dLon = half / (111320 * k);
+    return [latC - dLat, lonC - dLon, latC + dLat, lonC + dLon].map(v => v.toFixed(6)).join(',');
+  }
+
+  /**
+   * Whether a footprint reaches into the square of half-side h round the site:
+   * a corner inside it, or a wall crossing it. Overpass returns a way whose
+   * outline crosses its box even with no corner inside, so a long building
+   * across the square's edge counts, as it did when the box was the square.
+   */
+  function reachesSquare(pts, h){
+    const n = pts.length;
+    for (let i = 0; i < n; i++){
+      const a = pts[i], b = pts[(i + 1) % n];
+      if (Math.abs(a.x) <= h && Math.abs(a.z) <= h) return true;
+      // the wall a→b against the square, by clipping its parameter to [0, 1]
+      let t0 = 0, t1 = 1;
+      const dx = b.x - a.x, dz = b.z - a.z;
+      for (const [q, d] of [[a.x + h, -dx], [h - a.x, dx], [a.z + h, -dz], [h - a.z, dz]]){
+        if (d === 0){ if (q < 0){ t0 = 1; t1 = 0; break; } continue; }
+        const t = q / d;
+        if (d < 0) t0 = Math.max(t0, t); else t1 = Math.min(t1, t);
+        if (t0 > t1) break;
+      }
+      if (t0 <= t1) return true;
+    }
+    return false;
+  }
+
+  /**
    * Fetch and extrude the buildings around the current site. Resolves to null
    * when a newer load or a clear has superseded this one.
    * @param {{onRetry?: (msg: string) => void}} [opts]
@@ -19327,9 +19371,7 @@ const OsmBuildings = (() => {
     clear();
     requestRender();
     const radius = clamp(State.basemap.extent / 2, 120, MAX_RADIUS);
-    const dLat = radius / 111320;
-    const dLon = radius / (111320 * Math.max(Math.cos(lat * D2R), 0.05));
-    const bbox = [lat - dLat, lon - dLon, lat + dLat, lon + dLon].map(v => v.toFixed(6)).join(',');
+    const bbox = requestBox(lat, lon, radius);
     const query = '[out:json][timeout:25];(way["building"](' + bbox +
                   ');relation["building"](' + bbox + ');); out geom;';
 
@@ -19446,7 +19488,9 @@ const OsmBuildings = (() => {
     }
 
     const toLocal = projector(lat, lon);
-    let rings = ringsFrom(json.elements, toLocal);
+    // The box asked for is wider than the site's own (see requestBox): keep what
+    // reaches into the site's square, as a box centred on it would have returned.
+    let rings = ringsFrom(json.elements, toLocal).filter(r => reachesSquare(r.pts, radius));
     const found = rings.length;
     if (!found) throw new Error('OpenStreetMap has no building footprints mapped around this ' +
                                 'point. Try a larger site extent, or a city centre.');
@@ -19481,7 +19525,7 @@ const OsmBuildings = (() => {
            // whether this site's proxy is still being asked this session
            get proxyOn(){ return proxiesLeft().length > 0; },
            set proxyOn(on){ proxyMissing.clear(); if (!on) PROXIES.forEach(u => proxyMissing.add(u)); },
-           ENDPOINT, ENDPOINTS, PROXY, PROXIES, MAX_BUILDINGS, SHADOW_RADIUS };
+           requestBox, ENDPOINT, ENDPOINTS, PROXY, PROXIES, MAX_BUILDINGS, SHADOW_RADIUS };
 })();
 
 /** Show the basemap credit in the viewport; exports repeat it in the footer. */

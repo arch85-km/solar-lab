@@ -1714,15 +1714,21 @@ const osm3d = await page.evaluate(async () => {
   const q = overpassQueries[0] || '';
   const box = (q.match(/\(([-\d.]+),([-\d.]+),([-\d.]+),([-\d.]+)\)/) || []).slice(1).map(Number);
   const site = await page.evaluate(() => ({ ...window.__SUNAPP.State.site }));
-  const centred = box.length === 4 &&
-    Math.abs((box[0] + box[2]) / 2 - site.lat) < 1e-4 &&
-    Math.abs((box[1] + box[3]) / 2 - site.lon) < 1e-4;
+  // Snapped to a grid (see requestBox), so not centred on the site, but always
+  // covering its own square, within half a cell of it, and inside the proxy's
+  // 1.5 km limit.
+  const k = Math.cos(site.lat * Math.PI / 180), rr = osm3d.r ? osm3d.r.radius : 0;
+  const margin = box.length === 4 ? Math.min((site.lat - box[0]) * 111320 - rr, (box[2] - site.lat) * 111320 - rr,
+                                             (site.lon - box[1]) * 111320 * k - rr, (box[3] - site.lon) * 111320 * k - rr) : -1;
+  const off = box.length === 4 ? Math.max(Math.abs((box[0] + box[2]) / 2 - site.lat) * 111320,
+                                          Math.abs((box[1] + box[3]) / 2 - site.lon) * 111320 * k) : 1e9;
   const spanM = box.length === 4 ? (box[2] - box[0]) * 111320 : 0;
-  check('the query asks Overpass for buildings in a box centred on the site',
+  check('the query asks Overpass for buildings in a box that covers the site\'s own square',
         /\[out:json\]/.test(q) && /way\["building"\]/.test(q) &&
         /relation\["building"\]/.test(q) && /out geom/.test(q) &&
-        centred && spanM > 200 && spanM < 1300,
-        'centred on the site, ' + spanM.toFixed(0) + ' m across');
+        margin >= 0 && off <= 112 && spanM > 200 && spanM < 1500,
+        spanM.toFixed(0) + ' m across, centre ' + off.toFixed(0) + ' m from the site, ' +
+        margin.toFixed(0) + ' m to spare round the ' + (2 * rr).toFixed(0) + ' m square');
 }
 check('ways and multipolygon relations both become volumes, tiny scraps do not',
       osm3d.r.count === 4 && osm3d.r.found === 4,
@@ -2184,6 +2190,49 @@ check('with the proxy installed, the buildings come from this site and Overpass 
       overpassQueries.length + '×');
 check('an answer the proxy kept from an earlier load says so in the panel',
       /kept from an earlier load/.test(viaProxy.note), viaProxy.note);
+
+// 1b. Nearby sites ask for one box, so this site's cache serves them all: three
+// points 30 m apart in Sheffield each used to wait for Overpass. The box is wider
+// than the site's own square: a building beyond that square is left out, and one
+// with every corner outside but a wall across it is kept, as Overpass returns it.
+{
+  const plan = await page.evaluate(() => {
+    const A = window.__SUNAPP, S = A.State.site, D = Math.PI / 180;
+    const r = Math.min(Math.max(A.State.basemap.extent / 2, 120), 600);
+    const b0 = A.OsmBuildings.requestBox(S.lat, S.lon, r);
+    for (const [dx, dz] of [[30, 0], [-30, 0], [0, 30], [0, -30], [21, 21], [-21, -21], [21, -21], [-21, 21]]){
+      const lat = S.lat + dz / 111320, lon = S.lon + dx / (111320 * Math.cos(S.lat * D));
+      if (A.OsmBuildings.requestBox(lat, lon, r) === b0) return { r, home: { ...S }, near: { lat, lon } };
+    }
+    return { r, home: { ...S }, near: null };
+  });
+  const body = JSON.parse(await proxyFixture());
+  const c = Math.cos(plan.home.lat * Math.PI / 180), dx = (plan.r + 60) / 111320 / c, hw = 10 / 111320 / c, hd = 10 / 111320;
+  const cx = plan.home.lon + dx, cz = plan.home.lat;
+  body.elements.push({ type: 'way', id: 9, tags: { building: 'yes' }, geometry: [
+    { lat: cz - hd, lon: cx - hw }, { lat: cz - hd, lon: cx + hw }, { lat: cz + hd, lon: cx + hw },
+    { lat: cz + hd, lon: cx - hw }, { lat: cz - hd, lon: cx - hw }] });
+  const r = plan.r, at = (x, z) => ({ lat: plan.home.lat + z / 111320, lon: plan.home.lon + x / 111320 / c });
+  body.elements.push({ type: 'way', id: 10, tags: { building: 'yes' }, geometry: [
+    at(r + 10, r - 90), at(r + 40, r - 60), at(r - 60, r + 40), at(r - 90, r + 10), at(r + 10, r - 90)] });
+  overpassQueries = []; proxyAsked = [];
+  proxyReply = { status: 200, body: JSON.stringify(body) };
+  const shared = await page.evaluate(async (plan) => {
+    const A = window.__SUNAPP, S = A.State.site, counts = [];
+    for (const at of [plan.home, plan.near]){
+      if (!at) continue;
+      S.lat = at.lat; S.lon = at.lon;
+      const r = await A.OsmBuildings.load(); counts.push(r && r.count);
+    }
+    S.lat = plan.home.lat; S.lon = plan.home.lon;
+    A.OsmBuildings.clear();
+    return counts;
+  }, plan);
+  check('sites 30 m apart ask for the same box; a building past the site\'s square is left out, one across its corner kept',
+        plan.near && proxyAsked.length === 2 && proxyAsked[0] === proxyAsked[1] &&
+        shared[0] === 3 && shared[1] === 3 && overpassQueries.length === 0,
+        'both asked for ' + proxyAsked[0] + '; buildings ' + shared.join(' and ') + ' of the 4 returned');
+}
 
 // 2. Installed, but every server behind it down: the servers are asked directly
 overpassQueries = []; proxyAsked = [];
