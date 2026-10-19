@@ -21,6 +21,26 @@ in general rather than one build, use the concept DOI
   face's year from 1,089 to 908 kWh/m² evergreen and 992 deciduous, and the
   deciduous year equals its parts run separately. With no trees, every result
   is identical to before: compared value by value, the difference is zero.
+- **Fixed** the buildings of a large imported model looked as if they floated:
+  their shadows in the 3D view started metres away from the walls. The shadow
+  offset was a fixed share of the shadow camera's depth, 0.2–0.5 m for the
+  samples but 5 m for a 552 × 594 m Cadmapper district of Sheffield, so at noon
+  in June a 9 m building's 5 m shadow all but vanished. It is now capped at
+  0.5 m, and the shadow area for a large model covers the model plus its
+  tallest part's shadow at a 5° sun, rather than 3.2 times its radius (about
+  970 m against 1,323 m, so each shadow texel is about 0.95 m, not 1.29 m).
+  The samples' shadows are unchanged. The view only: the analysis traces exact
+  rays and was never affected.
+- **Changed** the 3D view is lighter when the sun is low. A December day in
+  Sheffield never gets the sun past 14°, and the view's ambient light and
+  background, which follow the sun's height, made the whole day read as dusk;
+  shadows at full strength from a 5° sun, eleven times as long as the
+  buildings are tall, turned an imported city grey. The ambient light now
+  stays above half while the sun is up and fades to a quarter by 6° below the
+  horizon, and shadows lighten as the sun drops below 30°, as a low sun's
+  weak direct light does. In the dark theme the demo massing at 09:00 on
+  21 December reads 62 where it read 56 (noon in June: 77, unchanged). Every
+  readout and every analysis value is identical to before.
 - **Changed** the OpenStreetMap buildings are asked for in a box snapped to a
   grid of about 220 m, so sites close together ask for the same box and this
   site's building cache answers them. A box centred on the site was new for

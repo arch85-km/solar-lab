@@ -18665,7 +18665,12 @@ function fitShadowCatcher(){
   // The context ring can be far wider than the model; a frustum sized to the
   // model alone would cut its shadows off with a straight edge, which is the
   // banding this had in v1.7.
-  const half = Math.max(State.modelRadius * 3.2, OsmBuildings.info.shadowRadius * 1.15, treeReach(), 60);
+  // 3.2 radii suits a building or a block. A district imported whole (a 600 m
+  // Cadmapper OBJ) took that to 1.3 km, 1.3 m a texel, so past the model it now
+  // reaches as far as the tallest part's shadow at a 5° sun, 11.4 heights. Four
+  // heights (a 14° sun) cut a long terrace's sunrise shadow off in a line.
+  const own = Math.min(State.modelRadius * 3.2, State.modelRadius + State.modelHeight / Math.tan(5 * D2R));
+  const half = Math.max(own, OsmBuildings.info.shadowRadius * 1.15, treeReach(), 60);
   shadowCatcher.scale.set(half * 2, half * 2, 1);
   return half;
 }
@@ -20158,9 +20163,25 @@ function updateSunVisuals(sun){
   // A wider frustum spreads the same 2048 texels over more ground, so the bias
   // has to grow with it or the shadows acne instead.
   sunLight.shadow.normalBias = clamp(shadowExt * 0.0016, 0.03, 0.12);
+  // The depth bias is a fraction of the camera's depth range: 0.0006 is 0.2-0.5 m
+  // for the samples, but 5 m for a 600 m district, which pushed every shadow 5 m
+  // off its building and left the buildings looking as if they floated.
+  sunLight.shadow.bias = -Math.min(0.0006, 0.5 / (cam.far - cam.near));
 
-  // Ambient sky tint follows the sun height so dusk reads as dusk
-  const dayness = clamp(Math.sin(Math.max(sun.altitude, -6) * D2R) * 1.6 + 0.16, 0.05, 1);
+  // Ambient sky tint follows the sun height so dusk reads as dusk, but no darker
+  // than it must. With the sun up the ambient stays above half: a December day
+  // in Sheffield never gets the sun past 14°, and on the old curve the whole day
+  // read as dusk, the model dim and hard to read. Under the horizon it fades
+  // to a quarter by -6°, where it used to reach 0.05. Never darker than before.
+  const sunUp = sun.altitude >= 0
+    ? 0.55 + 0.45 * clamp(Math.sin(sun.altitude * D2R) * 1.6, 0, 1)
+    : lerp(0.25, 0.55, clamp((sun.altitude + 6) / 6, 0, 1));
+  const dayness = Math.max(sunUp, clamp(Math.sin(Math.max(sun.altitude, -6) * D2R) * 1.6 + 0.16, 0.05, 1));
+  // A low sun brings little direct light, so its shadows are barely darker than
+  // the lit ground around them; at full strength a 5° sun's shadows, eleven
+  // times as long as the buildings are tall, turned a whole city grey. Full
+  // strength from 30° up, as before; a little over half at the horizon.
+  shadowCatcher.material.opacity = lerp(0.22, 0.42, clamp(Math.sin(Math.max(sun.altitude, 0) * D2R) / 0.5, 0, 1));
   skyLight.intensity = lerp(THEME.hemiRange[0], THEME.hemiRange[1], dayness);
   const bg = new THREE.Color().setHSL(THEME.bgHue,
     lerp(THEME.bgSat[0], THEME.bgSat[1], dayness),
@@ -24188,6 +24209,7 @@ function init(){
       far: sunLight.shadow.camera.far,
       lightDist: sunLight.position.length(),
       normalBias: sunLight.shadow.normalBias,
+      biasMetres: -sunLight.shadow.bias * (sunLight.shadow.camera.far - sunLight.shadow.camera.near),
       basemapExtent: Basemap.info.extent,
       groundVisible: ground.visible,
       catcherHalf: shadowCatcher.scale.x / 2,

@@ -1096,6 +1096,39 @@ check('the shadow frustum stays tight however large the basemap is',
 check('the shadow catcher covers the model neighbourhood',
       shad.every(p => p.catcherHalf >= 60), '±' + shad[0].catcherHalf.toFixed(0) + ' m');
 
+// Reported with a Cadmapper OBJ of Sheffield, 552 x 594 m: the buildings looked
+// as if they floated. The depth bias was a fixed share of the shadow camera's
+// depth range, 5 m at that size, so every shadow started metres off its wall,
+// and the frustum spread over 1.3 km; it now reaches past the model as far as
+// a 5° sun's shadow of its tallest part. A 560 m district of 9 m blocks, in a page
+// of its own so the model loaded here is left alone.
+{
+  const big = await ctx.newPage();
+  await big.goto('http://127.0.0.1:' + port + '/index.html?tour=0', { waitUntil: 'load' });
+  await big.waitForFunction(() => window.__SUNAPP && window.__SUNAPP.ready, null, { timeout: 60000 });
+  const v = [], f = [];
+  for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++){
+    const x = -280 + i * 80, z = -280 + j * 80, n = v.length;
+    for (const [dx, dz] of [[0, 0], [20, 0], [20, 12], [0, 12]]) v.push([x + dx, 0, z + dz], [x + dx, 9, z + dz]);
+    const k = (q) => n + q + 1;
+    f.push([k(1), k(3), k(5)], [k(1), k(5), k(7)]);
+    for (let e = 0; e < 4; e++){ const a = 2 * e, c = 2 * ((e + 1) % 4); f.push([k(a), k(c), k(c + 1)], [k(a), k(c + 1), k(a + 1)]); }
+  }
+  const obj = v.map(p => 'v ' + p.join(' ')).join('\n') + '\n' + f.map(t => 'f ' + t.join(' ')).join('\n');
+  const probe = await big.evaluate((obj) => {
+    const A = window.__SUNAPP;
+    A.importOBJ(obj, 'district.obj');
+    A.refresh(true);
+    return { ...A.shadowProbe(), radius: A.State.modelRadius, height: A.State.modelHeight };
+  }, obj);
+  await big.close();
+  check('a large imported model keeps its shadows on its walls, and the frustum to its neighbourhood',
+        probe.biasMetres <= 0.5 + 1e-9 && probe.ext <= (probe.radius + probe.height / Math.tan(5 * Math.PI / 180)) * 1.05 &&
+        2 * probe.ext / 2048 < 0.7,
+        probe.radius.toFixed(0) + ' m radius: shadow offset ' + probe.biasMetres.toFixed(2) + ' m, frustum ±' +
+        probe.ext.toFixed(0) + ' m, ' + (2 * probe.ext / 2048).toFixed(2) + ' m a texel');
+}
+
 // Z-fighting is view-dependent: it appears at some camera angles and not others,
 // which is why it read as "happens when I orbit". Sweep low elevations, where
 // depth precision is worst, and look for the artefact's signature — near-black
