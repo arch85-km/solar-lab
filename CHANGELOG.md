@@ -6,7 +6,16 @@ DOI resolves to the archived copy of exactly that build. To cite the software
 in general rather than one build, use the concept DOI
 [10.5281/zenodo.22812939](https://doi.org/10.5281/zenodo.22812939).
 
-## Unreleased
+## [1.3.0](https://github.com/arch85-km/solar-lab/releases/tag/v1.3.0) — 19 October 2026
+
+Version DOI minted when this release is archived; until then cite the concept
+DOI above.
+
+A feature and correctness release. One calculation changed: with an EPW
+loaded and **Daylight saving** ticked, the sun and the weather are now paired
+at the same hour, so a figure from that case on 1.2.1 does not reproduce here
+and should cite 1.2.1's own DOI. Without that switch, and with no trees
+placed, every result comes out as it did on 1.2.1.
 
 - **Added** trees, for shading only. In the new *Trees* section, set a crown
   shape (round, conical or columnar), height, crown width and evergreen or
@@ -92,6 +101,13 @@ in general rather than one build, use the concept DOI
 - **Changed** the tile proxy is looked for at the top of the site too: if no
   tile comes back from `tile-proxy.php` beside the page, the page tries the
   site root, where a host that refuses PHP in subfolders still runs it.
+- **Changed** the buildings proxy counts each visitor's fetches for the hour
+  under a keyed hash of the address, with a random key made for the hour, and
+  deletes the counts and the key as soon as the hour is over. It used a plain
+  hash, which can be undone by trying every IPv4 address, and left the counts
+  in the server's temporary folder. Nothing it keeps can now be traced to an
+  address once its hour is over. Checked by four new checks in
+  `tests/overpass-proxy.mjs`, which fail on the old code.
 - **Fixed** the buildings proxy kept its answers as plain `.json` files, which
   SiteGround serves directly whatever `.htaccess` says, so a kept answer could
   be downloaded by its name. They are now `.php` files whose first line ends a

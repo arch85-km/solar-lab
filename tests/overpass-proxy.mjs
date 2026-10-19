@@ -9,7 +9,8 @@
  */
 import { createServer } from 'node:http';
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync, existsSync, readdirSync, utimesSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync, utimesSync, rmSync } from 'node:fs';
+import { createHash, createHmac } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -70,6 +71,10 @@ swap(`$UPSTREAMS = [
     'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
 ];`, `$UPSTREAMS = ['${UP}/u1', '${UP}/u2', '${UP}/u3'];`);
 swap('$SERVER_TIMEOUT = 30;', '$SERVER_TIMEOUT = 5;');
+// The hour's visitor counts go to a folder of the test's own, to be inspected
+const LIMITS = join(dir, 'limits');
+mkdirSync(LIMITS);
+swap('$LIMIT_DIR = sys_get_temp_dir();', '$LIMIT_DIR = ' + JSON.stringify(LIMITS) + ';');
 writeFileSync(join(dir, 'overpass-proxy.php'), php);
 
 const port = 20000 + Math.floor(Math.random() * 20000);
@@ -193,6 +198,47 @@ try {
           ' days old, Overpass asked ' + (hits.u1 + hits.u2 + hits.u3) + '×');
     mode.u1 = mode.u2 = mode.u3 = 'ok';
   }
+
+  // The visitor counts: filed under a keyed hash, never the address or a
+  // plain hash of it, and deleted when their hour is over
+  const IP = '127.0.0.1';
+  let names = readdirSync(LIMITS);
+  const keyName = names.find((f) => /-key$/.test(f)) || '';
+  const hour = (keyName.match(/^sunstudio-overpass-(\d{10})-key$/) || [])[1] || '';
+  const counts = names.filter((f) => f.endsWith('.cnt'));
+  const plain = [IP, createHash('sha1').update(IP).digest('hex'), createHash('sha256').update(IP).digest('hex')];
+  check('a visitor\'s count is filed under a keyed hash, not the address or a plain hash of it',
+        !!hour && counts.length === 1 && names.every((f) => plain.every((x) => !f.includes(x))),
+        names.length + ' files this hour: ' + names.map((f) => f.replace(/[0-9a-f]{40,}/, '…')).join(', '));
+
+  // Files from an earlier hour, including the first version's plain-hash name
+  const was = ['sunstudio-overpass-2000010100-key', 'sunstudio-overpass-2000010100-' + 'a'.repeat(64) + '.cnt',
+               'sunstudio-overpass-2000010100-' + plain[1] + '.cnt'];
+  for (const f of was) writeFileSync(join(LIMITS, f), '1');
+  const hit = await ask(BOX4);                    // answered from the cache
+  names = readdirSync(LIMITS);
+  check('counts and keys from an earlier hour are deleted by the next request, even a cached one',
+        hit.cache === 'hit' && was.every((f) => !names.includes(f)) && names.includes(keyName),
+        'cache ' + hit.cache + '; ' + was.filter((f) => names.includes(f)).length + ' of ' + was.length +
+        ' earlier-hour files left, ' + names.length + ' file(s) in all');
+
+  // The limit still applies: this visitor's count, set to the hour's maximum
+  const key = readFileSync(join(LIMITS, keyName));
+  const mine = 'sunstudio-overpass-' + hour + '-' + createHmac('sha256', key).update(IP).digest('hex') + '.cnt';
+  writeFileSync(join(LIMITS, mine), '300');
+  reset(); mode.u1 = mode.u2 = mode.u3 = 'ok';
+  const over = await ask('48.850000,2.340000,48.853594,2.345470');
+  check('a visitor past 300 fetches in the hour is refused, and Overpass is not asked',
+        over.status === 429 && hits.u1 + hits.u2 + hits.u3 === 0,
+        'status ' + over.status + ', Overpass asked ' + (hits.u1 + hits.u2 + hits.u3) + '×');
+
+  // A new hour, a new key: its first fetch makes one
+  for (const f of readdirSync(LIMITS)) rmSync(join(LIMITS, f));
+  const fresh = await ask('48.860000,2.340000,48.863594,2.345470');
+  const key2 = readFileSync(join(LIMITS, keyName));
+  check('the key is random and made afresh: a new hour\'s key differs from the last',
+        fresh.status === 200 && key2.length === 32 && !key2.equals(key),
+        '32 random bytes, different from the previous key');
 
   // A POST is not how the page asks
   const post = await fetch(BASE + '/overpass-proxy.php?bbox=' + BOX, { method: 'POST', headers: { Referer: PAGE } });

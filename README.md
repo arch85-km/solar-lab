@@ -585,13 +585,13 @@ file satisfies that; a citation is the scholarly courtesy on top of it.
 **APA 7**
 
 > Al-Obaidi, K. M. (2026). *Solar Analysis Lab: A browser-based sun path and solar
-> irradiance tool* (Version 1.2.1) [Computer software]. Zenodo.
-> https://doi.org/10.5281/zenodo.23326705
+> irradiance tool* (Version 1.3.0) [Computer software]. Zenodo.
+> https://doi.org/10.5281/zenodo.22812939
 
 **Harvard**
 
 > Al-Obaidi, K.M. (2026) *Solar Analysis Lab: A browser-based sun path and solar
-> irradiance tool* (Version 1.2.1). Zenodo. Available at: https://doi.org/10.5281/zenodo.23326705
+> irradiance tool* (Version 1.3.0). Zenodo. Available at: https://doi.org/10.5281/zenodo.22812939
 
 **BibTeX**
 
@@ -600,21 +600,22 @@ file satisfies that; a citation is the scholarly courtesy on top of it.
   author    = {Al-Obaidi, Karam M.},
   title     = {Solar Analysis Lab: A browser-based sun path and solar irradiance tool},
   year      = {2026},
-  version   = {1.2.1},
+  version   = {1.3.0},
   publisher = {Zenodo},
-  doi       = {10.5281/zenodo.23326705},
+  doi       = {10.5281/zenodo.22812939},
   url       = {https://karam.me.uk/applications/solar-analysis-lab/},
   note      = {Code MIT licensed; accompanying material CC BY 4.0}
 }
 ```
 
-Those entries name the **version DOI**, frozen on 1.2.1 — the right thing to cite in a
-paper, because it resolves to the exact build the figures came from. Earlier builds keep
-theirs: 1.2.0 at https://doi.org/10.5281/zenodo.23324265, 1.1.0 at
-https://doi.org/10.5281/zenodo.23141695 and 1.0.0 at https://doi.org/10.5281/zenodo.22812940.
-The badge at the top of this page is the **concept DOI** (10.5281/zenodo.22812939), which
-always resolves to whichever version is newest, and is what to cite when you mean the
-software rather than a particular build.
+Those entries name the **concept DOI**, which always resolves to the newest version. They
+will name 1.3.0's own **version DOI** instead once it exists: a version DOI is minted when
+this release is archived, and not before — so for the moment there is no version DOI for
+this release to cite, and the concept DOI is the honest thing to put in a paper. If you are
+quoting a figure from an earlier build, 1.2.1 is archived at
+https://doi.org/10.5281/zenodo.23326705, 1.2.0 at https://doi.org/10.5281/zenodo.23324265,
+1.1.0 at https://doi.org/10.5281/zenodo.23141695 and 1.0.0 at
+https://doi.org/10.5281/zenodo.22812940.
 
 Anyone reporting a figure from the tool should also state the **climate file**, the
 **analysis period**, the **grid size**, the **sky model** and whether **context geometry**

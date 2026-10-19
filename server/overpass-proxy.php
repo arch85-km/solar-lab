@@ -54,6 +54,10 @@ $MAX_SIDE_M = 1500;
  *  through one shared address. */
 $MAX_FETCHES_PER_HOUR = 300;
 
+/** Where the hour's counts are kept: the server's temporary folder, which is
+ *  never served to the web. Nothing written there outlives its hour. */
+$LIMIT_DIR = sys_get_temp_dir();
+
 /** Seconds to wait for each server. The query itself allows Overpass 25 s. */
 $CONNECT_TIMEOUT = 6;
 $SERVER_TIMEOUT = 30;
@@ -169,6 +173,16 @@ if (is_file($legacy)) {
 }
 $maxAge = $CACHE_DAYS * 86400;
 
+/* ── the hour's counts: delete everything from earlier hours ──────────── */
+
+// Each visitor's fetches are counted for the current hour only (below). The
+// counts and the key they are filed under go as soon as the hour is over,
+// whoever asks next and whether or not the answer is already kept.
+$hour = date('YmdH');
+foreach ((array)glob($LIMIT_DIR . '/sunstudio-overpass-*') as $old) {
+    if (strpos(basename((string)$old), 'sunstudio-overpass-' . $hour . '-') !== 0) @unlink((string)$old);
+}
+
 $age = is_file($file) ? time() - (int)filemtime($file) : null;
 if ($age !== null && $age < $maxAge) {
     answer(cached($file), 'hit', 'cache', $age);
@@ -186,8 +200,29 @@ if ($age !== null && $age < $maxAge) {
 
 /* ── rate limit per visitor, for fetches only ──────────────────────────── */
 
+// A count is filed under a keyed hash of the address, never the address or a
+// plain hash of it: a plain hash of an IPv4 address is undone by trying all
+// four billion. The key is random, made by the hour's first fetch, and deleted
+// with the counts when the hour is over (above), after which no count can be
+// traced back to anyone.
+$limitKeyFile = $LIMIT_DIR . '/sunstudio-overpass-' . $hour . '-key';
+$limitKey = (string)@file_get_contents($limitKeyFile);
+if (strlen($limitKey) !== 32) {
+    $fresh = random_bytes(32);
+    $fh = @fopen($limitKeyFile, 'x');              // only one request makes it
+    if ($fh) {
+        fwrite($fh, $fresh);
+        fclose($fh);
+        @chmod($limitKeyFile, 0600);
+        $limitKey = $fresh;
+    } else {
+        usleep(50000);                              // another request is writing it
+        $limitKey = (string)@file_get_contents($limitKeyFile);
+        if (strlen($limitKey) !== 32) $limitKey = $fresh;
+    }
+}
 $ip = (string)($_SERVER['REMOTE_ADDR'] ?? 'unknown');
-$bucket = sys_get_temp_dir() . '/sunstudio-overpass-' . date('YmdH') . '-' . sha1($ip) . '.cnt';
+$bucket = $LIMIT_DIR . '/sunstudio-overpass-' . $hour . '-' . hash_hmac('sha256', $ip, $limitKey) . '.cnt';
 $count = (int)@file_get_contents($bucket);
 if ($count >= $MAX_FETCHES_PER_HOUR) {
     if ($age !== null) answer(cached($file), 'stale', 'cache', $age);
