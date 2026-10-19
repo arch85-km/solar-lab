@@ -60,7 +60,7 @@
 .sl-doc .sl-masthead{padding:2.75rem 0 1.9rem;border-bottom:2px solid var(--sl-ink);}
 .sl-doc .sl-eyebrow{font-family:var(--sl-fm);font-size:.70rem;font-weight:500;
   letter-spacing:.16em;text-transform:uppercase;color:var(--sl-accent);margin:0 0 1.1rem;}
-.sl-doc h1{font-family:var(--sl-fd);font-weight:600;
+.sl-doc h1,.sl-doc .sl-title{font-family:var(--sl-fd);font-weight:600;
   font-size:clamp(1.9rem,5.2vw,2.75rem);line-height:1.04;letter-spacing:-.028em;
   text-wrap:balance;margin:0 0 1.1rem;color:var(--sl-ink);}
 .sl-doc .sl-standfirst{max-width:var(--sl-measure);font-size:1.14rem;line-height:1.6;
@@ -325,7 +325,7 @@
 <div class="sl-doc sl-auto-dark">
 
   <div class="sl-masthead">
-    <h1>Method Notes in Brief</h1>
+    <h2 class="sl-title">Method Notes in Brief</h2>
     <p class="sl-standfirst">The short version: what the tool computes, and &mdash; the part that
       matters most when you cite it &mdash; <strong>what it does not model at all</strong>. It
       traces sun and sky against your geometry; it does not bounce light, and that single absence
