@@ -8,8 +8,7 @@ in general rather than one build, use the concept DOI
 
 ## [1.3.0](https://github.com/arch85-km/solar-lab/releases/tag/v1.3.0) — 19 October 2026
 
-Version DOI minted when this release is archived; until then cite the concept
-DOI above.
+Version DOI [10.5281/zenodo.23482443](https://doi.org/10.5281/zenodo.23482443)
 
 A feature and correctness release. One calculation changed: with an EPW
 loaded and **Daylight saving** ticked, the sun and the weather are now paired

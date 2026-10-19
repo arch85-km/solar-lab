@@ -21,6 +21,9 @@ identifiers:
   - type: doi
     value: 10.5281/zenodo.23326705
     description: "Version DOI — 1.2.1"
+  - type: doi
+    value: 10.5281/zenodo.23482443
+    description: "Version DOI — 1.3.0; cite this when quoting a figure"
 abstract: >-
   A sun path and solar irradiance tool for architecture students that runs
   entirely in the browser, shipped as a single self-contained HTML file. The sun
