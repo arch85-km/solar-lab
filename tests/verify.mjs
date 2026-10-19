@@ -697,6 +697,63 @@ check('self-shading in a courtyard reduces incident radiation',
       shade.withShade < shade.noShade * 0.97,
       'shaded ' + shade.withShade.toFixed(0) + ' vs unshaded ' + shade.noShade.toFixed(0) + ' kWh/m²');
 
+/* ----------------------------------------------------------------- trees --- */
+console.log('\n=== trees (shading only) ===');
+// A 10 m round tree 6 m south of the 14 m reference box. Trees shade and are
+// never measured; deciduous crowns are solid in leaf (May-October by default)
+// and give way to a few bare limbs otherwise, which the tracer handles by splitting a run that spans
+// both into in-leaf and leaf-off parts.
+const trees = await page.evaluate(async () => {
+  const A = window.__SUNAPP, S = A.State;
+  const south = () => { const r = S.results; let s = 0, a = 0; for (let i = 0; i < r.sensors.count; i++) if (r.sensors.normals[i*3+2] > 0.9){ s += r.values[i]*r.sensors.areas[i]; a += r.sensors.areas[i]; } return { v: s / a, n: r.sensors.count }; };
+  const YEAR = { mode: 'cum', period: 'year', unit: 'kwh', density: 1, gridSize: 2, useGround: true, groundRefl: 0.2, shade: true };
+  const run = async (an) => { A.setAnalysis(an); await A.runAnalysis(); return south(); };
+  const put = (list) => { S.trees = list.map(t => ({ ...t })); A.addTree(0, 0); S.trees.pop(); };
+  const tree = (kind) => ({ shape: 'round', height: 10, crown: 8, kind, x: 0, z: 13 });
+  const keepLeaf = { ...S.leaf }, o = {};
+  A.loadSample('box');
+  put([]);                   o.none = await run(YEAR);
+  put([tree('evergreen')]);  o.ever = await run(YEAR);
+  put([tree('deciduous')]);  o.deci = await run(YEAR);
+  const part = async (from, to) => (await run({ ...YEAR, period: 'custom', from, to })).v;
+  o.parts = await part(1, 120) + await part(121, 304) + await part(305, 365);
+  S.leaf = { from: 1, to: 365 };  o.deciAllYear = await run(YEAR);
+  S.leaf = keepLeaf;
+  const inst = async (doy) => { A.setDoy(doy); A.setMinutes(720); return (await run({ ...YEAR, mode: 'inst' })).v; };
+  put([]);                   o.janNone = await inst(15);
+  put([tree('evergreen')]);  o.janEver = await inst(15); o.junEver = await inst(172);
+  put([tree('deciduous')]);  o.janDeci = await inst(15); o.junDeci = await inst(172);
+  const occ = A.occluderSet();
+  o.crowns = occ.flags ? occ.flags.filter(f => f === 1).length : 0;
+  o.limbs = occ.flags ? occ.flags.filter(f => f === 2).length : 0;
+  o.treeTris = occ.tris.length / 9 - S.model.tris.length / 9;
+  put([]); A.setDoy(172); A.setMinutes(720);
+  o.cleared = A.occluderSet().flags === null && A.occluderSet().tris.length === S.model.tris.length || !S.analysis.osmShade;
+  return o;
+});
+check('trees are never measured: the analysis grid is the same with and without them',
+      trees.none.n === trees.ever.n && trees.none.n === trees.deci.n, trees.none.n + ' points each time');
+check('an evergreen tree south of the box shades its south face over the year',
+      trees.ever.v < trees.none.v * 0.95,
+      trees.none.v.toFixed(0) + ' → ' + trees.ever.v.toFixed(0) + ' kWh/m²');
+check('a deciduous tree shades less than an evergreen one, and still shades',
+      trees.deci.v > trees.ever.v && trees.deci.v < trees.none.v,
+      'evergreen ' + trees.ever.v.toFixed(0) + ' < deciduous ' + trees.deci.v.toFixed(0) + ' < none ' + trees.none.v.toFixed(0));
+check('a deciduous year equals its in-leaf and leaf-off parts run separately',
+      Math.abs(trees.parts - trees.deci.v) < 1e-6 * trees.deci.v,
+      'year ' + trees.deci.v.toFixed(3) + ', parts ' + trees.parts.toFixed(3));
+check('a deciduous tree in leaf all year shades exactly as an evergreen one',
+      Math.abs(trees.deciAllYear.v - trees.ever.v) < 1e-9 * trees.ever.v,
+      trees.deciAllYear.v.toFixed(3) + ' vs ' + trees.ever.v.toFixed(3));
+check('at noon in January the bare deciduous tree shades, less than the evergreen; in June they are equal',
+      trees.janEver < trees.janDeci && trees.janDeci < trees.janNone &&
+      Math.abs(trees.junDeci - trees.junEver) < 1e-9 * trees.junEver,
+      'January none ' + trees.janNone.toFixed(0) + ', deciduous ' + trees.janDeci.toFixed(0) + ', evergreen ' + trees.janEver.toFixed(0) +
+      ' W/m²; June deciduous ' + trees.junDeci.toFixed(0) + ' = evergreen ' + trees.junEver.toFixed(0));
+check('a deciduous tree\'s crown and bare limbs are flagged for their seasons, and clearing the trees clears them',
+      trees.crowns > 0 && trees.limbs > 0 && trees.crowns + trees.limbs < trees.treeTris && trees.cleared,
+      trees.crowns + ' crown and ' + trees.limbs + ' limb triangles of ' + trees.treeTris);
+
 /* ------------------------------------------------------------ OBJ import --- */
 const objText = [
   '# 10 x 10 x 10 cube',

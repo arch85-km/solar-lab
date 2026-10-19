@@ -394,11 +394,15 @@
           <dd>No absorptance, reflectance, colour or emissivity: a sensor reports the irradiance
             arriving, never what the surface does with it. Nothing is transparent either &mdash; a
             window is a solid triangle that blocks the beam completely.</dd></div>
-        <div><span class="sl-chip is-out">Out</span><dt>Turbidity, spectrum, snow, vegetation</dt>
+        <div><span class="sl-chip is-out">Out</span><dt>Turbidity, spectrum, snow</dt>
           <dd>Broadband throughout, with no turbidity control anywhere in the interface. Ground
             reflectance is one number for the whole run, so a winter figure for a snow-covered site
-            is wrong in a direction the tool cannot correct. Overpass is queried for buildings
-            alone, and a tree modelled as a solid would shade the whole year identically.</dd></div>
+            is wrong in a direction the tool cannot correct.</dd></div>
+        <div><span class="sl-chip is-part">Partly</span><dt>Trees</dt>
+          <dd>Single trees can be placed by hand: round, conical or columnar, evergreen or
+            deciduous. They shade but are never measured. In leaf a crown is solid, so its shade
+            is a little overstated; out of leaf (outside 1 May &ndash; 31 October unless changed) a
+            deciduous tree shades with its trunk and a few bare limbs. Trees in OpenStreetMap are not loaded.</dd></div>
         <div><span class="sl-chip is-part">Partly</span><dt>Terrain, and context</dt>
           <dd>The ground is a flat plane for the reflected term only &mdash; a sloping or sunken
             site is not represented unless you import it as geometry. Context shades but never

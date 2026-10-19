@@ -480,6 +480,8 @@ input[type=range]:focus::-webkit-slider-thumb{box-shadow:0 0 0 3px var(--accent-
 .chip.on .cname{color:var(--accent)}
 .chip .cx{background:transparent;border:0;color:var(--text-faint);cursor:pointer;font-size:15px;line-height:1;padding:0 3px}
 .chip .cx:hover{color:var(--red)}
+/* a placing button while it waits for a click on the site */
+.btn.on{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
 .chip.info{border-left-color:var(--blue)}
 .kv{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:11px;margin-top:8px}
 .kv dt{color:var(--text-faint)}
@@ -1262,6 +1264,41 @@ body.embed{--topbar-h:44px}
         </section>
 
         <!-- ANALYSIS -->
+        <!-- TREES -->
+        <section class="sec closed" data-sec="trees">
+          <button class="sec-head">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="9" r="6"/><path d="M12 15v6.5M9 21.5h6"/></svg>
+            <span class="sec-title">Trees</span><span class="chev"></span>
+          </button>
+          <div class="sec-body">
+            <p class="hint">Trees shade the analysis but are never measured. Set the tree, press <b>Place trees</b>, then click the site; Escape stops placing.</p>
+            <div class="grid2">
+              <div class="row col">
+                <label for="i-tree-shape">Crown shape</label>
+                <select id="i-tree-shape"><option value="round">Round</option><option value="conical">Conical</option><option value="columnar">Columnar</option></select>
+              </div>
+              <div class="row col">
+                <label for="i-tree-kind">Leaves</label>
+                <select id="i-tree-kind"><option value="deciduous">Deciduous</option><option value="evergreen">Evergreen</option></select>
+              </div>
+              <div class="row col"><label for="i-tree-h">Height (m)</label><input type="number" id="i-tree-h" min="2" max="40" step="0.5" value="8"></div>
+              <div class="row col"><label for="i-tree-w">Crown width (m)</label><input type="number" id="i-tree-w" min="1" max="25" step="0.5" value="6"></div>
+            </div>
+            <div class="row" style="margin:8px 0 0">
+              <button type="button" class="btn sm grow" id="b-tree-place">Place trees&hellip;</button>
+              <button type="button" class="btn sm ghost" id="b-tree-clear" disabled>Remove all</button>
+            </div>
+            <div id="tree-list"></div>
+            <p class="hint" id="tree-sel-note" style="display:none">The settings above now change the selected tree. Click it again to let go.</p>
+            <div class="grid2" style="margin-top:9px">
+              <div class="row col"><label for="i-leaf-from">Deciduous in leaf from</label><input type="date" id="i-leaf-from"></div>
+              <div class="row col"><label for="i-leaf-to">to</label><input type="date" id="i-leaf-to"></div>
+            </div>
+            <p class="hint">Deciduous crowns are drawn a lighter green. In leaf, the two kinds shade alike, so on a date in the season they give the same result: the difference shows on a date outside it, or over a period that includes it.</p>
+            <p class="hint">In leaf, a crown is solid: a real one lets some light through, so its shade is a little overstated. Out of leaf, a deciduous tree shades with its trunk and the few limbs drawn, a stand-in for the many finer twigs of a real one.</p>
+          </div>
+        </section>
+
         <section class="sec closed" data-sec="analysis">
           <button class="sec-head">
             <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 19.5h16M6.5 19.5V11M11 19.5V5.4M15.5 19.5v-5.6M20 19.5V8.2"/></svg>
@@ -18294,6 +18331,7 @@ const SkyMatrix = (() => {
 const WORKER_SOURCE = `
 'use strict';
 var TRI = null, NTRI = 0;
+var FLAG = null;          /* per triangle: 1 = a deciduous crown, 2 = its bare limbs */
 var nodeMin = null, nodeMax = null, nodeLeft = null, nodeStart = null, nodeCount = null, triIdx = null;
 var nNodes = 0;
 var EPS = 1e-7;
@@ -18382,7 +18420,9 @@ function hitTri(t, ox, oy, oz, dx, dy, dz, maxT){
 
 var stackBuf = new Int32Array(128);
 
-function occluded(ox, oy, oz, dx, dy, dz, maxT){
+/* bare: the light comes from a time when deciduous trees have no leaves, so
+   their crowns let it through (their trunks still block it) */
+function occluded(ox, oy, oz, dx, dy, dz, maxT, bare){
   if (!NTRI) return false;
   var idx = 1 / (dx === 0 ? 1e-20 : dx), idy = 1 / (dy === 0 ? 1e-20 : dy), idz = 1 / (dz === 0 ? 1e-20 : dz);
   var sp = 0; stackBuf[sp++] = 0;
@@ -18399,6 +18439,7 @@ function occluded(ox, oy, oz, dx, dy, dz, maxT){
     if (nodeLeft[node] < 0){
       var s = nodeStart[node], c = nodeCount[node];
       for (var k = s; k < s + c; k++){
+        if (FLAG && FLAG[triIdx[k]] === (bare ? 1 : 2)) continue;   /* the other season's */
         if (hitTri(triIdx[k] * 9, ox, oy, oz, dx, dy, dz, maxT)) return true;
       }
     } else {
@@ -18412,6 +18453,7 @@ self.onmessage = function(ev){
   var m = ev.data;
   if (m.cmd === 'build'){
     TRI = m.tris;
+    FLAG = m.flags || null;
     buildBVH();
     self.postMessage({ ok: true, cmd: 'build', tris: NTRI, nodes: nNodes });
     return;
@@ -18423,6 +18465,10 @@ self.onmessage = function(ev){
     var out = new Float64Array(n);
     var direct = new Float64Array(n);
     var firstSun = m.firstSun == null ? nd : m.firstSun;
+    /* Only for deciduous trees over a period with and without leaves: which
+       directions are leaf-off light, and which are sun (the two parts each
+       carry their own sky, so the sun is no longer one block at the end). */
+    var bareOf = (m.bare && FLAG) ? m.bare : null, sunMask = m.sunMask || null;
     var maxT = m.maxT || 1e6;
     var reportEvery = Math.max(1, Math.floor(n / 60));
 
@@ -18436,10 +18482,10 @@ self.onmessage = function(ev){
         var dx = dirs[j*3], dy = dirs[j*3+1], dz = dirs[j*3+2];
         var dot = nx * dx + ny * dy + nz * dz;
         if (dot <= 0) continue;
-        if (shade && occluded(ox, oy, oz, dx, dy, dz, maxT)) continue;
+        if (shade && occluded(ox, oy, oz, dx, dy, dz, maxT, bareOf ? bareOf[j] : 0)) continue;
         var e = v * dot;
         acc += e;
-        if (j >= firstSun) accDir += e;
+        if (sunMask ? sunMask[j] : j >= firstSun) accDir += e;
       }
       out[i] = acc;
       direct[i] = accDir;
@@ -18465,7 +18511,7 @@ const THEMES = {
     bgHue: 0.58, bgSat: [0.12, 0.35], bgLight: [0.035, 0.10],
     ground: 0x2b3038,
     gridMajor: 0x4a5563, gridMinor: 0x333c47, gridOpacity: 0.5,
-    building: 0xb9c4d0, context: 0x7e8894, fin: 0x8e99a6,
+    building: 0xb9c4d0, context: 0x7e8894, fin: 0x8e99a6, tree: 0x6f9468, deciduous: 0xa0ab62, trunk: 0x7d6a55,
     hemiSky: 0x9dc3ee, hemiGround: 0x2a2f38, hemiRange: [0.28, 1.15],
     fill: 0x93b4de, fillIntensity: 0.32,
     sun: { summer: 0xffb340, winter: 0x62b8ff, today: 0xffe27a, analemma: 0x6d8398 },
@@ -18490,7 +18536,7 @@ const THEMES = {
     bgHue: 0.58, bgSat: [0.05, 0.16], bgLight: [0.90, 0.975],
     ground: 0xe6e9ee,
     gridMajor: 0xbcc4ce, gridMinor: 0xd6dbe2, gridOpacity: 0.9,
-    building: 0xf4f6f9, context: 0xd6dbe2, fin: 0xc6ccd4,
+    building: 0xf4f6f9, context: 0xd6dbe2, fin: 0xc6ccd4, tree: 0x9fc499, deciduous: 0xccd38f, trunk: 0xa08c74,
     hemiSky: 0xe8f0fb, hemiGround: 0xbfc5cd, hemiRange: [0.55, 1.0],
     fill: 0xc6d6ea, fillIntensity: 0.42,
     sun: { summer: 0xd97706, winter: 0x1d6fbf, today: 0xb45309, analemma: 0x8b97a5 },
@@ -18607,12 +18653,19 @@ shadowCatcher.renderOrder = 1;
 shadowCatcher.userData.noAnalysis = true;
 scene.add(shadowCatcher);
 
+/** How far from the centre a tree's shadow can reach, at a sun 27° up. */
+function treeReach(){
+  let r = 0;
+  for (const t of State.trees) r = Math.max(r, Math.hypot(t.x, t.z) + t.crown / 2 + 2 * t.height);
+  return r;
+}
+
 /** Size the catcher to the model's neighbourhood; returns its half-extent. */
 function fitShadowCatcher(){
   // The context ring can be far wider than the model; a frustum sized to the
   // model alone would cut its shadows off with a straight edge, which is the
   // banding this had in v1.7.
-  const half = Math.max(State.modelRadius * 3.2, OsmBuildings.info.shadowRadius * 1.15, 60);
+  const half = Math.max(State.modelRadius * 3.2, OsmBuildings.info.shadowRadius * 1.15, treeReach(), 60);
   shadowCatcher.scale.set(half * 2, half * 2, 1);
   return half;
 }
@@ -20182,6 +20235,267 @@ function collectTriangles(){
   return { tris, count: tris.length / 9, area, bbox };
 }
 
+/* ============================================================================
+ *  Trees — shading only
+ *
+ *  A tree is a trunk and a crown of one of three simple forms. Like the
+ *  OpenStreetMap context it shades the analysis and is never measured: the
+ *  sensor grid comes from State.model.tris alone. Two simplifications, stated
+ *  in the method notes: in leaf, a crown is solid (a real one lets some light
+ *  through, so the shade is a little overstated); a deciduous tree out of leaf
+ *  shades with its trunk and a few solid limbs (a stand-in for the many finer
+ *  twigs of a real one). Trees sit on the site, so Project north does
+ *  not turn them.
+ * ========================================================================== */
+const treeGroup = new THREE.Group();
+scene.add(treeGroup);
+const TREE_SHAPES = { round: 'Round', conical: 'Conical', columnar: 'Columnar' };
+// Deciduous crowns are a lighter, yellower green, so the two kinds can be told
+// apart in leaf, when they shade alike.
+const treeCrownMat = (kind) => { const k = kind === 'deciduous' ? 'deciduous' : 'tree';
+  return themed(new THREE.MeshStandardMaterial({
+    color: THEME[k], roughness: 0.95, metalness: 0.0, flatShading: true }), k); };
+const treeTrunkMat = () => themed(new THREE.MeshStandardMaterial({
+  color: THEME.trunk, roughness: 0.95, metalness: 0.0 }), 'trunk');
+
+/** In leaf on this day of the year? The season may wrap the new year. */
+function inLeaf(doy){
+  const a = State.leaf.from, b = State.leaf.to;
+  return a <= b ? (doy >= a && doy <= b) : (doy >= a || doy <= b);
+}
+
+/**
+ * The two parts of a tree, in its own frame (base at the origin, y up):
+ *   round     a crown as wide as it is tall, unless that leaves the trunk
+ *             under a quarter of the height, when it is flattened;
+ *   conical   a cone from a fifth of the height to the top;
+ *   columnar  a straight-sided column with a domed top, from an eighth of the
+ *             height. An ellipsoid looked like the round crown whenever the
+ *             tree was not much taller than wide.
+ */
+function columnarProfile(t){
+  const H = t.height, R = t.crown / 2, base = 0.125 * H, L = H - base;
+  const hd = Math.min(R, 0.35 * L), hb = Math.min(0.5 * R, 0.15 * L);
+  const pts = [[0, base], [0.75 * R, base + 0.5 * hb], [R, base + hb], [R, H - hd]];
+  for (let k = 1; k <= 4; k++){ const a = k * Math.PI / 8; pts.push([R * Math.cos(a), H - hd + hd * Math.sin(a)]); }
+  pts[pts.length - 1][0] = 0;
+  return { base, pts };
+}
+function treeGeometry(t){
+  const H = t.height, R = t.crown / 2;
+  let crown, base;
+  if (t.shape === 'conical'){
+    base = 0.2 * H;
+    crown = new THREE.ConeGeometry(R, H - base, 10, 1);
+    crown.translate(0, base + (H - base) / 2, 0);
+  } else if (t.shape === 'columnar'){
+    const c = columnarProfile(t);
+    base = c.base;
+    crown = new THREE.LatheGeometry(c.pts.map(([r, y]) => new THREE.Vector2(r, y)), 10);
+  } else {
+    const rv = Math.min(R, 0.375 * H);
+    base = H - 2 * rv;
+    crown = new THREE.SphereGeometry(1, 10, 7);
+    crown.scale(R, rv, R);
+    crown.translate(0, H - rv, 0);
+  }
+  const rt = Math.min(Math.max(0.05 * t.crown, 0.12), 0.45);
+  const th = base + 0.3 * (H - base);        // into the crown, so it does not float
+  const trunk = new THREE.CylinderGeometry(rt * 0.8, rt, th, 6, 1);
+  trunk.translate(0, th / 2, 0);
+  return { crown, trunk };
+}
+
+/**
+ * A bare deciduous tree's branches, in the tree's frame: a leader up the middle
+ * and five limbs from the top of the trunk, each forking once, with their tips
+ * inside the crown's outline. Drawn, shadowed and traced out of leaf only
+ * (flag 2), so in leaf a deciduous tree shades exactly as an evergreen one.
+ */
+function treeBranches(t){
+  const H = t.height, R = t.crown / 2;
+  const g = treeGeometry(t); g.crown.dispose(); g.trunk.computeBoundingBox();
+  const th = g.trunk.boundingBox.max.y, rt = Math.min(Math.max(0.05 * t.crown, 0.12), 0.45);
+  g.trunk.dispose();
+  // The crown's outline: its radius at height y
+  let base, outline;
+  if (t.shape === 'conical'){
+    base = 0.2 * H;
+    outline = (y) => R * clamp((H - y) / (H - base), 0, 1);
+  } else if (t.shape === 'columnar'){
+    const c = columnarProfile(t);
+    base = c.base;
+    outline = (y) => {
+      for (let i = 1; i < c.pts.length; i++){
+        const [r0, y0] = c.pts[i - 1], [r1, y1] = c.pts[i];
+        if (y <= y1) return y1 > y0 ? r0 + (r1 - r0) * clamp((y - y0) / (y1 - y0), 0, 1) : r1;
+      }
+      return 0;
+    };
+  } else {
+    const rv = Math.min(R, 0.375 * H), cy = H - rv;
+    base = H - 2 * rv;
+    outline = (y) => R * Math.sqrt(Math.max(0, 1 - ((y - cy) / rv) ** 2));
+  }
+  const span = H - base, parts = [];
+  const limb = (a, b, r0, r1) => {
+    const d = new THREE.Vector3().subVectors(b, a), len = d.length();
+    const c = new THREE.CylinderGeometry(Math.max(r1, 0.02), Math.max(r0, 0.03), len, 5, 1);
+    c.translate(0, len / 2, 0);
+    c.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()));
+    c.translate(a.x, a.y, a.z);
+    parts.push(c);
+  };
+  const at = (az, y, f) => { const r = f * outline(y); return new THREE.Vector3(Math.cos(az) * r, y, Math.sin(az) * r); };
+  limb(new THREE.Vector3(0, th * 0.9, 0), new THREE.Vector3(0, H - 0.1 * span, 0), rt * 0.6, rt * 0.15);
+  const turn = (Math.abs(t.x * 7.3 + t.z * 3.1) % 1) * Math.PI;      // not every tree alike
+  for (let i = 0; i < 5; i++){
+    const az = turn + i * 2 * Math.PI / 5;
+    const y0 = th * 0.85 + (i % 3) * 0.05 * span;
+    const y1 = base + (0.42 + 0.1 * (i % 3)) * span;
+    const a = new THREE.Vector3(0, y0, 0), b = at(az, y1, 0.8);
+    limb(a, b, rt * 0.5, rt * 0.2);
+    const m = a.clone().lerp(b, 0.55), y2 = Math.min(y1 + 0.22 * span, H - 0.08 * span);
+    for (const s of [-0.45, 0.45]) limb(m, at(az + s, y2, 0.7), rt * 0.25, rt * 0.1);
+  }
+  // One geometry, so a tree is one draw however many limbs it has
+  let n = 0; const flat = parts.map(c => { const f = c.toNonIndexed(); c.dispose(); n += f.attributes.position.count; return f; });
+  const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3);
+  let o = 0;
+  for (const f of flat){ pos.set(f.attributes.position.array, o); nor.set(f.attributes.normal.array, o); o += f.attributes.position.array.length; f.dispose(); }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  return out;
+}
+
+/** World triangles of one geometry, placed at the tree's spot. */
+function worldTris(geo, x, z){
+  const g = geo.index ? geo.toNonIndexed() : geo;
+  const a = g.attributes.position.array, out = new Float32Array(a.length);
+  for (let i = 0; i < a.length; i += 3){ out[i] = a[i] + x; out[i+1] = a[i+1]; out[i+2] = a[i+2] + z; }
+  if (g !== geo) g.dispose();
+  return out;
+}
+
+/** Redraw the trees; a bare deciduous crown is hidden on the day shown. */
+function buildTrees(){
+  disposeGroup(treeGroup);
+  for (const t of State.trees){
+    const { crown, trunk } = treeGeometry(t);
+    const c = new THREE.Mesh(crown, treeCrownMat(t.kind)), k = new THREE.Mesh(trunk, treeTrunkMat());
+    for (const m of [c, k]){ m.position.set(t.x, 0, t.z); m.castShadow = true; m.receiveShadow = true; treeGroup.add(m); }
+    c.userData.deciduous = t.kind === 'deciduous';
+    if (c.userData.deciduous){
+      const b = new THREE.Mesh(treeBranches(t), treeTrunkMat());
+      b.position.set(t.x, 0, t.z); b.userData.bare = true;
+      b.castShadow = true; b.receiveShadow = true;
+      treeGroup.add(b);
+    }
+  }
+  syncTreeLeaves();
+}
+function syncTreeLeaves(){
+  const on = inLeaf(State.doy);
+  treeGroup.children.forEach(m => {
+    if (m.userData.deciduous) m.visible = on;
+    else if (m.userData.bare) m.visible = !on;
+  });
+}
+
+/** Tree triangles for the tracer: 1 marks a deciduous crown, 2 its bare limbs. */
+function treeTriangles(){
+  const parts = [], flags = [];
+  for (const t of State.trees){
+    const { crown, trunk } = treeGeometry(t), deci = t.kind === 'deciduous';
+    const pieces = [[crown, deci ? 1 : 0], [trunk, 0]];
+    if (deci) pieces.push([treeBranches(t), 2]);       // out of leaf only
+    for (const [geo, flag] of pieces){
+      const tri = worldTris(geo, t.x, t.z);
+      parts.push(tri); flags.push(flag, tri.length / 9);
+      geo.dispose();
+    }
+  }
+  let n = 0; for (const p of parts) n += p.length;
+  const tris = new Float32Array(n), fl = new Uint8Array(n / 9);
+  let o = 0, f = 0;
+  parts.forEach((p, i) => { tris.set(p, o); o += p.length; fl.fill(flags[i * 2], f, f + flags[i * 2 + 1]); f += flags[i * 2 + 1]; });
+  return { tris, flags: fl };
+}
+
+/**
+ * Everything the tracer tests against, and which triangles belong to one
+ * season of a deciduous tree. With no trees this is occluderTriangles() exactly, and no flags.
+ */
+function occluderSet(){
+  const base = occluderTriangles();
+  if (!State.trees.length) return { tris: base, flags: null };
+  const t = treeTriangles();
+  const tris = new Float32Array(base.length + t.tris.length);
+  tris.set(base, 0); tris.set(t.tris, base.length);
+  const flags = new Uint8Array(tris.length / 9);
+  flags.set(t.flags, base.length / 9);
+  return { tris, flags: flags.some(Boolean) ? flags : null };
+}
+
+/**
+ * The light to trace when deciduous trees change through the run. A run that
+ * accumulates months is traced as one list of sky patches and sun bins, so a
+ * crown cannot be in leaf for some hours and bare for others. The days of the
+ * period are split into in-leaf and leaf-off parts (as the heating season is
+ * split at the new year), each part gets its own sky and sun, and the leaf-off
+ * part is flagged so the tracer lets it through the deciduous crowns.
+ * Returns null when nothing needs splitting: no deciduous tree, or a period
+ * entirely in leaf, which then traces exactly as before.
+ */
+function leafSources(sources){
+  if (!State.trees.some(t => t.kind === 'deciduous')) return null;
+  const a = State.analysis;
+  if (a.mode === 'inst'){
+    if (inLeaf(State.doy)) return null;
+    return { dirs: sources.dirs, vals: sources.vals, bare: new Uint8Array(sources.count).fill(1), sunMask: null };
+  }
+  const p = resolvePeriod();
+  const days = p.split ? [[p.from, 365], [1, p.to]] : [[p.from, p.to]];
+  const runs = { on: [], off: [] };
+  for (const [d0, d1] of days){
+    let start = d0, state = inLeaf(d0);
+    for (let d = d0 + 1; d <= d1 + 1; d++){
+      const st = d <= d1 ? inLeaf(d) : !state;
+      if (st !== state){ runs[state ? 'on' : 'off'].push([start, d - 1]); start = d; state = st; }
+    }
+  }
+  if (!runs.off.length) return null;
+  if (!runs.on.length) return { dirs: sources.dirs, vals: sources.vals, bare: new Uint8Array(sources.count).fill(1), sunMask: null };
+
+  const common = skyCommon();
+  const part = (list) => {
+    const mats = list.map(([f, t]) => SkyMatrix.cumulative({ ...common, doyFrom: f, doyTo: t,
+      hourFrom: a.hourFrom, hourTo: a.hourTo }));
+    const nFixed = mats[0].meta.nSky + mats[0].meta.nGround;
+    const nSun = mats.reduce((k, m) => k + m.meta.nSun, 0);
+    const dirs = new Float32Array((nFixed + nSun) * 3), vals = new Float64Array(nFixed + nSun);
+    dirs.set(mats[0].dirs.subarray(0, nFixed * 3));
+    let k = nFixed;
+    for (const m of mats){
+      for (let i = 0; i < nFixed; i++) vals[i] += m.vals[i];
+      dirs.set(m.dirs.subarray(nFixed * 3, (nFixed + m.meta.nSun) * 3), k * 3);
+      vals.set(m.vals.subarray(nFixed, nFixed + m.meta.nSun), k);
+      k += m.meta.nSun;
+    }
+    return { dirs, vals, nFixed, count: nFixed + nSun };
+  };
+  const on = part(runs.on), off = part(runs.off);
+  const n = on.count + off.count;
+  const dirs = new Float32Array(n * 3), vals = new Float64Array(n);
+  const bare = new Uint8Array(n), sunMask = new Uint8Array(n);
+  dirs.set(on.dirs, 0); vals.set(on.vals, 0);
+  dirs.set(off.dirs, on.count * 3); vals.set(off.vals, on.count);
+  bare.fill(1, on.count);
+  sunMask.fill(1, on.nFixed, on.count); sunMask.fill(1, on.count + off.nFixed);
+  return { dirs, vals, bare, sunMask };
+}
+
 /**
  * Triangles the tracer must test against: the model, plus the OpenStreetMap
  * context when "OSM context shades the analysis" is on. The sensor grid is
@@ -20597,6 +20911,10 @@ const State = {
   model: { tris:new Float32Array(0), count:0, area:0, bbox:new THREE.Box3() },
   modelHeight: 24, modelRadius: 24,
   objName: null,
+  /* Shading-only trees: each { shape, height, crown, kind, x, z } in metres, on
+     the site (geographic: Project north does not turn them). */
+  trees: [],
+  leaf: { from: doyOf(5, 1), to: doyOf(10, 31) },   // deciduous trees in leaf
   results: null,
   bvhDirty: true,
   playing: false, animMode: 'day', speed: 1.4, autoRun: false,
@@ -20754,11 +21072,13 @@ const Tracer = (() => {
     return worker;
   }
 
-  function build(tris){
+  function build(tris, flags){
     const w = ensure();
     built = false;
     const copy = tris.slice();
-    w.postMessage({ cmd: 'build', tris: copy }, [copy.buffer]);
+    const msg = { cmd: 'build', tris: copy }, xfer = [copy.buffer];
+    if (flags){ msg.flags = flags.slice(); xfer.push(msg.flags.buffer); }
+    w.postMessage(msg, xfer);
   }
 
   function trace(payload, onProgress){
@@ -20822,13 +21142,18 @@ function setProgress(frac, text){
  * Build the source list (directions + energies) for the current settings.
  * Shared by the analysis run and by the unobstructed reference calculation.
  */
-function buildSources(onProgress){
+/** The sky-matrix options every period shares. */
+function skyCommon(){
   const a = State.analysis;
-  const dome = getDome(a.density);
-  const common = {
-    dome, site: State.site, weather: State.weather, dstHours: State.dstHours,
+  return {
+    dome: getDome(a.density), site: State.site, weather: State.weather, dstHours: State.dstHours,
     groundRefl: a.groundRefl, useGround: a.useGround,
   };
+}
+
+function buildSources(onProgress){
+  const a = State.analysis;
+  const common = skyCommon();
   if (a.mode === 'inst')
     return SkyMatrix.instant({ ...common, doy: State.doy, minutes: State.minutes });
 
@@ -20910,7 +21235,8 @@ async function runAnalysis(){
            context when it is switched on. Sensors come from the model alone, so
            the context shades without ever being measured. */
     if (State.bvhDirty){
-      Tracer.build(occluderTriangles());
+      const occ = occluderSet();
+      Tracer.build(occ.tris, occ.flags);
       State.bvhDirty = false;
     }
     setProgress(0.32, fmtNum(sensors.count) + ' points × ' + fmtNum(sources.count) + ' sky directions…');
@@ -20919,11 +21245,16 @@ async function runAnalysis(){
 
     /* 4 — trace */
     const firstSun = sources.meta.nSky + sources.meta.nGround;
+    // Deciduous trees over a period with and without leaves: the light is
+    // traced in in-leaf and leaf-off parts (see leafSources). Otherwise null,
+    // and the sources go to the tracer exactly as they always have.
+    const leaf = leafSources(sources);
     const res = await Tracer.trace({
       origins: sensors.origins.slice(),
       normals: sensors.normals.slice(),
-      dirs: sources.dirs.slice(),
-      vals: sources.vals.slice(),
+      dirs: (leaf ? leaf.dirs : sources.dirs).slice(),
+      vals: (leaf ? leaf.vals : sources.vals).slice(),
+      ...(leaf ? { bare: leaf.bare, sunMask: leaf.sunMask } : {}),
       shade: a.shade,
       firstSun,
       maxT: Math.max(State.modelRadius * 6, 500),
@@ -21307,6 +21638,10 @@ function exportCSV(){
       ? OsmBuildings.info.count + ' OpenStreetMap buildings,shading the analysis,' +
         (State.analysis.osmShade ? 'yes' : 'no')
       : 'none loaded,shading the analysis,n/a'),
+    '# Trees,' + (State.trees.length
+      ? State.trees.length + ' (shading only; crowns solid in leaf; deciduous in leaf ' +
+        fmtDate(State.leaf.from) + ' to ' + fmtDate(State.leaf.to) + ', trunk and bare limbs otherwise)'
+      : 'none'),
     'x_m,y_m,z_m,nx,ny,nz,area_m2,orientation,value_' + r.unit.replace(/[^\w]/g,'_') + ',direct_component',
   ];
   for (let i = 0; i < r.sensors.count; i++){
@@ -21350,7 +21685,7 @@ function applyTheme(name){
 
   // Retint model materials in place, by the role tagged on them at creation
   const seen = new Set();
-  modelGroup.traverse(o => {
+  [modelGroup, treeGroup].forEach(g => g.traverse(o => {
     if (!o.isMesh) return;
     const mats = Array.isArray(o.material) ? o.material : [o.material];
     for (const m of mats){
@@ -21359,7 +21694,7 @@ function applyTheme(name){
       const hex = t[m.userData.kind || 'building'];
       if (typeof hex === 'number') m.color.setHex(hex);
     }
-  });
+  }));
 
   todayArc = null;
   buildSunPath();
@@ -21647,6 +21982,7 @@ let statusThrottle = 0;
 /** Refresh everything that depends on the current instant. */
 function refresh(force = false){
   const sun = currentSun();
+  syncTreeLeaves();
   updateSunVisuals(sun);
   updateReadout(sun);
   $('v-date').textContent = fmtDate(State.doy);
@@ -22699,7 +23035,7 @@ on('d-radius', 'input', (e) => {
    A one-shot pick: arm it, click the ground, done. The plane is y = 0, so the
    hit is where the cursor meets the site rather than wherever the model
    happens to be tall. */
-let placingTarget = null;                       // 'chart' | 'model' | null
+let placingTarget = null;                       // 'chart' | 'model' | 'tree' | null
 const chartPickRay = new THREE.Raycaster();
 const chartPickPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 
@@ -22709,8 +23045,10 @@ function armPlacement(target){
   $('b-chart-place').classList.toggle('on', target === 'chart');
   const objBtn = $('b-obj-place');
   if (objBtn) objBtn.classList.toggle('on', target === 'model');
+  $('b-tree-place').classList.toggle('on', target === 'tree');
   renderer.domElement.style.cursor = target ? 'crosshair' : '';
-  if (target) toast('Click the spot on the site where the ' +
+  if (target === 'tree') toast('Click the site to place a tree, as many as you need. Escape or the button again to stop.', 'info', 6000);
+  else if (target) toast('Click the spot on the site where the ' +
                     (target === 'chart' ? 'chart' : 'model') +
                     ' should sit. Escape to cancel.', 'info', 6000);
 }
@@ -22727,6 +23065,7 @@ renderer.domElement.addEventListener('pointerdown', (e) => {
     -((e.clientY - r.top) / r.height) * 2 + 1), camera);
   const hit = new THREE.Vector3();
   if (chartPickRay.ray.intersectPlane(chartPickPlane, hit)){
+    if (placingTarget === 'tree'){ addTree(hit.x, hit.z); return; }   // stays armed for the next
     if (placingTarget === 'chart') setChartAt(hit.x, hit.z);
     else placeModelAt(hit.x, hit.z);
   }
@@ -22736,6 +23075,7 @@ renderer.domElement.addEventListener('pointerdown', (e) => {
 on('b-chart-place', 'click', () => armPlacement(placingTarget === 'chart' ? null : 'chart'));
 on('b-chart-centre', 'click', () => { armPlacement(null); setChartAt(0, 0); });
 on('b-obj-place', 'click', () => armPlacement(placingTarget === 'model' ? null : 'model'));
+on('b-tree-place', 'click', () => armPlacement(placingTarget === 'tree' ? null : 'tree'));
 on('b-obj-centre', 'click', () => {
   armPlacement(null);
   const it = objItems[objActive];
@@ -22779,6 +23119,76 @@ addEventListener('scroll', () => {
     if (shell.scrollTop || shell.scrollLeft){ shell.scrollTop = 0; shell.scrollLeft = 0; }
   }, { passive: true });
 }
+
+/* ---- trees: new ones take the settings; a selected one is edited by them ---- */
+let treeActive = -1;
+function treeSettings(){
+  const num = (id, lo, hi, d) => { const v = parseFloat($(id).value); return isFinite(v) ? clamp(v, lo, hi) : d; };
+  return { shape: $('i-tree-shape').value, kind: $('i-tree-kind').value,
+           height: num('i-tree-h', 2, 40, 8), crown: num('i-tree-w', 1, 25, 6) };
+}
+function treesChanged(){
+  State.bvhDirty = true;              // the occluder set changed
+  buildTrees();
+  renderTreeList();
+  updateSunVisuals(currentSun());     // the shadow map is only redrawn on request
+  requestRender();
+}
+function addTree(x, z){
+  State.trees.push({ ...treeSettings(), x, z });
+  treeActive = -1;
+  treesChanged();
+}
+function removeTree(i){
+  State.trees.splice(i, 1);
+  if (treeActive === i) treeActive = -1; else if (treeActive > i) treeActive--;
+  treesChanged();
+}
+function renderTreeList(){
+  const box = $('tree-list');
+  box.innerHTML = '';
+  State.trees.forEach((t, i) => {
+    const chip = document.createElement('div');
+    chip.className = 'chip' + (i === treeActive ? ' on' : '');
+    chip.innerHTML = '<span class="cname"></span><button class="cx" title="Remove" aria-label="Remove tree ' + (i + 1) + '">&times;</button>';
+    const nm = chip.querySelector('.cname');
+    nm.textContent = (i + 1) + ' · ' + TREE_SHAPES[t.shape] + ' · ' + fmtNum(t.height, 1) + ' m · \u2300 ' +
+      fmtNum(t.crown, 1) + ' m · ' + t.kind;
+    nm.title = TREE_SHAPES[t.shape] + ' ' + t.kind + ' tree, ' + fmtNum(t.height, 1) + ' m tall, crown ' +
+      fmtNum(t.crown, 1) + ' m wide. Click to edit it with the settings above.';
+    nm.onclick = () => {
+      treeActive = treeActive === i ? -1 : i;
+      if (treeActive >= 0){
+        $('i-tree-shape').value = t.shape; $('i-tree-kind').value = t.kind;
+        $('i-tree-h').value = t.height; $('i-tree-w').value = t.crown;
+        Selects.syncAll();
+      }
+      renderTreeList();
+    };
+    chip.querySelector('.cx').onclick = () => removeTree(i);
+    box.appendChild(chip);
+  });
+  $('b-tree-clear').disabled = !State.trees.length;
+  $('tree-sel-note').style.display = treeActive >= 0 ? '' : 'none';
+}
+['i-tree-shape', 'i-tree-kind', 'i-tree-h', 'i-tree-w'].forEach(id => on(id, 'change', () => {
+  const v = treeSettings();
+  $('i-tree-h').value = v.height; $('i-tree-w').value = v.crown;
+  if (treeActive < 0) return;
+  Object.assign(State.trees[treeActive], v);
+  treesChanged();
+}));
+on('b-tree-clear', 'click', () => { State.trees = []; treeActive = -1; treesChanged(); });
+const isoOfDoy = (d) => { const m = dateOfDoy(d); return YEAR + '-' + String(m.month).padStart(2, '0') + '-' + String(m.day).padStart(2, '0'); };
+$('i-leaf-from').value = isoOfDoy(State.leaf.from);
+$('i-leaf-to').value = isoOfDoy(State.leaf.to);
+['i-leaf-from', 'i-leaf-to'].forEach(id => on(id, 'change', (e) => {
+  const v = e.target.value.split('-');
+  if (v.length !== 3) return;
+  State.leaf[id === 'i-leaf-from' ? 'from' : 'to'] = doyOf(+v[1], +v[2]);
+  refresh();                          // shows or hides the crowns, and their shadows
+  requestRender();
+}));
 
 on('i-ctx-osm', 'change', (e) => {
   State.analysis.osmShade = e.target.checked;
@@ -23647,6 +24057,7 @@ function init(){
     State, SolarCore, EPW, Perez, ClearSky, SkyMatrix,
     buildSkyDome, buildSources, unobstructed, buildSensorGrid,
     runAnalysis, applyEPW, setDoy, setMinutes, loadSample, refresh,
+    addTree, removeTree, leafSources, occluderSet, inLeaf, treeGeometry,
     exportSheet, applyTheme, THEMES, getTheme: () => THEME.name,
     Tour, TOUR_KEY, setUiTheme, currentUiTheme, UI_THEME_KEY,
     Basemap, Mercator, TILE_SOURCES, loadBasemapTiles, pickPlace, runSearch, Selects,

@@ -742,7 +742,7 @@ DNI = G_on · τ_b,   G_on = 1367 · (1 + 0.033 cos(2π·doy/365))</pre>
         <div><span class="sl-chip is-out">Out</span><dt>Atmospheric turbidity as a variable</dt><dd>Under a climate file, turbidity enters only as whatever is already implicit in the measured DNI and DHI. Under the clear-sky fallback it is fixed by Hottel's 23 km visibility atmosphere and cannot be adjusted — there is no turbidity input anywhere in the interface.</dd></div>
         <div><span class="sl-chip is-out">Out</span><dt>Altitude correction beyond Hottel's</dt><dd>Site elevation enters the clear-sky model only, through Hottel's A term, clamped to 2.5 km. Searching a place reads it from the embedded topography grid, to 50 m, and flags it for checking. With an EPW loaded, elevation comes from the header and is used for nothing at all.</dd></div>
         <div><span class="sl-chip is-out">Out</span><dt>Snow albedo, seasonal or otherwise</dt><dd>Ground reflectance is a single number for the whole run. It cannot vary by month, so a winter cumulative figure for a snow-covered site is wrong in a direction the tool cannot correct.</dd></div>
-        <div><span class="sl-chip is-out">Out</span><dt>Tree canopy and vegetation</dt><dd>No trees, no partial transmission, no seasonal leaf cover. Overpass is queried for buildings alone. A deciduous street would have to be modelled as OBJ solids, and would then shade the whole year identically.</dd></div>
+        <div><span class="sl-chip is-part">Partly</span><dt>Trees and vegetation</dt><dd>Single trees can be placed by hand, in the <b>Trees</b> section: a trunk and a crown, round, conical or columnar, with a height (2–40 m) and a crown width (1–25 m), evergreen or deciduous. Like the context they shade and are never measured. Two simplifications: <b>in leaf, a crown is solid</b> — no light passes through it, so its shade is a little overstated, where a real crown lets some through; and <b>a deciduous tree out of leaf shades with its trunk and five forked limbs</b>, a stand-in for the many finer twigs of a real one, whose shade depends on the species. On the reference box at noon in January, a bare 10 m tree blocks about a fifth of the sunlight it blocks in leaf. Deciduous trees are in leaf from 1 May to 31 October unless the dates are changed. A cumulative run that spans both is traced in two parts, in-leaf and leaf-off, each with its own sky and sun, which adds up exactly to running the parts separately. The crown forms are simple: a round crown is as tall as it is wide unless that would leave the trunk under a quarter of the height, when it is flattened; a conical crown runs from a fifth of the height to the top; a columnar crown is a straight-sided column with a domed top, from an eighth of the height. Deciduous crowns are drawn a lighter green. Overpass is still queried for buildings alone: trees mapped in OpenStreetMap are not loaded.</dd></div>
         <div><span class="sl-chip is-out">Out</span><dt>Sensors on context geometry</dt><dd>Sensors come from your model alone. You cannot read a number off a neighbour, and the context contributes no measured area to any statistic.</dd></div>
         <div><span class="sl-chip is-part">Note</span><dt>Calendar</dt><dd>A flat 365-day year. 29 February is dropped from any EPW, and daylight saving shifts the clock for the instantaneous view but is applied throughout a cumulative run as a single constant offset, not as a seasonal rule.</dd></div>
       </dl>
@@ -852,7 +852,7 @@ DNI = G_on · τ_b,   G_on = 1367 · (1 + 0.033 cos(2π·doy/365))</pre>
           <tr><td><b>Context is an occluder, never a sensor</b></td><td>You cannot read a number off a neighbouring building, and the context contributes no measured area to any statistic.</td><td class="sl-n">05, 06c</td></tr>
           <tr><td><b>OpenStreetMap heights are incomplete</b></td><td>Untagged buildings are drawn at a default 8 m. The panel reports how many were guessed, and that count should be read before relying on an overshadowing result.</td><td class="sl-n">08</td></tr>
           <tr><td><b>Context is capped</b></td><td>1,200 buildings within 600 m. A denser or wider city is truncated, and the panel says so.</td><td class="sl-n">08</td></tr>
-          <tr><td><b>No vegetation</b></td><td>Overpass is queried for buildings alone. A tree modelled as a solid would shade the whole year identically, which no deciduous tree does.</td><td class="sl-n">05</td></tr>
+          <tr><td><b>Trees are simple, and solid in leaf</b></td><td>A placed tree is a trunk and one of three crown forms. In leaf its crown passes no light, so its shade is a little overstated; out of leaf a deciduous tree shades with its trunk and a few bare limbs. Trees in OpenStreetMap are not loaded.</td><td class="sl-n">05</td></tr>
           <tr><td><b>A flat 365-day year</b></td><td>29 February is dropped from any EPW, and daylight saving is a constant offset rather than a seasonal rule.</td><td class="sl-n">04, 05</td></tr>
         </tbody>
       </table></div>
@@ -964,6 +964,8 @@ out geom;</pre>
           <tr><td>OBJ rotation</td><td class="sl-d">0°</td><td class="sl-n">−180 – 180</td><td>1° steps, about the model's own centre</td></tr>
           <tr><td>Drop to ground</td><td class="sl-d">on</td><td class="sl-n">on / off</td><td>Sits the model on y = 0</td></tr>
           <tr><td>Centre under the sun path</td><td class="sl-d">on</td><td class="sl-n">on / off</td><td>Off lets you place it by hand</td></tr>
+          <tr><td>Trees</td><td class="sl-d">none</td><td class="sl-n">round / conical / columnar</td><td>Height 2–40 m, crown width 1–25 m, evergreen or deciduous. Placed by clicking the site; shade only, never measured; they stay put when Project north turns the model.</td></tr>
+          <tr><td>Deciduous in leaf</td><td class="sl-d">1 May – 31 October</td><td class="sl-n">any dates</td><td>Outside these dates a deciduous tree shades with its trunk and a few bare limbs. The season may wrap the new year, for a southern-hemisphere site.</td></tr>
         </tbody>
         <caption>Several OBJ files can be loaded at once, each with its own scale, rotation and position.</caption>
       </table></div>
@@ -1294,6 +1296,7 @@ out geom;</pre>
         <tr><td>Sky density — Tregenza 145 or Reinhart 577</td><td class="sl-p"># Sky</td></tr>
         <tr><td>Ground reflectance</td><td class="sl-p"># Sky</td></tr>
         <tr><td>Whether OpenStreetMap context was shading the run</td><td class="sl-p"># Context</td></tr>
+        <tr><td>How many trees were shading, and the leaf season</td><td class="sl-p"># Trees</td></tr>
         <tr><td>Grid size</td><td class="sl-p"># Analysis</td></tr>
       </tbody>
       <caption>The same header also carries the site and its coordinates, the analysis period, the unit, and the number of context buildings loaded. Exported images and study sheets carry the equivalent in their title block.</caption>

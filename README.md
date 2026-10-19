@@ -28,6 +28,7 @@ Below: the first-load state (London, clear-sky model) and the phone layout.
 |---|---|
 | **Site basemap** | Put the model on its real site: OpenStreetMap tiles, **a tile service of your own**, or an image you upload scaled by its real-world width. Shadows fall across the map, and the required credit appears on screen and in exports. The app holds no map key of its own — aerial imagery goes through a small proxy on your own server, so nothing secret is in the page. |
 | **3D city context** | **OpenStreetMap + 3D buildings** extrudes the surrounding footprints from their `height` and `building:levels` tags, fetched from the Overpass API with no key. They cast shadows, and a switch decides whether they shade the analysis — so you can show the same massing with and without its neighbours. |
+| **Trees** | Place single trees on the site — round, conical or columnar, any height and crown width, evergreen or deciduous. They shade the analysis and the 3D view but are never measured; a deciduous crown is there from May to October (editable) and its trunk and bare limbs shade the rest of the year. |
 | **Saved locations** | Search a place, check its time zone once, then save it by name — coordinates, time zone and elevation together — and it stays in the city list. |
 | **2D stereographic sun path** | The classic printed sun-path chart — horizon on the outer circle, zenith at the centre — laid flat on the site. Engages automatically in top view, or switch it on in any view. |
 | **Dark and light presentation** | The whole interface and the 3D scene switch together, live — dark for the studio and the lecture theatre, light for print, handouts and projectors that wash out. The choice is remembered, and exports default to whichever is on screen. |
@@ -178,6 +179,13 @@ only your model is measured — and the exported CSV records which way the switc
 Comparing the two runs is a good exercise in itself.
 
 Building data © OpenStreetMap contributors, ODbL.
+
+**Trees** — open *Trees* in the right panel, set the crown shape, height, crown width and
+whether the tree is evergreen or deciduous, press *Place trees…* and click the site; each
+click places one, Escape stops. Click a tree in the list to edit it, × to remove it. Trees
+shade like the context and are never measured. In leaf a crown is solid, so its shade is a
+little overstated; a deciduous tree out of leaf (in leaf 1 May – 31 October unless changed)
+shades with its trunk and a few bare limbs. The exported CSV records the trees and the leaf season.
 
 ### Aerial imagery, with the key on your server
 

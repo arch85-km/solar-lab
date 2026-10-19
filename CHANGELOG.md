@@ -8,6 +8,21 @@ in general rather than one build, use the concept DOI
 
 ## Unreleased
 
+- **Added** trees, for shading only. In the new *Trees* section, set a crown
+  shape (round, conical or columnar), height, crown width and evergreen or
+  deciduous, then click the site to place each tree; click one in the list to
+  edit it. Trees shade the analysis and the 3D view like the OpenStreetMap
+  context and are never measured. In leaf a crown is solid; a deciduous tree
+  out of leaf (in leaf 1 May – 31 October by default, editable) shades with its
+  trunk and five forked bare limbs, drawn in the view as well. Deciduous
+  crowns are drawn a lighter green, since in leaf the two kinds shade alike.
+  A cumulative run spanning both is traced in in-leaf and leaf-off
+  parts. On the reference box, a 10 m round tree 6 m south of it cuts the south
+  face's year from 1,089 to 908 kWh/m² evergreen and 992 deciduous, and the
+  deciduous year equals its parts run separately. With no trees, every result
+  is identical to before: compared value by value, the difference is zero.
+- **Changed** the placing buttons (*Place model*, the chart's, *Place trees*)
+  show while they wait for a click on the site.
 - **Added** a message over the model when the browser runs scripts without
   its compiler, as Microsoft Edge's "Enhance your security on the web" does
   for sites it does not know. Every run then takes about thirteen times as

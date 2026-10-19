@@ -60,8 +60,14 @@ application script, named as below so it can be found by search.
 2. **Sensors.** `buildSensorGrid()` lays sensors over the model's own
    triangles, offset slightly off each surface.
 3. **Occluders.** `occluderTriangles()` collects the model, plus the
-   OpenStreetMap context when that switch is on. Context shades the model but
-   carries no sensors of its own.
+   OpenStreetMap context when that switch is on; `occluderSet()` adds the
+   placed trees (`treeTriangles()`) and flags each deciduous crown (1) and its
+   bare limbs (2). Context and
+   trees shade the model but carry no sensors of its own. When a deciduous
+   tree meets a run that spans both leaf states, `leafSources()` rebuilds the
+   light in in-leaf and leaf-off parts and marks the leaf-off directions, which
+   the worker lets through the crowns; every other direction passes through the
+   limbs. Otherwise the sources go to the worker unchanged.
 4. **Trace.** `Tracer` hands the triangles to the worker, which builds the
    BVH and answers, for each sensor and source, whether the way is clear.
    Each sensor's value is the cosine-weighted sum of the sources it can see.
