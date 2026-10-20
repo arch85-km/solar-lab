@@ -6,6 +6,18 @@ DOI resolves to the archived copy of exactly that build. To cite the software
 in general rather than one build, use the concept DOI
 [10.5281/zenodo.22812939](https://doi.org/10.5281/zenodo.22812939).
 
+## Unreleased
+
+- **Changed** the buildings proxy has a ceiling for the whole site as well as
+  for each visitor: past 1,000 fetches from Overpass in an hour it fetches
+  nothing new for anyone and the page asks Overpass itself, while answers it
+  already keeps are still served. Its kept answers are held under 200 MB: a
+  new one that takes the folder past that removes the oldest first. A script
+  sending a forged Referer could otherwise fill the disk, keep PHP busy or
+  wear out this server's welcome at Overpass from many addresses at once.
+  Two new checks in `tests/overpass-proxy.mjs`, which fail without the
+  limits. Nothing changes for the app or for the Privacy page.
+
 ## [1.3.0](https://github.com/arch85-km/solar-lab/releases/tag/v1.3.0) — 19 October 2026
 
 Version DOI [10.5281/zenodo.23482443](https://doi.org/10.5281/zenodo.23482443)

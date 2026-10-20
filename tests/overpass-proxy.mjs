@@ -76,6 +76,11 @@ const LIMITS = join(dir, 'limits');
 mkdirSync(LIMITS);
 swap('$LIMIT_DIR = sys_get_temp_dir();', '$LIMIT_DIR = ' + JSON.stringify(LIMITS) + ';');
 writeFileSync(join(dir, 'overpass-proxy.php'), php);
+// A second copy with a tiny cache ceiling and a folder of its own, to see the
+// oldest answers go when a new one takes the folder past it
+writeFileSync(join(dir, 'overpass-proxy-cap.php'),
+  php.replace('$CACHE_MAX_MB = 200;', '$CACHE_MAX_MB = 0.002;')
+     .replace("$CACHE_DIR = __DIR__ . '/overpass-cache';", "$CACHE_DIR = __DIR__ . '/overpass-cache-cap';"));
 
 const port = 20000 + Math.floor(Math.random() * 20000);
 const server = spawn('php', ['-S', '127.0.0.1:' + port, '-t', dir],
@@ -205,7 +210,7 @@ try {
   let names = readdirSync(LIMITS);
   const keyName = names.find((f) => /-key$/.test(f)) || '';
   const hour = (keyName.match(/^sunstudio-overpass-(\d{10})-key$/) || [])[1] || '';
-  const counts = names.filter((f) => f.endsWith('.cnt'));
+  const counts = names.filter((f) => f.endsWith('.cnt') && !f.endsWith('-all.cnt'));
   const plain = [IP, createHash('sha1').update(IP).digest('hex'), createHash('sha256').update(IP).digest('hex')];
   check('a visitor\'s count is filed under a keyed hash, not the address or a plain hash of it',
         !!hour && counts.length === 1 && names.every((f) => plain.every((x) => !f.includes(x))),
@@ -232,6 +237,17 @@ try {
         over.status === 429 && hits.u1 + hits.u2 + hits.u3 === 0,
         'status ' + over.status + ', Overpass asked ' + (hits.u1 + hits.u2 + hits.u3) + '×');
 
+  // The whole site's ceiling: past it, nothing new is fetched for anyone, and
+  // what is already kept is still served
+  for (const f of readdirSync(LIMITS)) if (f.endsWith('.cnt')) rmSync(join(LIMITS, f));
+  writeFileSync(join(LIMITS, 'sunstudio-overpass-' + hour + '-all.cnt'), '1000');
+  reset();
+  const capped = await ask('48.870000,2.340000,48.873594,2.345470');
+  const keptStill = await ask(BOX4);
+  check('past 1,000 fetches in the hour for the whole site, nothing new is fetched; kept answers still are served',
+        capped.status === 429 && hits.u1 + hits.u2 + hits.u3 === 0 && keptStill.status === 200 && keptStill.cache === 'hit',
+        'new box ' + capped.status + ', Overpass asked ' + (hits.u1 + hits.u2 + hits.u3) + '×; a kept box ' + keptStill.cache);
+
   // A new hour, a new key: its first fetch makes one
   for (const f of readdirSync(LIMITS)) rmSync(join(LIMITS, f));
   const fresh = await ask('48.860000,2.340000,48.863594,2.345470');
@@ -239,6 +255,27 @@ try {
   check('the key is random and made afresh: a new hour\'s key differs from the last',
         fresh.status === 200 && key2.length === 32 && !key2.equals(key),
         '32 random bytes, different from the previous key');
+
+  // The cache ceiling (about 2 KB in this copy): three old answers are planted,
+  // a fourth is fetched, and the oldest go first until the folder is under it
+  for (const f of readdirSync(LIMITS)) rmSync(join(LIMITS, f));
+  const CAP = join(dir, 'overpass-cache-cap');
+  mkdirSync(CAP, { recursive: true });
+  const G = '<?php http_response_code(404); exit; ?>\n', pad = (n) => JSON.stringify({ elements: [], pad: 'x'.repeat(n) });
+  const planted = ['a', 'b', 'c'].map((n, i) => {
+    const f = join(CAP, n.repeat(40) + '.php');
+    writeFileSync(f, G + pad(700));
+    const t = Date.now() / 1000 - (3 - i) * 3600;  // a oldest, then b, then c
+    utimesSync(f, t, t);
+    return f;
+  });
+  const capAsk = await fetch(BASE + '/overpass-proxy-cap.php?bbox=48.880000,2.340000,48.883594,2.345470', { headers: { Referer: PAGE } });
+  const left = readdirSync(CAP).filter((f) => f.endsWith('.php'));
+  let bytes = 0; for (const f of left) bytes += readFileSync(join(CAP, f)).length;
+  check('past the cache ceiling the oldest answers are removed first, and the new one is kept',
+        capAsk.status === 200 && !existsSync(planted[0]) && existsSync(planted[2]) && left.length >= 2 && bytes <= 0.002 * 1048576,
+        'kept ' + left.length + ' answers, ' + bytes + ' bytes against a ' + Math.round(0.002 * 1048576) +
+        '-byte ceiling; the oldest ' + (existsSync(planted[0]) ? 'still there' : 'gone'));
 
   // A POST is not how the page asks
   const post = await fetch(BASE + '/overpass-proxy.php?bbox=' + BOX, { method: 'POST', headers: { Referer: PAGE } });

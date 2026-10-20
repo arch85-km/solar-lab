@@ -54,6 +54,16 @@ $MAX_SIDE_M = 1500;
  *  through one shared address. */
 $MAX_FETCHES_PER_HOUR = 300;
 
+/** Requests to Overpass all visitors together may cause per hour. A ceiling on
+ *  the whole site, whatever addresses the requests come from: it keeps this
+ *  server's use of the public Overpass service modest and its PHP workers free
+ *  for the rest of the site. Past it, the page asks Overpass itself. */
+$MAX_FETCHES_ALL_PER_HOUR = 1000;
+
+/** Largest size of the kept answers, in megabytes. A new answer that takes the
+ *  folder past it removes the oldest ones first, down to nine tenths. */
+$CACHE_MAX_MB = 200;
+
 /** Where the hour's counts are kept: the server's temporary folder, which is
  *  never served to the web. Nothing written there outlives its hour. */
 $LIMIT_DIR = sys_get_temp_dir();
@@ -107,6 +117,45 @@ const GUARD = "<?php http_response_code(404); exit; ?>\n";
 function cached(string $path): string {
     $s = (string)@file_get_contents($path);
     return strncmp($s, GUARD, strlen(GUARD)) === 0 ? substr($s, strlen(GUARD)) : '';
+}
+
+/** Add one to a count kept in a file, holding the file while doing it. */
+function bump(string $path): void {
+    $fh = @fopen($path, 'c+');
+    if (!$fh) return;
+    flock($fh, LOCK_EX);
+    $n = (int)stream_get_contents($fh);
+    ftruncate($fh, 0);
+    rewind($fh);
+    fwrite($fh, (string)($n + 1));
+    fflush($fh);
+    flock($fh, LOCK_UN);
+    fclose($fh);
+}
+
+/**
+ * Keep the kept answers under $maxBytes: past it, remove the oldest first (the
+ * least recently fetched) down to nine tenths, never the one just written.
+ */
+function trim_cache(string $dir, int $maxBytes, string $keep): void {
+    $files = [];
+    $total = 0;
+    foreach ((array)glob($dir . '/*.php') as $f) {
+        if (!is_string($f) || strpos(basename($f), '.tmp.') !== false) continue;
+        $size = (int)@filesize($f);
+        $files[] = [(int)@filemtime($f), $size, $f];
+        $total += $size;
+    }
+    if ($total <= $maxBytes) return;
+    sort($files);                                  // oldest first
+    foreach ($files as [$when, $size, $f]) {
+        if ($total <= $maxBytes * 0.9) break;
+        if ($f === $keep) continue;
+        if (@unlink($f)) {
+            $total -= $size;
+            @unlink(substr($f, 0, -4) . '.lock');
+        }
+    }
 }
 
 /** A usable Overpass answer: JSON with an elements list and no runtime error. */
@@ -223,12 +272,19 @@ if (strlen($limitKey) !== 32) {
 }
 $ip = (string)($_SERVER['REMOTE_ADDR'] ?? 'unknown');
 $bucket = $LIMIT_DIR . '/sunstudio-overpass-' . $hour . '-' . hash_hmac('sha256', $ip, $limitKey) . '.cnt';
+// The whole site's count for the hour: a number and nothing else.
+$allBucket = $LIMIT_DIR . '/sunstudio-overpass-' . $hour . '-all.cnt';
+if ((int)@file_get_contents($allBucket) >= $MAX_FETCHES_ALL_PER_HOUR) {
+    if ($age !== null) answer(cached($file), 'stale', 'cache', $age);
+    fail(429, 'This site\'s building requests for the hour are used up.', 600);
+}
 $count = (int)@file_get_contents($bucket);
 if ($count >= $MAX_FETCHES_PER_HOUR) {
     if ($age !== null) answer(cached($file), 'stale', 'cache', $age);
     fail(429, 'Building request limit reached for this hour.', 600);
 }
 @file_put_contents($bucket, (string)($count + 1), LOCK_EX);
+bump($allBucket);
 
 /* ── ask Overpass ──────────────────────────────────────────────────────── */
 
@@ -257,6 +313,7 @@ foreach ($UPSTREAMS as $url) {
         // Written to a temporary name and moved, so a reader never sees half a file.
         $tmp = $CACHE_DIR . '/' . $key . '.' . getmypid() . '.tmp.php';
         if (@file_put_contents($tmp, GUARD . $body) !== false) @rename($tmp, $file);
+        trim_cache($CACHE_DIR, (int)($CACHE_MAX_MB * 1048576), $file);
         // Now and then, drop answers nobody has refreshed in 90 days and their
         // locks, so the folder cannot grow without limit.
         if (mt_rand(1, 50) === 1) {
